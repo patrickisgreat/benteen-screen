@@ -2,7 +2,7 @@
   "name": "pelicula",
   "version": "1.0.0",
   "description": "The ultimate PWA for movie night polls.",
-  "author": "Alex Imbrea",
+  "author": "Paddy Bee",
   "private": true,
   "scripts": {
     "dev": "nuxt",
