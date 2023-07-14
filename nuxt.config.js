@@ -19,7 +19,7 @@ const config = {
       {
         hid: 'description',
         name: 'description',
-        content: 'The ultimate PWA for movie night polls.'
+        content: 'I Really Whips the Movies Ass!'
       }
     ],
     link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }]
