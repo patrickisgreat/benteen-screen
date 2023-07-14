@@ -12,7 +12,7 @@ const config = {
    ** Headers of the page
    */
   head: {
-    title: 'Película',
+    title: 'BTSOG',
     meta: [
       { charset: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },

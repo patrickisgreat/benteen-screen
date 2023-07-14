@@ -4,7 +4,7 @@
       <div class="container">
         <div class="navbar-brand">
           <nuxt-link class="navbar-item" to="/overview">
-            <img src="~assets/pelicula_logo_white.png" alt="Película" />
+            <h1 class="title">BSOTG</h1>
           </nuxt-link>
           <a
             role="button"

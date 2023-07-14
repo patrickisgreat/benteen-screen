@@ -4,21 +4,23 @@
       <div class="hero-body">
         <div class="container has-text-centered">
           <h1 class="title">
-            <img class="hero__logo" src="~assets/pelicula_logo_white.png" alt="Película" />
+            Benteen Screen On the Green
           </h1>
+          <br />
+          <br />
           <h2 class="subtitle">
-            <b-button class="is-large hero__btn" inverted @click="goToApp">GO TO THE DEMO APP</b-button>
+            <b-button class="is-large hero__btn" inverted @click="goToApp">GET STARTED</b-button>
           </h2>
         </div>
       </div>
-      <div class="hero-footer">
+      <!-- <div class="hero-footer">
         <div v-scroll-to="'#instructions'" class="container has-text-centered">
           <b-icon icon="chevron-down" size="is-large" class="scroll-down__arrow bounce" />
         </div>
-      </div>
+      </div> -->
     </section>
 
-    <section id="instructions" class="section is-medium is-light">
+    <!-- <section id="instructions" class="section is-medium is-light">
       <div class="container">
         <div class="columns is-centered is-vcentered has-text-centered">
           <div class="column">
@@ -95,14 +97,14 @@
       <div class="container has-text-centered">
         Made with ❤️ in 🇳🇱
       </div>
-    </footer>
+    </footer> -->
   </main>
 </template>
 
 <style lang="scss">
 @import '~/assets/scss/gradients.scss';
 .hero {
-  background-image: url('../assets/landing-0.jpeg');
+  background-image: url('../assets/xp.jpg');
   background-size: cover;
 
   .hero__logo {
