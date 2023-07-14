@@ -12,14 +12,14 @@ const config = {
    ** Headers of the page
    */
   head: {
-    title: 'BTSOG',
+    title: 'Benteen Screen On The Green',
     meta: [
       { charset: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       {
         hid: 'description',
         name: 'description',
-        content: 'I Really Whips the Movies Ass!'
+        content: 'It Really Whips the Movies Ass!'
       }
     ],
     link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }]
