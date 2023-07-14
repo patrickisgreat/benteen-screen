@@ -22,7 +22,7 @@ const config = {
         content: 'It Really Whips the Movies Ass!'
       }
     ],
-    link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }]
+    link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico?v=2' }]
   },
 
   /*
