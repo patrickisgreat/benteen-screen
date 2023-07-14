@@ -1,7 +1,7 @@
 <template>
   <article class="media">
-    <figure class="media-left is-hidden-mobile image is-96x96">
-      <img :src="`https://image.tmdb.org/t/p/w500/${suggestion.suggestedItem.poster_path}`" />
+    <figure class="is-hidden-mobile image is-96x96">
+        <img :src="`https://image.tmdb.org/t/p/w500/${suggestion.suggestedItem.poster_path}`" />
     </figure>
 
     <div class="media-content">
