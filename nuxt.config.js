@@ -12,7 +12,7 @@ const config = {
    ** Headers of the page
    */
   head: {
-    title: 'Benteen Screen On The Green',
+    title: 'Benteen Screen On The',
     meta: [
       { charset: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
