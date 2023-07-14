@@ -4,5 +4,6 @@ export interface Event {
   id: string;
   timestamp: Timestamp | number;
   date: Date;
+  title: string;
   description: string;
 }

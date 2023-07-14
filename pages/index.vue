@@ -2,9 +2,9 @@
   <main>
     <section class="hero is-fullheight">
       <div class="hero-body">
-        <div class="container has-text-centered">
+        <div class="container has-text-centered sub-hero">
           <h1 class="title">
-            Benteen Screen On the Green
+            <img class="hero__logo" src="~assets/transparent_logo.png" alt="Benteen Screen On the Green" />
           </h1>
           <br />
           <br />
@@ -103,14 +103,22 @@
 
 <style lang="scss">
 @import '~/assets/scss/gradients.scss';
+
 .hero {
-  background-image: url('../assets/xp.jpg');
+  background-image: url('../assets/xp.png');
   background-size: cover;
+
+  .title {
+    margin-bottom: -4rem;
+  }
+
+  .sub-hero {
+    margin-top: 8rem;
+  }
 
   .hero__logo {
     min-width: 20rem;
     max-width: 33%;
-    margin-bottom: 5rem;
   }
 
   .hero__btn {

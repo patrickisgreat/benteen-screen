@@ -6,8 +6,11 @@
           <p class="modal-card-title">Add event</p>
         </header>
         <section class="modal-card-body">
+          <b-field label="Title">
+            <b-input v-model="event.title" type="text"> </b-input>
+          </b-field>
           <b-field label="Description">
-            <b-input v-model="event.description" type="text"> </b-input>
+            <b-input v-model="event.description" type="textarea"> </b-input>
           </b-field>
         </section>
         <footer class="modal-card-foot">
@@ -19,6 +22,7 @@
   </b-modal>
 </template>
 
+
 <script lang="ts">
 import { Component, Vue, Prop, Emit } from 'vue-property-decorator';
 
@@ -26,6 +30,7 @@ import { Component, Vue, Prop, Emit } from 'vue-property-decorator';
 export default class AddEventModal extends Vue {
   @Prop() isActive: boolean;
   event = {
+    title: '',
     description: ''
   };
 
@@ -40,3 +45,4 @@ export default class AddEventModal extends Vue {
   }
 }
 </script>
+

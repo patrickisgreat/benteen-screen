@@ -35,12 +35,13 @@ export const actions: ActionTree<State, State> = {
       .collection('events')
       .orderBy('timestamp')
       .get();
-    const events: Event[] = eventsSnapshot.docs.map((event: QueryDocumentSnapshot) => {
-      const eventData: DocumentData = event.data();
-      const timestamp: Timestamp = eventData.timestamp;
-      const date: Date = new Date(timestamp.seconds * 1000 + timestamp.nanoseconds);
-      return { id: event.id, timestamp, date, description: eventData.description };
-    });
+      const events: Event[] = eventsSnapshot.docs.map((event: QueryDocumentSnapshot) => {
+        const eventData: DocumentData = event.data();
+        const timestamp: Timestamp = eventData.timestamp;
+        const date: Date = new Date(timestamp.seconds * 1000 + timestamp.nanoseconds);
+        return { id: event.id, timestamp, date, title: eventData.title, description: eventData.description };
+      });
+  
 
     commit('setEvents', events);
     commit('setLoading', false);
@@ -50,11 +51,17 @@ export const actions: ActionTree<State, State> = {
     dispatch('getEvents');
   },
   async updateEvent({ dispatch }, event) {
+    // Separate out 'editedTitle', 'editedDescription' and 'editMode' properties which shouldn't be stored in Firebase
+    const { editMode, editedTitle, editedDescription, ...eventToUpdate } = event;
+
     await firestore
-      .collection('events')
-      .doc(event.id)
-      .set(event);
-    dispatch('getEvents');
+    .collection('events')
+    .doc(event.id)
+    .update({
+      title: event.title,
+      description: event.description
+    });
+  dispatch('getEvents');
   },
   async deleteEvent({ dispatch }, event) {
     await firestore
