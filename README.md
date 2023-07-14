@@ -14,7 +14,7 @@ Perfect for tech startups who organize movie nights with the colleagues. The ope
 The initial version will use Firebase as the realtime backend provider, but with the community help it can be backend agnostic in the future.
 
 
-## La Película 
+## YAY SAAS
 
 SaaS offering hosted by us featuring recurrent movie nights, API integrations and AI-augmented suggestions based on previous choices, genres and critic scores.
 
