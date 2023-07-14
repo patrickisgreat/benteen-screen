@@ -8,6 +8,7 @@ const config = {
     ]
   ],
   mode: 'spa',
+
   /*
    ** Headers of the page
    */
