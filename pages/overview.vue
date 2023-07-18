@@ -32,7 +32,6 @@
                 {{ event.date.toLocaleDateString() }}
               </p>
               <h2 class="title">{{ event.title }}</h2>
-              
             </header>
           </template>
           <template v-slot:default>
@@ -118,7 +117,6 @@
   transform: scaleY(0);
   transform-origin: center top;
 }
-
 </style>
 
 <script lang="ts">
@@ -168,20 +166,45 @@ export default class Overview extends Vue {
       .orderBy("votesCount", "desc")
       .orderBy("createdAt", "asc")
       .onSnapshot(async (suggestions: QuerySnapshot) => {
-        const suggestionsArr = [];
-        for (const suggestionDocument of suggestions.docs) {
+        let userReferences = [];
+
+        // Map over suggestions to create an array of suggestion data and userReferences
+        let suggestionsArr = suggestions.docs.map((suggestionDocument) => {
           const { suggestedItem, userReference, votes } =
             suggestionDocument.data();
-          const user = await userReference.get();
-          const suggestion = {
+
+          userReferences.push(userReference);
+
+          return {
             id: suggestionDocument.id,
             suggestedItem,
-            user: { id: user.id, ...user.data() },
+            userReference,
             votes,
           };
-          suggestionsArr.push(suggestion);
-        }
-        this.suggestions = suggestionsArr.sort();
+        });
+
+        // Remove duplicates from userReferences
+        userReferences = [...new Set(userReferences)];
+
+        // Fetch all users at once
+        let users = await Promise.all(userReferences.map((ref) => ref.get()));
+
+        // Map user documents to their IDs for easy access
+        let userMap = {};
+        users.forEach((userDoc) => {
+          userMap[userDoc.id] = userDoc.data();
+        });
+
+        // Map over suggestionsArr to replace userReference with actual user data
+        suggestionsArr = suggestionsArr.map((suggestion) => {
+          return {
+            ...suggestion,
+            user: userMap[suggestion.userReference.id],
+          };
+        });
+        // Sort the suggestions by vote count
+        suggestionsArr.sort((a, b) => b.votes.length - a.votes.length); 
+        this.suggestions = suggestionsArr;
       });
   }
 

@@ -69,6 +69,26 @@
           >Add new</b-button
         >
       </card>
+      <card>
+        <template v-if="!currentDateEvents.length">
+          No events on this date.
+        </template>
+        <template v-else>
+          <h3>Suggestions for selected event:</h3>
+          <div v-for="(suggestion, index) in suggestions" :key="index">
+            <!-- Display suggestion title -->
+            <h4>{{ suggestion.suggestedItem.title }}</h4>
+
+            <!-- Display user who made the suggestion -->
+            <p>Suggested by: {{ suggestion.userReference }}</p>
+
+            <!-- Display number of votes -->
+            <p>Votes: {{ suggestion.votes.length }}</p>
+
+            <!-- Add any other suggestion details here -->
+          </div>
+        </template>
+      </card>
     </div>
     <add-event-modal
       :is-active="isEventModalActive"
@@ -81,12 +101,14 @@
 <style lang="scss"></style>
 
 <script lang="ts">
-import { Component, Vue } from "vue-property-decorator";
+import { Component, Vue, Watch } from "vue-property-decorator";
+import firestore from "@/plugins/firestore";
 import Card from "@/components/Card.vue";
 import Calendar from "@/components/Calendar.vue";
 import AddEventModal from "@/components/AddEventModal.vue";
 import { Event } from "@/types/event";
 import { isSameDay } from "@/helpers/datetime";
+import { QuerySnapshot } from "@firebase/firestore-types";
 
 @Component({
   components: {
@@ -98,8 +120,84 @@ import { isSameDay } from "@/helpers/datetime";
 export default class Admin extends Vue {
   calendarDate: Date = new Date();
   isEventModalActive = false;
+  event: Event = null;
+  suggestions = [];
+  eventSuggestionsListener = null;
 
   editingEvents = {};
+
+  get selectedEvent(): Event | null {
+    const currentDateEvents = this.currentDateEvents;
+    return currentDateEvents.length > 0 ? currentDateEvents[0] : null;
+  }
+
+  @Watch("selectedEvent")
+  onSelectedEventChange(selectedEvent) {
+    this.event = selectedEvent;
+  }
+
+  @Watch("event")
+  eventChange(event) {
+    if (event === null) {
+      console.log("No event selected");
+      // Detach listener if it exists.
+      if (this.eventSuggestionsListener) {
+        this.eventSuggestionsListener();
+        this.eventSuggestionsListener = null;
+      }
+      // Clear suggestions as there is no selected event.
+      this.suggestions = [];
+    } else {
+      console.log("STUFF", event.id);
+      if (this.eventSuggestionsListener) this.eventSuggestionsListener();
+      this.eventSuggestionsListener = firestore
+        .collection(`events/${event.id}/suggestions`)
+        .onSnapshot(async (suggestions: QuerySnapshot) => {
+          let suggestionsArr = [];
+          let userReferences = [];
+
+          // Map over suggestions to create an array of suggestion data and userReferences
+          suggestions.docs.forEach((suggestionDocument) => {
+            const { suggestedItem, userReference, votes } =
+              suggestionDocument.data();
+
+            suggestionsArr.push({
+              id: suggestionDocument.id,
+              suggestedItem,
+              userReference,
+              votes,
+            });
+
+            userReferences.push(userReference);
+          });
+
+          // Remove duplicates from userReferences
+          userReferences = [...new Set(userReferences)];
+
+          // Fetch all users at once
+          let users = await Promise.all(userReferences.map((ref) => ref.get()));
+
+          // Map user documents to their IDs for easy access
+          let userMap = {};
+          users.forEach((userDoc) => {
+            userMap[userDoc.id] = userDoc.data();
+          });
+
+          // Map over suggestionsArr to replace userReference with actual user data
+          suggestionsArr = suggestionsArr.map((suggestion) => {
+            // Extract userReference from the suggestion
+            const { userReference, ...suggestionWithoutUserReference } =
+              suggestion;
+            return {
+              ...suggestionWithoutUserReference,
+              user: userMap[userReference.id],
+            };
+          });
+
+          this.suggestions = suggestionsArr;
+        });
+    }
+  }
 
   toggleEditMode(event) {
     if (this.editingEvents[event.id]) {
@@ -141,7 +239,7 @@ export default class Admin extends Vue {
         editedDescription: event.description,
       }));
   }
-  
+
   async addNewEvent(event) {
     try {
       await this.$store.dispatch("events/addEvent", {
@@ -183,6 +281,24 @@ export default class Admin extends Vue {
 
   deleteEvent(event) {
     this.$store.dispatch("events/deleteEvent", event);
+  }
+
+  async deleteSuggestion(suggestion) {
+    try {
+      // Here you'll need to call your backend service to delete the suggestion
+      // Remember that this is a soft delete, so you probably want to just set a flag in your DB
+      await this.$store.dispatch(
+        "suggestions/softDeleteSuggestion",
+        suggestion.id
+      );
+      this.$buefy.toast.open({
+        message: "Suggestion deleted",
+      });
+    } catch (e) {
+      this.$buefy.toast.open({
+        message: "Error while deleting suggestion",
+      });
+    }
   }
 }
 </script>
