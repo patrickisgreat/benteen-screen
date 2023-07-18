@@ -55,7 +55,7 @@
         </card>
       </div>
 
-      <div class="columns is-mobile">
+      <!-- <div class="columns is-mobile">
         <card title="Suggest a movie">
           <preliminary-suggestion-media-object
             v-if="selectedPreliminarySuggestion"
@@ -70,7 +70,7 @@
             @select="(selected) => (selectedPreliminarySuggestion = selected)"
           />
         </card>
-      </div>
+      </div> -->
     </template>
     <template v-else>
       <p>No events available.</p>
