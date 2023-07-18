@@ -163,6 +163,7 @@ export default class Overview extends Vue {
     if (this.eventSuggestionsListener) this.eventSuggestionsListener();
     this.eventSuggestionsListener = firestore
       .collection(`events/${event.id}/suggestions`)
+      .where('deleted', '==', false)
       .orderBy("votesCount", "desc")
       .orderBy("createdAt", "asc")
       .onSnapshot(async (suggestions: QuerySnapshot) => {
@@ -241,6 +242,8 @@ export default class Overview extends Vue {
       await firestore.collection(`events/${this.event.id}/suggestions`).add({
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         userReference: firestore.doc(`users/${this.user.uid}`),
+        userEmail: firestore.doc(`users/${this.user.email}`),
+        deleted: false,
         suggestedItem: suggestion,
         votesCount: 0,
         votes: [],

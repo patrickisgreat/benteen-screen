@@ -75,16 +75,28 @@
         </template>
         <template v-else>
           <h3>Suggestions for selected event:</h3>
-          <div v-for="(suggestion, index) in suggestions" :key="index">
+          <div
+            v-for="(suggestion, index) in suggestions"
+            :key="index"
+            class="admin-list-card"
+          >
             <!-- Display suggestion title -->
-            <h4>{{ suggestion.suggestedItem.title }}</h4>
+            <h4>Title: {{ suggestion.suggestedItem.title }}</h4>
 
             <!-- Display user who made the suggestion -->
-            <p>Suggested by: {{ suggestion.userReference }}</p>
+            <p><b>Suggested by:</b> {{ suggestion.userEmail }}</p>
 
             <!-- Display number of votes -->
             <p>Votes: {{ suggestion.votes.length }}</p>
 
+            <!-- Soft delete button -->
+            <button v-if="!suggestion.deleted" @click="softDelete(suggestion)">
+              Delete
+            </button>
+
+            <!-- Undelete button -->
+            <button v-else @click="undelete(suggestion)">Undelete</button>
+            <br />
             <!-- Add any other suggestion details here -->
           </div>
         </template>
@@ -98,7 +110,13 @@
   </section>
 </template>
 
-<style lang="scss"></style>
+<style lang="scss">
+.admin-list-card {
+  margin-bottom: 30px;
+  background-color: #d0cece;
+  padding: 10px;
+}
+</style>
 
 <script lang="ts">
 import { Component, Vue, Watch } from "vue-property-decorator";
@@ -148,7 +166,6 @@ export default class Admin extends Vue {
       // Clear suggestions as there is no selected event.
       this.suggestions = [];
     } else {
-      console.log("STUFF", event.id);
       if (this.eventSuggestionsListener) this.eventSuggestionsListener();
       this.eventSuggestionsListener = firestore
         .collection(`events/${event.id}/suggestions`)
@@ -158,12 +175,14 @@ export default class Admin extends Vue {
 
           // Map over suggestions to create an array of suggestion data and userReferences
           suggestions.docs.forEach((suggestionDocument) => {
-            const { suggestedItem, userReference, votes } =
+            const { suggestedItem, userReference, votes, userEmail, deleted } =
               suggestionDocument.data();
 
             suggestionsArr.push({
               id: suggestionDocument.id,
               suggestedItem,
+              userEmail,
+              deleted,
               userReference,
               votes,
             });
@@ -193,6 +212,14 @@ export default class Admin extends Vue {
               user: userMap[userReference.id],
             };
           });
+
+          // Sort suggestions by userEmail
+          suggestionsArr.sort((a, b) => {
+            // Use the localeCompare method to compare strings in case-sensitive manner
+            return a.userEmail.localeCompare(b.userEmail);
+          });
+
+          this.suggestions = suggestionsArr;
 
           this.suggestions = suggestionsArr;
         });
@@ -282,21 +309,78 @@ export default class Admin extends Vue {
   deleteEvent(event) {
     this.$store.dispatch("events/deleteEvent", event);
   }
+  async updateAllSuggestions() {
+    // 1. Fetch all events
+    const eventsSnapshot = await firestore.collection("events").get();
 
-  async deleteSuggestion(suggestion) {
+    // Iterate through all events
+    for (let eventDoc of eventsSnapshot.docs) {
+      const eventId = eventDoc.id;
+
+      // 2. Fetch all suggestions for this event
+      const suggestionsSnapshot = await firestore
+        .collection(`events/${eventId}/suggestions`)
+        .get();
+
+      // Iterate through all suggestions
+      for (let suggestionDoc of suggestionsSnapshot.docs) {
+        const suggestionId = suggestionDoc.id;
+        const suggestionData = suggestionDoc.data();
+
+        // 3. Fetch the user who added this suggestion
+        const userDoc = await suggestionData.userReference.get();
+        const userData = userDoc.data();
+
+        // 4. Update this suggestion with user's email and 'deleted' field
+        await firestore
+          .collection(`events/${eventId}/suggestions`)
+          .doc(suggestionId)
+          .update({
+            userEmail: userData.email, // assuming the user's document contains an 'email' field
+            deleted: false,
+          });
+      }
+    }
+  }
+
+  async softDelete(suggestion) {
     try {
-      // Here you'll need to call your backend service to delete the suggestion
-      // Remember that this is a soft delete, so you probably want to just set a flag in your DB
-      await this.$store.dispatch(
-        "suggestions/softDeleteSuggestion",
-        suggestion.id
-      );
+      await this.$store.dispatch("events/softDeleteSuggestion", {
+        eventId: this.event.id,
+        suggestionId: suggestion.id,
+      });
+
+      // Only update the local state if Firestore update was successful
+      suggestion.deleted = true;
+
       this.$buefy.toast.open({
         message: "Suggestion deleted",
       });
     } catch (e) {
       this.$buefy.toast.open({
         message: "Error while deleting suggestion",
+        type: "is-danger",
+      });
+    }
+  }
+
+  async undelete(suggestion) {
+    try {
+      await this.$store.dispatch("events/undeleteSuggestion", {
+        eventId: this.event.id,
+        suggestionId: suggestion.id,
+      });
+
+      // Only update the local state if Firestore update was successful
+      suggestion.deleted = false;
+
+      this.$buefy.toast.open({
+        message: "Suggestion undeleted",
+      });
+    } catch (e) {
+      this.$buefy.toast.open({
+        message: "Error while undeleting suggestion",
+        type: "is-danger",
       });
     }
   }
