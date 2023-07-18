@@ -46,10 +46,26 @@ export const actions: ActionTree<State, State> = {
     commit('setEvents', events);
     commit('setLoading', false);
   },
+
+  async softDeleteSuggestion({ commit }, { eventId, suggestionId }) {
+    // Get a reference to the Firestore document
+    const docRef = firestore.collection(`events/${eventId}/suggestions`).doc(suggestionId);
+    
+    // Update Firestore and return the Promise
+    return docRef.update({ deleted: true });
+  },
+
+  async undeleteSuggestion({ commit }, { eventId, suggestionId }) {
+    const docRef = firestore.collection(`events/${eventId}/suggestions`).doc(suggestionId);
+    
+    return docRef.update({ deleted: false });
+  },
+
   async addEvent({ dispatch }, event) {
     await firestore.collection('events').add(event);
     dispatch('getEvents');
   },
+
   async updateEvent({ dispatch }, event) {
     // Separate out 'editedTitle', 'editedDescription' and 'editMode' properties which shouldn't be stored in Firebase
     const { editMode, editedTitle, editedDescription, ...eventToUpdate } = event;
