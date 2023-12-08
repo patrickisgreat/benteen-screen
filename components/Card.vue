@@ -29,3 +29,11 @@ export default class Card extends Vue {
   @Prop() customClass;
 }
 </script>
+
+
+<style scoped>
+.card-header-title {
+  text-align: center;
+  /* Additional styling as needed */
+}
+</style>
