@@ -84,11 +84,17 @@
   margin-bottom: 10px; // Adjust as needed
   display: flex;
   padding: 15px;
+  justify-content: space-between;
+  flex: 2.6 1 70%;
 }
 
 .description {
   font-size: 1em; // Adjust as needed
   color: grey; // Adjust as needed
+  width: 70%;
+  margin-left: 15%;
+  font-weight: bold;
+  padding-bottom: 20px;
 }
 
 .list-enter-active,
@@ -146,6 +152,21 @@ export default class Overview extends Vue {
   eventSuggestionsListener = null;
   votingLimitsEnabled = false;
 
+  logSuggestionsData(suggestionsArr) {
+    if (!suggestionsArr || !Array.isArray(suggestionsArr)) {
+      console.log(
+        "logSuggestionsData: No suggestions array or not an array.",
+        suggestionsArr
+      );
+      return;
+    }
+
+    suggestionsArr.forEach((suggestion, index) => {
+      console.log(`Suggestion ${index}:`, suggestion);
+      console.log(`User data for Suggestion ${index}:`, suggestion.user);
+    });
+  }
+
   async created() {
     await this.$store.dispatch("events/getEvents");
     if (this.events.length) this.selectEvent();
@@ -163,49 +184,36 @@ export default class Overview extends Vue {
     if (this.eventSuggestionsListener) this.eventSuggestionsListener();
     this.eventSuggestionsListener = firestore
       .collection(`events/${event.id}/suggestions`)
-      .where('deleted', '==', false)
+      .where("deleted", "==", false)
       .orderBy("votesCount", "desc")
       .orderBy("createdAt", "asc")
-      .onSnapshot(async (suggestions: QuerySnapshot) => {
-        let userReferences = [];
+      .onSnapshot(async (suggestionsSnapshot) => {
+        let suggestions = [];
+        let userFetchPromises = [];
 
-        // Map over suggestions to create an array of suggestion data and userReferences
-        let suggestionsArr = suggestions.docs.map((suggestionDocument) => {
-          const { suggestedItem, userReference, votes } =
-            suggestionDocument.data();
-
-          userReferences.push(userReference);
-
-          return {
-            id: suggestionDocument.id,
-            suggestedItem,
-            userReference,
-            votes,
-          };
+        // Iterate over each suggestion and prepare to fetch user data
+        suggestionsSnapshot.forEach((doc) => {
+          const suggestion = doc.data();
+          suggestion.id = doc.id;
+          suggestions.push(suggestion);
+          userFetchPromises.push(suggestion.userReference.get());
         });
 
-        // Remove duplicates from userReferences
-        userReferences = [...new Set(userReferences)];
+        const users = await Promise.all(userFetchPromises);
 
-        // Fetch all users at once
-        let users = await Promise.all(userReferences.map((ref) => ref.get()));
-
-        // Map user documents to their IDs for easy access
-        let userMap = {};
-        users.forEach((userDoc) => {
-          userMap[userDoc.id] = userDoc.data();
+        // Map user data back to suggestions
+        suggestions = suggestions.map((suggestion, index) => {
+          const userData = users[index].data();
+          console.log("userData", userData);
+          return { ...suggestion, user: userData };
         });
 
-        // Map over suggestionsArr to replace userReference with actual user data
-        suggestionsArr = suggestionsArr.map((suggestion) => {
-          return {
-            ...suggestion,
-            user: userMap[suggestion.userReference.id],
-          };
+        // Sort the suggestions
+        this.suggestions = suggestions.sort((a, b) => {
+          const voteDifference = b.votesCount - a.votesCount;
+          if (voteDifference !== 0) return voteDifference;
+          return a.createdAt.seconds - b.createdAt.seconds; // Adjust if your timestamp format is different
         });
-        // Sort the suggestions by vote count
-        suggestionsArr.sort((a, b) => b.votes.length - a.votes.length); 
-        this.suggestions = suggestionsArr;
       });
   }
 

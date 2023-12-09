@@ -1,13 +1,19 @@
 <template>
   <article class="media">
-    <figure class="media-left is-hidden-mobile">
-      <p class="image is-128x128">
-        <img :src="`https://image.tmdb.org/t/p/w500/${suggestionItem.poster_path}`" />
+    <figure class="media-left">
+      <p class="image is-128x128 thumbnail-image">
+        <img
+          :src="`https://image.tmdb.org/t/p/w500/${suggestionItem.poster_path}`"
+        />
       </p>
     </figure>
     <div class="media-content">
       <div class="content">
-        <h3>{{ suggestionItem.title }} ({{ suggestionItem.release_date.split('-')[0] }})</h3>
+        <h3>
+          {{ suggestionItem.title }} ({{
+            suggestionItem.release_date.split("-")[0]
+          }})
+        </h3>
         <strong>IMDb score: {{ suggestionItem.vote_average }}</strong>
         <br />
         <strong>Popularity: {{ suggestionItem.popularity.toFixed(1) }}</strong>
@@ -16,11 +22,18 @@
           <br />
           {{ suggestionItem.overview }}
         </p>
-        <a :href="`https://www.themoviedb.org/movie/${suggestionItem.id}`" target="_blank">
+        <a
+          :href="`https://www.themoviedb.org/movie/${suggestionItem.id}`"
+          target="_blank"
+        >
           Find more
           <b-icon icon="open-in-new" size="is-small"> </b-icon>
         </a>
-        <b-button type="is-primary" class="is-pulled-right" :disabled="alreadySuggested" @click="$emit('suggest', suggestionItem)"
+        <b-button
+          type="is-primary"
+          class="is-pulled-right"
+          :disabled="alreadySuggested"
+          @click="$emit('suggest', suggestionItem)"
           >Suggest</b-button
         >
       </div>
@@ -31,8 +44,22 @@
   </article>
 </template>
 
+<style lang="scss">
+.thumbnail-image {
+  display: block; // Ensures the image is displayed
+  width: 128px; // Default size
+  height: 128px; // Default size
+}
+
+@media (max-width: 768px) {
+  .thumbnail-image {
+    width: 250px;
+  }
+}
+</style>
+
 <script lang="ts">
-import { Component, Vue, Prop } from 'vue-property-decorator';
+import { Component, Vue, Prop } from "vue-property-decorator";
 
 @Component
 export default class PreliminarySuggestionMediaObject extends Vue {

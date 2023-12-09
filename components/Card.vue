@@ -3,8 +3,11 @@
     <div class="card" :class="customClass">
       <slot name="header">
         <header class="card-header">
-          <p v-if="title" class="card-header-title has-text-grey">{{ title }}</p>
-          <slot name="description"></slot> <!-- Add this line -->
+          <p v-if="title" class="card-header-title has-text-grey">
+            {{ title }}
+          </p>
+          <slot name="description"></slot>
+          <!-- Add this line -->
         </header>
       </slot>
       <div class="card-content">
@@ -20,7 +23,7 @@
 </template>
 
 <script lang="ts">
-import { Component, Vue, Prop } from 'vue-property-decorator';
+import { Component, Vue, Prop } from "vue-property-decorator";
 
 @Component
 export default class Card extends Vue {
@@ -30,10 +33,8 @@ export default class Card extends Vue {
 }
 </script>
 
-
 <style scoped>
 .card-header-title {
   text-align: center;
-  /* Additional styling as needed */
 }
 </style>
