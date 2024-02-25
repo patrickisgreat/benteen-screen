@@ -155,71 +155,34 @@ export default class Admin extends Vue {
   }
 
   @Watch("event")
-  eventChange(event) {
+  async eventChange(event) {
     if (event === null) {
       console.log("No event selected");
-      // Detach listener if it exists.
       if (this.eventSuggestionsListener) {
         this.eventSuggestionsListener();
         this.eventSuggestionsListener = null;
       }
-      // Clear suggestions as there is no selected event.
       this.suggestions = [];
     } else {
       if (this.eventSuggestionsListener) this.eventSuggestionsListener();
       this.eventSuggestionsListener = firestore
         .collection(`events/${event.id}/suggestions`)
-        .onSnapshot(async (suggestions: QuerySnapshot) => {
+        .onSnapshot(async (suggestionsSnapshot: QuerySnapshot) => {
           let suggestionsArr = [];
-          let userReferences = [];
-
-          // Map over suggestions to create an array of suggestion data and userReferences
-          suggestions.docs.forEach((suggestionDocument) => {
-            const { suggestedItem, userReference, votes, userEmail, deleted } =
-              suggestionDocument.data();
+          suggestionsSnapshot.docs.forEach(async (doc) => {
+            const suggestion = doc.data();
+            // Assuming 'userReference' is a path to the user's document
+            const userDoc = await suggestion.userReference.get();
+            const userEmail = userDoc.exists
+              ? userDoc.data().email
+              : "No email found"; // Make sure the user document has an 'email' field
 
             suggestionsArr.push({
-              id: suggestionDocument.id,
-              suggestedItem,
-              userEmail,
-              deleted,
-              userReference,
-              votes,
+              ...suggestion,
+              userEmail, // Directly using the email string
+              id: doc.id,
             });
-
-            userReferences.push(userReference);
           });
-
-          // Remove duplicates from userReferences
-          userReferences = [...new Set(userReferences)];
-
-          // Fetch all users at once
-          let users = await Promise.all(userReferences.map((ref) => ref.get()));
-
-          // Map user documents to their IDs for easy access
-          let userMap = {};
-          users.forEach((userDoc) => {
-            userMap[userDoc.id] = userDoc.data();
-          });
-
-          // Map over suggestionsArr to replace userReference with actual user data
-          suggestionsArr = suggestionsArr.map((suggestion) => {
-            // Extract userReference from the suggestion
-            const { userReference, ...suggestionWithoutUserReference } =
-              suggestion;
-            return {
-              ...suggestionWithoutUserReference,
-              user: userMap[userReference.id],
-            };
-          });
-
-          // Sort suggestions by userEmail
-          suggestionsArr.sort((a, b) => {
-            // Use the localeCompare method to compare strings in case-sensitive manner
-            return a.userEmail.localeCompare(b.userEmail);
-          });
-
-          this.suggestions = suggestionsArr;
 
           this.suggestions = suggestionsArr;
         });
