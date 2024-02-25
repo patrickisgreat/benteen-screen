@@ -171,15 +171,14 @@ export default class Admin extends Vue {
           let suggestionsArr = [];
           suggestionsSnapshot.docs.forEach(async (doc) => {
             const suggestion = doc.data();
-            // Assuming 'userReference' is a path to the user's document
             const userDoc = await suggestion.userReference.get();
             const userEmail = userDoc.exists
               ? userDoc.data().email
-              : "No email found"; // Make sure the user document has an 'email' field
+              : "No email found";
 
             suggestionsArr.push({
               ...suggestion,
-              userEmail, // Directly using the email string
+              userEmail,
               id: doc.id,
             });
           });
@@ -193,13 +192,11 @@ export default class Admin extends Vue {
     if (this.editingEvents[event.id]) {
       this.updateEvent(event);
     } else {
-      // If we're not editing this event, clone it into the editingEvents.
       this.$set(this.editingEvents, event.id, Object.assign({}, event));
     }
   }
 
   cancelEdit(event) {
-    // Remove the event from the editingEvents, cancelling the edit.
     this.$delete(this.editingEvents, event.id);
   }
 
