@@ -88,12 +88,14 @@
 
             <!-- Display number of votes -->
             <p>Votes: {{ suggestion.votes.length }}</p>
-           <div v-if="suggestion.votes.length">
-             <p><b>Voters:</b></p>
-             <ul>
-               <li v-for="voter in suggestion.voters" :key="voter">{{ voter }}</li>
-             </ul>
-           </div>
+            <div v-if="suggestion.votes.length">
+              <p><b>Voters:</b></p>
+              <ul>
+                <li v-for="voter in suggestion.voters" :key="voter">
+                  {{ voter }}
+                </li>
+              </ul>
+            </div>
 
             <!-- Soft delete button -->
             <button v-if="!suggestion.deleted" @click="softDelete(suggestion)">
@@ -194,18 +196,19 @@ export default class Admin extends Vue {
 
           this.suggestions = suggestionsArr;
         });
-    },
-    async fetchVoters(voteIds) {
-      const voters = [];
-      if (voteIds && voteIds.length) {
-        const voterPromises = voteIds.map(async (userId) => {
-          const userDoc = await firestore.collection('users').doc(userId).get();
-          return userDoc.exists ? userDoc.data().username : 'Unknown';
-        });
-        return Promise.all(voterPromises);
-      }
-      return voters;
     }
+  }
+
+  async fetchVoters(voteIds) {
+    const voters = [];
+    if (voteIds && voteIds.length) {
+      const voterPromises = voteIds.map(async (userId) => {
+        const userDoc = await firestore.collection("users").doc(userId).get();
+        return userDoc.exists ? userDoc.data().username : "Unknown";
+      });
+      return Promise.all(voterPromises);
+    }
+    return voters;
   }
 
   toggleEditMode(event) {
