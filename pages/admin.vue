@@ -296,7 +296,7 @@ export default class Admin extends Vue {
           .collection(`events/${eventId}/suggestions`)
           .doc(suggestionId)
           .update({
-            userEmail: userData.email, // assuming the user's document contains an 'email' field
+            userEmail: userData.email,
             deleted: false,
           });
       }
