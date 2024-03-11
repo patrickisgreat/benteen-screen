@@ -88,6 +88,17 @@
 
             <!-- Display number of votes -->
             <p>Votes: {{ suggestion.votes.length }}</p>
+            <div v-if="suggestion.votes.length">
+              <p><b>Voters:</b></p>
+              <ul>
+                <li
+                  v-for="(voter, index) in suggestion.voters"
+                  :key="`voter-${index}`"
+                >
+                  {{ voter }}
+                </li>
+              </ul>
+            </div>
 
             <!-- Soft delete button -->
             <button v-if="!suggestion.deleted" @click="softDelete(suggestion)">
@@ -176,16 +187,36 @@ export default class Admin extends Vue {
               ? userDoc.data().email
               : "No email found";
 
+            const voters = await this.fetchVoters(suggestion.votes);
+
             suggestionsArr.push({
               ...suggestion,
               userEmail,
               id: doc.id,
+              voters,
             });
           });
 
           this.suggestions = suggestionsArr;
         });
     }
+  }
+
+  async fetchVoters(voteObjects) {
+    const voters = [];
+    if (voteObjects && voteObjects.length) {
+      const voterPromises = voteObjects.map(async (voteObj) => {
+        // Using voteObj.userReference directly since it's a document reference
+        const userDoc = await voteObj.userReference.get();
+        // Log to see if userDoc is being fetched correctly
+        console.log(
+          `Fetching user document: ${voteObj.userReference.path}, Found: ${userDoc.exists}`
+        );
+        return userDoc.exists ? userDoc.data().displayName : "Unknown";
+      });
+      return Promise.all(voterPromises);
+    }
+    return voters;
   }
 
   toggleEditMode(event) {
@@ -296,7 +327,7 @@ export default class Admin extends Vue {
           .collection(`events/${eventId}/suggestions`)
           .doc(suggestionId)
           .update({
-            userEmail: userData.email, // assuming the user's document contains an 'email' field
+            userEmail: userData.email,
             deleted: false,
           });
       }
