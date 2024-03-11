@@ -91,7 +91,10 @@
             <div v-if="suggestion.votes.length">
               <p><b>Voters:</b></p>
               <ul>
-                <li v-for="(voter, index) in suggestion.voters" :key="`voter-${index}`">
+                <li
+                  v-for="(voter, index) in suggestion.voters"
+                  :key="`voter-${index}`"
+                >
                   {{ voter }}
                 </li>
               </ul>
@@ -177,14 +180,14 @@ export default class Admin extends Vue {
         .collection(`events/${event.id}/suggestions`)
         .onSnapshot(async (suggestionsSnapshot: QuerySnapshot) => {
           let suggestionsArr = [];
-          for (const doc of suggestionsSnapshot.docs) {
+          suggestionsSnapshot.docs.forEach(async (doc) => {
             const suggestion = doc.data();
             const userDoc = await suggestion.userReference.get();
             const userEmail = userDoc.exists
               ? userDoc.data().email
               : "No email found";
 
-            const voters = await this.fetchVoters(suggestion.votes); // Ensure this is awaited properly
+            const voters = await this.fetchVoters(suggestion.votes);
 
             suggestionsArr.push({
               ...suggestion,
@@ -204,7 +207,7 @@ export default class Admin extends Vue {
     if (voteIds && voteIds.length) {
       const voterPromises = voteIds.map(async (voteRef) => {
         // Assuming voteRef is a document reference, we need to extract the document ID
-        const userId = typeof voteRef === 'string' ? voteRef : voteRef.id;
+        const userId = typeof voteRef === "string" ? voteRef : voteRef.id;
         const userDoc = await firestore.collection("users").doc(userId).get();
         return userDoc.exists ? userDoc.data().username : "Unknown";
       });
