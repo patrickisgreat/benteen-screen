@@ -31,4 +31,4 @@ $ yarn run dev
 
 # generate static project
 $ yarn run generate
-```
+```yarn

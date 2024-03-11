@@ -178,16 +178,16 @@ export default class Admin extends Vue {
       if (this.eventSuggestionsListener) this.eventSuggestionsListener();
       this.eventSuggestionsListener = firestore
         .collection(`events/${event.id}/suggestions`)
-        .onSnapshot(async (suggestionsSnapshot: QuerySnapshot, suggestion) => {
+        .onSnapshot(async (suggestionsSnapshot: QuerySnapshot) => {
           let suggestionsArr = [];
-          for (const doc of suggestionsSnapshot.docs) {
+          suggestionsSnapshot.docs.forEach(async (doc) => {
             const suggestion = doc.data();
             const userDoc = await suggestion.userReference.get();
             const userEmail = userDoc.exists
               ? userDoc.data().email
               : "No email found";
 
-            const voters = await this.fetchVoters(suggestion.votes); // Ensure this is awaited properly
+            const voters = await this.fetchVoters(suggestion.votes);
 
             suggestionsArr.push({
               ...suggestion,
@@ -202,14 +202,17 @@ export default class Admin extends Vue {
     }
   }
 
-  async fetchVoters(voteIds) {
+  async fetchVoters(voteObjects) {
     const voters = [];
-    if (voteIds && voteIds.length) {
-      const voterPromises = voteIds.map(async (voteRef) => {
-        // Assuming voteRef is a document reference, we need to extract the document ID
-        const userId = typeof voteRef === "string" ? voteRef : voteRef.id;
-        const userDoc = await firestore.collection("users").doc(userId).get();
-        return userDoc.exists ? userDoc.data().username : "Unknown";
+    if (voteObjects && voteObjects.length) {
+      const voterPromises = voteObjects.map(async (voteObj) => {
+        // Using voteObj.userReference directly since it's a document reference
+        const userDoc = await voteObj.userReference.get();
+        // Log to see if userDoc is being fetched correctly
+        console.log(
+          `Fetching user document: ${voteObj.userReference.path}, Found: ${userDoc.exists}`
+        );
+        return userDoc.exists ? userDoc.data().displayName : "Unknown";
       });
       return Promise.all(voterPromises);
     }
