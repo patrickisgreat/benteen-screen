@@ -182,11 +182,7 @@ export default class Admin extends Vue {
               ? userDoc.data().email
               : "No email found";
 
-            let voters = [];
-            if (suggestion.votes && suggestion.votes.length) {
-              const voterPromises = suggestion.votes.map(voteRef => voteRef.get().then(voteDoc => voteDoc.exists ? voteDoc.data().username : 'Unknown'));
-              voters = await Promise.all(voterPromises);
-            }
+            const voters = await this.fetchVoters(suggestion.votes);
 
             suggestionsArr.push({
               ...suggestion,
@@ -198,6 +194,17 @@ export default class Admin extends Vue {
 
           this.suggestions = suggestionsArr;
         });
+    },
+    async fetchVoters(voteIds) {
+      const voters = [];
+      if (voteIds && voteIds.length) {
+        const voterPromises = voteIds.map(async (userId) => {
+          const userDoc = await firestore.collection('users').doc(userId).get();
+          return userDoc.exists ? userDoc.data().username : 'Unknown';
+        });
+        return Promise.all(voterPromises);
+      }
+      return voters;
     }
   }
 
