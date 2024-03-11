@@ -177,14 +177,14 @@ export default class Admin extends Vue {
         .collection(`events/${event.id}/suggestions`)
         .onSnapshot(async (suggestionsSnapshot: QuerySnapshot) => {
           let suggestionsArr = [];
-          suggestionsSnapshot.docs.forEach(async (doc) => {
+          for (const doc of suggestionsSnapshot.docs) {
             const suggestion = doc.data();
             const userDoc = await suggestion.userReference.get();
             const userEmail = userDoc.exists
               ? userDoc.data().email
               : "No email found";
 
-            const voters = await this.fetchVoters(suggestion.votes);
+            const voters = await this.fetchVoters(suggestion.votes); // Ensure this is awaited properly
 
             suggestionsArr.push({
               ...suggestion,
