@@ -91,7 +91,7 @@
             <div v-if="suggestion.votes.length">
               <p><b>Voters:</b></p>
               <ul>
-                <li v-for="voter in suggestion.voters" :key="voter">
+                <li v-for="(voter, index) in suggestion.voters" :key="`voter-${index}`">
                   {{ voter }}
                 </li>
               </ul>
