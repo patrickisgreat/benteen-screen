@@ -202,7 +202,9 @@ export default class Admin extends Vue {
   async fetchVoters(voteIds) {
     const voters = [];
     if (voteIds && voteIds.length) {
-      const voterPromises = voteIds.map(async (userId) => {
+      const voterPromises = voteIds.map(async (voteRef) => {
+        // Assuming voteRef is a document reference, we need to extract the document ID
+        const userId = typeof voteRef === 'string' ? voteRef : voteRef.id;
         const userDoc = await firestore.collection("users").doc(userId).get();
         return userDoc.exists ? userDoc.data().username : "Unknown";
       });
