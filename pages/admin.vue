@@ -178,7 +178,7 @@ export default class Admin extends Vue {
       if (this.eventSuggestionsListener) this.eventSuggestionsListener();
       this.eventSuggestionsListener = firestore
         .collection(`events/${event.id}/suggestions`)
-        .onSnapshot(async (suggestionsSnapshot: QuerySnapshot) => {
+        .onSnapshot(async (suggestionsSnapshot: QuerySnapshot, suggestion) => {
           let suggestionsArr = [];
           for (const doc of suggestionsSnapshot.docs) {
             const suggestion = doc.data();
