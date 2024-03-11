@@ -88,6 +88,12 @@
 
             <!-- Display number of votes -->
             <p>Votes: {{ suggestion.votes.length }}</p>
+           <div v-if="suggestion.votes.length">
+             <p><b>Voters:</b></p>
+             <ul>
+               <li v-for="voter in suggestion.voters" :key="voter">{{ voter }}</li>
+             </ul>
+           </div>
 
             <!-- Soft delete button -->
             <button v-if="!suggestion.deleted" @click="softDelete(suggestion)">
@@ -176,10 +182,17 @@ export default class Admin extends Vue {
               ? userDoc.data().email
               : "No email found";
 
+            let voters = [];
+            if (suggestion.votes && suggestion.votes.length) {
+              const voterPromises = suggestion.votes.map(voteRef => voteRef.get().then(voteDoc => voteDoc.exists ? voteDoc.data().username : 'Unknown'));
+              voters = await Promise.all(voterPromises);
+            }
+
             suggestionsArr.push({
               ...suggestion,
               userEmail,
               id: doc.id,
+              voters,
             });
           });
 
