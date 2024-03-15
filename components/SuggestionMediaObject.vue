@@ -98,13 +98,6 @@ export default class SuggestionMediaObject extends Vue {
   }
 
   isUserSuggestion() {
-    console.log("Suggestion User ID:", this.suggestion.user?.id);
-    console.log("Current User ID:", this.user?.uid);
-    console.log(
-      "User Suggestion Comparison:",
-      this.suggestion.user?.id === this.user?.uid
-    );
-    console.log("USER", this.suggestion.user);
     return this.suggestion.user?.uid === this.user?.uid;
   }
 

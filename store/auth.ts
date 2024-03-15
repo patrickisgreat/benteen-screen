@@ -23,13 +23,6 @@ export const mutations: MutationTree<State> = {
 };
 
 export const actions: ActionTree<State, State> = {
-  // https://nuxtjs.org/guide/vuex-store/#the-nuxtserverinit-action
-  // async nuxtServerInit({ commit }, { req }) {
-  //   const user = await firebaseAuth.currentUser;
-  //   console.log('Server init user', user);
-  //   commit('authStateChange', user)
-  // },
-
   async authStateChange({ commit }, firebaseUser) {
     commit('setLoading', true);
 

@@ -168,7 +168,6 @@ export default class Admin extends Vue {
   @Watch("event")
   async eventChange(event) {
     if (event === null) {
-      console.log("No event selected");
       if (this.eventSuggestionsListener) {
         this.eventSuggestionsListener();
         this.eventSuggestionsListener = null;
@@ -207,11 +206,7 @@ export default class Admin extends Vue {
     if (voteObjects && voteObjects.length) {
       const voterPromises = voteObjects.map(async (voteObj) => {
         // Using voteObj.userReference directly since it's a document reference
-        const userDoc = await voteObj.userReference.get();
-        // Log to see if userDoc is being fetched correctly
-        console.log(
-          `Fetching user document: ${voteObj.userReference.path}, Found: ${userDoc.exists}`
-        );
+        const userDoc = await voteObj.userReference.get();    
         return userDoc.exists ? userDoc.data().displayName : "Unknown";
       });
       return Promise.all(voterPromises);
