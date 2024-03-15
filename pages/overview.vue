@@ -152,21 +152,6 @@ export default class Overview extends Vue {
   eventSuggestionsListener = null;
   votingLimitsEnabled = false;
 
-  logSuggestionsData(suggestionsArr) {
-    if (!suggestionsArr || !Array.isArray(suggestionsArr)) {
-      console.log(
-        "logSuggestionsData: No suggestions array or not an array.",
-        suggestionsArr
-      );
-      return;
-    }
-
-    suggestionsArr.forEach((suggestion, index) => {
-      console.log(`Suggestion ${index}:`, suggestion);
-      console.log(`User data for Suggestion ${index}:`, suggestion.user);
-    });
-  }
-
   async created() {
     await this.$store.dispatch("events/getEvents");
     if (this.events.length) this.selectEvent();
@@ -204,7 +189,6 @@ export default class Overview extends Vue {
         // Map user data back to suggestions
         suggestions = suggestions.map((suggestion, index) => {
           const userData = users[index].data();
-          console.log("userData", userData);
           return { ...suggestion, user: userData };
         });
 
