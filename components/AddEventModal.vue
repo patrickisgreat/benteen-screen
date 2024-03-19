@@ -10,7 +10,11 @@
             <b-input v-model="event.title" type="text"> </b-input>
           </b-field>
           <b-field label="Description">
-            <b-input v-model="event.description" type="textarea"> </b-input>
+            <!-- Replace the b-input with vue-quill-editor for rich text support -->
+            <quill-editor
+              v-model="event.description"
+              :options="editorOptions"
+            ></quill-editor>
           </b-field>
         </section>
         <footer class="modal-card-foot">
@@ -22,18 +26,33 @@
   </b-modal>
 </template>
 
-
 <script lang="ts">
-import { Component, Vue, Prop, Emit } from 'vue-property-decorator';
+import { Component, Vue, Prop, Emit } from "vue-property-decorator";
+import { quillEditor } from "vue-quill-editor";
+import "quill/dist/quill.core.css";
+import "quill/dist/quill.snow.css";
 
-@Component
+@Component({
+  components: {
+    quillEditor,
+  },
+})
 export default class AddEventModal extends Vue {
   @Prop() isActive: boolean;
   event = {
-    title: '',
-    description: ''
+    title: "",
+    description: "",
   };
 
+  // Add editorOptions if you want to customize Quill editor
+  editorOptions = {
+    debug: "info",
+    modules: {
+      toolbar: true,
+    },
+    placeholder: "Compose an epic...",
+    theme: "snow",
+  };
   @Emit()
   close() {
     return null;
@@ -46,3 +65,6 @@ export default class AddEventModal extends Vue {
 }
 </script>
 
+<style>
+/* You might need to add some styles */
+</style>

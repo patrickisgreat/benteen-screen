@@ -23,6 +23,7 @@
     "nuxt": "^2.15.4",
     "nuxt-buefy": "^0.4.7",
     "ts-node": "^9.1.1",
+    "vue-quill-editor": "^3.0.6",
     "vue-scrollto": "^2.20.0"
   },
   "devDependencies": {
@@ -46,9 +47,9 @@
     "eslint-plugin-standard": ">=5.0.0",
     "eslint-plugin-vue": "^7.9.0",
     "jest": "^26.6.3",
-    "sass": "^1.49.9", 
     "nodemon": "^2.0.7",
     "prettier": "^2.7.1",
+    "sass": "^1.49.9",
     "sass-loader": "^10.3.2",
     "vue-jest": "^3.0.7",
     "vue-property-decorator": "^8.4.2",
