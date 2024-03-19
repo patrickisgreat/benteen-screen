@@ -33,15 +33,17 @@
             <div class="card-content" v-else>
               <div class="content">
                 <b-field label="Title">
-                  <b-input v-model="editingEvents[event.id].title" type="text">
-                  </b-input>
+                  <b-input
+                    v-model="editingEvents[event.id].title"
+                    type="text"
+                  ></b-input>
                 </b-field>
                 <b-field label="Description">
-                  <b-input
+                  <!-- Updated to use Quill Editor for rich text editing -->
+                  <quill-editor
                     v-model="editingEvents[event.id].description"
-                    type="textarea"
-                  >
-                  </b-input>
+                    :options="{ theme: 'snow' }"
+                  ></quill-editor>
                 </b-field>
               </div>
             </div>
@@ -138,12 +140,16 @@ import AddEventModal from "@/components/AddEventModal.vue";
 import { Event } from "@/types/event";
 import { isSameDay } from "@/helpers/datetime";
 import { QuerySnapshot } from "@firebase/firestore-types";
+import { quillEditor } from "vue-quill-editor";
+import "quill/dist/quill.core.css";
+import "quill/dist/quill.snow.css";
 
 @Component({
   components: {
     Card,
     Calendar,
     AddEventModal,
+    quillEditor,
   },
 })
 export default class Admin extends Vue {
@@ -206,7 +212,7 @@ export default class Admin extends Vue {
     if (voteObjects && voteObjects.length) {
       const voterPromises = voteObjects.map(async (voteObj) => {
         // Using voteObj.userReference directly since it's a document reference
-        const userDoc = await voteObj.userReference.get();    
+        const userDoc = await voteObj.userReference.get();
         return userDoc.exists ? userDoc.data().displayName : "Unknown";
       });
       return Promise.all(voterPromises);

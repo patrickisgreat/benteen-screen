@@ -35,7 +35,7 @@
             </header>
           </template>
           <template v-slot:default>
-            <p class="description">{{ event.description }}</p>
+            <p class="description" v-html="event.description"></p>
             <div v-if="!suggestions.length" class="has-text-centered">
               No suggestions for this event!
             </div>
@@ -54,7 +54,7 @@
           </template>
         </card>
       </div>
-
+      <!-- 
       <div class="columns is-mobile">
         <card title="Suggest a movie">
           <preliminary-suggestion-media-object
@@ -70,7 +70,7 @@
             @select="(selected) => (selectedPreliminarySuggestion = selected)"
           />
         </card>
-      </div>
+      </div> -->
     </template>
     <template v-else>
       <p>No events available.</p>
@@ -91,8 +91,7 @@
 .description {
   font-size: 1em; // Adjust as needed
   color: grey; // Adjust as needed
-  width: 70%;
-  margin-left: 15%;
+  margin: 0% 3.5% 4% 3.5%;
   font-weight: bold;
   padding-bottom: 20px;
 }
