@@ -3,6 +3,29 @@ definePageMeta({ middleware: 'auth' })
 useSeoMeta({ title: 'Profile · BSOTG' })
 
 const { user, isAdmin } = useAuth()
+const { deleteAccount } = useAccount()
+const toast = useToast()
+
+const confirmOpen = ref(false)
+const deleting = ref(false)
+
+async function onDelete(): Promise<void> {
+  deleting.value = true
+  try {
+    await deleteAccount()
+    toast.add({ title: 'Account deleted', color: 'neutral' })
+    await navigateTo('/')
+  } catch (error) {
+    toast.add({
+      title: 'Could not delete account',
+      description: error instanceof Error ? error.message : undefined,
+      color: 'error'
+    })
+  } finally {
+    deleting.value = false
+    confirmOpen.value = false
+  }
+}
 </script>
 
 <template>
@@ -43,5 +66,39 @@ const { user, isAdmin } = useAuth()
         <UInput :model-value="user.email ?? ''" readonly icon="i-lucide-mail" class="w-full" />
       </UFormField>
     </UCard>
+
+    <!-- Danger zone -->
+    <UCard class="mt-6" :ui="{ root: 'ring-error/30' }">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="font-semibold text-error">
+            Delete account
+          </h3>
+          <p class="text-sm text-muted">
+            Permanently delete your account. This can't be undone.
+          </p>
+        </div>
+        <UButton
+          label="Delete account"
+          color="error"
+          variant="outline"
+          icon="i-lucide-trash-2"
+          @click="confirmOpen = true"
+        />
+      </div>
+    </UCard>
+
+    <UModal
+      v-model:open="confirmOpen"
+      title="Delete your account?"
+      description="This permanently deletes your account and sign-in. This action cannot be undone."
+    >
+      <template #footer>
+        <div class="flex justify-end gap-2 w-full">
+          <UButton label="Cancel" color="neutral" variant="ghost" @click="confirmOpen = false" />
+          <UButton label="Delete account" color="error" icon="i-lucide-trash-2" :loading="deleting" @click="onDelete" />
+        </div>
+      </template>
+    </UModal>
   </UContainer>
 </template>

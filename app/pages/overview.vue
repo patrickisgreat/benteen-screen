@@ -5,6 +5,7 @@ definePageMeta({ middleware: 'auth' })
 useSeoMeta({ title: 'Overview · BSOTG' })
 
 const toast = useToast()
+const { user } = useAuth()
 const { events } = useEvents()
 
 const eventIndex = ref(0)
@@ -23,6 +24,22 @@ const {
 } = useSuggestions(currentEventId)
 
 const selectedMovie = ref<TmdbMovie | null>(null)
+
+// Real per-user participation limits (replaces the legacy fake counters).
+const usedVotes = computed(() => {
+  const uid = user.value?.uid
+  if (!uid) return 0
+  return suggestions.value.filter(s => (s.votes ?? []).some(v => v.userId === uid)).length
+})
+const usedSuggestions = computed(() => {
+  const uid = user.value?.uid
+  if (!uid) return 0
+  return suggestions.value.filter(s => s.userReference?.id === uid).length
+})
+const votesLeft = computed(() => Math.max(0, VOTE_LIMIT - usedVotes.value))
+const suggestionsLeft = computed(() => Math.max(0, SUGGESTION_LIMIT - usedSuggestions.value))
+const voteLocked = computed(() => votesLeft.value <= 0)
+const canSuggest = computed(() => suggestionsLeft.value > 0)
 
 const eventOptions = computed(() =>
   events.value.map((event, index) => ({
@@ -47,6 +64,10 @@ function nextEvent(): void {
 }
 
 async function onSuggest(movie: TmdbMovie): Promise<void> {
+  if (!canSuggest.value) {
+    toast.add({ title: 'Suggestion limit reached', description: `You can suggest up to ${SUGGESTION_LIMIT} per event.`, color: 'warning' })
+    return
+  }
   if (alreadySuggested(movie.id)) {
     toast.add({ title: 'Already suggested', description: `${movie.title} is already on the list.`, color: 'warning' })
     selectedMovie.value = null
@@ -62,6 +83,10 @@ async function onSuggest(movie: TmdbMovie): Promise<void> {
 }
 
 async function onVote(suggestion: typeof suggestions.value[number]): Promise<void> {
+  if (voteLocked.value) {
+    toast.add({ title: 'Vote limit reached', description: `You can back up to ${VOTE_LIMIT} movies per event. Unvote one to free a slot.`, color: 'warning' })
+    return
+  }
   try {
     await vote(suggestion)
   } catch {
@@ -137,11 +162,24 @@ async function onRemove(suggestion: typeof suggestions.value[number]): Promise<v
       </UCard>
 
       <!-- Suggestions -->
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h2 class="text-xl font-semibold">
           Suggestions
         </h2>
-        <UBadge :label="`${suggestions.length}`" color="neutral" variant="subtle" />
+        <div class="flex items-center gap-2">
+          <UBadge
+            :label="`${votesLeft} ${votesLeft === 1 ? 'vote' : 'votes'} left`"
+            :color="votesLeft ? 'primary' : 'neutral'"
+            variant="subtle"
+            icon="i-lucide-heart"
+          />
+          <UBadge
+            :label="`${suggestionsLeft} ${suggestionsLeft === 1 ? 'suggestion' : 'suggestions'} left`"
+            :color="suggestionsLeft ? 'primary' : 'neutral'"
+            variant="subtle"
+            icon="i-lucide-plus"
+          />
+        </div>
       </div>
 
       <div v-if="suggestions.length" class="space-y-3">
@@ -149,6 +187,7 @@ async function onRemove(suggestion: typeof suggestions.value[number]): Promise<v
           v-for="suggestion in suggestions"
           :key="suggestion.id"
           :suggestion="suggestion"
+          :vote-locked="voteLocked"
           @vote="onVote(suggestion)"
           @unvote="onUnvote(suggestion)"
           @remove="onRemove(suggestion)"
@@ -167,7 +206,16 @@ async function onRemove(suggestion: typeof suggestions.value[number]): Promise<v
           Suggest a movie
         </h2>
 
-        <UCard v-if="selectedMovie" variant="subtle">
+        <UAlert
+          v-if="!canSuggest"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-info"
+          title="Suggestion limit reached"
+          :description="`You've used all ${SUGGESTION_LIMIT} of your suggestions for this event.`"
+        />
+
+        <UCard v-else-if="selectedMovie" variant="subtle">
           <div class="flex gap-4">
             <img
               v-if="selectedMovie.poster_path"

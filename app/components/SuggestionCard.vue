@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Suggestion } from '#shared/types/suggestion'
 
-const props = defineProps<{ suggestion: Suggestion }>()
+const props = defineProps<{ suggestion: Suggestion, voteLocked?: boolean }>()
 const emit = defineEmits<{ vote: []; unvote: []; remove: [] }>()
 
 const { user } = useAuth()
@@ -73,6 +73,7 @@ const tmdbUrl = computed(() => `https://www.themoviedb.org/movie/${movie.value.i
             :variant="hasVoted ? 'soft' : 'outline'"
             icon="i-lucide-heart"
             :label="String(voteCount)"
+            :disabled="voteLocked && !hasVoted"
             @click="hasVoted ? emit('unvote') : emit('vote')"
           />
         </div>
