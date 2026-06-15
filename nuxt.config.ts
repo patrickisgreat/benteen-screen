@@ -2,13 +2,11 @@
 export default defineNuxtConfig({
   modules: ['@nuxt/ui', '@nuxt/eslint'],
 
-  devtools: { enabled: true },
-
   // Client-rendered SPA: Firebase auth is client-only. Nitro still serves /api/*
   // routes (e.g. the TMDB proxy) as serverless functions when deployed.
   ssr: false,
 
-  css: ['~/assets/css/main.css'],
+  devtools: { enabled: true },
 
   app: {
     head: {
@@ -22,11 +20,17 @@ export default defineNuxtConfig({
     }
   },
 
+  css: ['~/assets/css/main.css'],
+
   runtimeConfig: {
-    // Server-only — never shipped to the browser. Override via NUXT_TMDB_API_KEY.
+    // Server-only — never shipped to the browser. Nitro overrides this from
+    // NUXT_TMDB_API_KEY at runtime.
     tmdbApiKey: '',
     public: {
-      // Firebase web config is public by design. Override via NUXT_PUBLIC_FIREBASE_*.
+      // Firebase web config is public by design. Nitro injects these from the
+      // NUXT_PUBLIC_FIREBASE_* environment variables into the served HTML at
+      // request time — so they must be set in the deploy environment (Vercel),
+      // not just locally. Defaults are intentionally empty.
       firebase: {
         apiKey: '',
         authDomain: '',
