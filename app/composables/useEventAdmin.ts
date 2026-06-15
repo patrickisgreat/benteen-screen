@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore'
+import type { Database } from '~/types/database.types'
 
 export interface EventInput {
   title: string
@@ -6,28 +6,33 @@ export interface EventInput {
   date: Date
 }
 
-/** Admin write actions for events. Firestore stores the JS Date as a Timestamp. */
+/** Admin write actions for events. */
 export function useEventAdmin() {
-  const { $firestore } = useNuxtApp()
+  const supabase = useSupabaseClient<Database>()
+  const user = useSupabaseUser()
 
   async function createEvent(input: EventInput): Promise<void> {
-    await addDoc(collection($firestore, 'events'), {
+    const { error } = await supabase.from('events').insert({
       title: input.title,
       description: input.description,
-      timestamp: input.date
+      event_date: input.date.toISOString(),
+      created_by: user.value?.id ?? null
     })
+    if (error) throw error
   }
 
   async function updateEvent(id: string, input: EventInput): Promise<void> {
-    await updateDoc(doc($firestore, 'events', id), {
+    const { error } = await supabase.from('events').update({
       title: input.title,
       description: input.description,
-      timestamp: input.date
-    })
+      event_date: input.date.toISOString()
+    }).eq('id', id)
+    if (error) throw error
   }
 
   async function deleteEvent(id: string): Promise<void> {
-    await deleteDoc(doc($firestore, 'events', id))
+    const { error } = await supabase.from('events').delete().eq('id', id)
+    if (error) throw error
   }
 
   return { createEvent, updateEvent, deleteEvent }

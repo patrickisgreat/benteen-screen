@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { TmdbMovie } from '#shared/types/movie'
 
-definePageMeta({ middleware: 'auth' })
 useSeoMeta({ title: 'Overview · BSOTG' })
 
 const toast = useToast()
@@ -26,8 +25,8 @@ const {
 const selectedMovie = ref<TmdbMovie | null>(null)
 
 // Real per-user participation limits (replaces the legacy fake counters).
-const usedVotes = computed(() => (user.value ? countUserVotes(suggestions.value, user.value.uid) : 0))
-const usedSuggestions = computed(() => (user.value ? countUserSuggestions(suggestions.value, user.value.uid) : 0))
+const usedVotes = computed(() => (user.value ? countUserVotes(suggestions.value, user.value.id) : 0))
+const usedSuggestions = computed(() => (user.value ? countUserSuggestions(suggestions.value, user.value.id) : 0))
 const votesLeft = computed(() => remaining(VOTE_LIMIT, usedVotes.value))
 const suggestionsLeft = computed(() => remaining(SUGGESTION_LIMIT, usedSuggestions.value))
 const voteLocked = computed(() => votesLeft.value <= 0)
@@ -35,7 +34,7 @@ const canSuggest = computed(() => suggestionsLeft.value > 0)
 
 const eventOptions = computed(() =>
   events.value.map((event, index) => ({
-    label: `${formatDate(event.timestamp, { dateStyle: 'medium' })} · ${event.title}`,
+    label: `${formatDate(event.event_date, { dateStyle: 'medium' })} · ${event.title}`,
     value: index
   }))
 )
@@ -43,7 +42,7 @@ const eventOptions = computed(() =>
 // On first data load, jump to the next upcoming event (fallback: the latest one).
 watch(events, (list) => {
   if (initialized.value || !list.length) return
-  const upcoming = list.findIndex(event => isUpcoming(event.timestamp))
+  const upcoming = list.findIndex(event => isUpcoming(event.event_date))
   eventIndex.value = upcoming > -1 ? upcoming : list.length - 1
   initialized.value = true
 }, { immediate: true })
@@ -136,12 +135,12 @@ async function onRemove(suggestion: typeof suggestions.value[number]): Promise<v
       <UCard class="mb-8">
         <div class="flex flex-wrap items-center gap-3 mb-2">
           <UBadge
-            :color="isUpcoming(currentEvent.timestamp) ? 'primary' : 'neutral'"
-            :variant="isUpcoming(currentEvent.timestamp) ? 'solid' : 'subtle'"
-            :label="isUpcoming(currentEvent.timestamp) ? 'Upcoming' : 'Past'"
+            :color="isUpcoming(currentEvent.event_date) ? 'primary' : 'neutral'"
+            :variant="isUpcoming(currentEvent.event_date) ? 'solid' : 'subtle'"
+            :label="isUpcoming(currentEvent.event_date) ? 'Upcoming' : 'Past'"
             icon="i-lucide-calendar"
           />
-          <span class="text-muted">{{ formatDate(currentEvent.timestamp) }}</span>
+          <span class="text-muted">{{ formatDate(currentEvent.event_date) }}</span>
         </div>
         <h1 class="text-2xl font-bold">
           {{ currentEvent.title }}

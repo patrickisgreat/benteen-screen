@@ -18,7 +18,7 @@ watch(open, (isOpen) => {
   if (props.event) {
     title.value = props.event.title
     description.value = props.event.description ?? ''
-    const date = toDate(props.event.timestamp)
+    const date = toDate(props.event.event_date)
     dateStr.value = toInputDate(date ?? new Date())
   } else {
     title.value = ''

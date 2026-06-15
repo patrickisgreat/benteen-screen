@@ -8,50 +8,49 @@ movie-night **events**, searches TMDB to **suggest** a film for an event, and
 movie nights with rich descriptions) and moderate suggestions. The tagline:
 "It Really Whips the Movie's Ass."
 
-> **Status:** Migrated from a legacy Nuxt 2 / Vue 2 / Buefy / Firebase 8 codebase to
-> the modern stack below. If you find anything still referencing the old stack
-> (class components, `vue-property-decorator`, Buefy `b-*` components, the Firebase 8
-> namespaced SDK, Vuex), it is a leftover to be removed, not a pattern to follow.
+> **Status:** Migrated from Nuxt 2 / Vue 2 / Buefy, then from Firebase to Supabase.
+> If you find anything still referencing the old stacks (class components,
+> `vue-property-decorator`, Buefy `b-*` components, Firebase/Firestore/VueFire,
+> `firestore.rules`, `votesCount`/`userReference`/`suggestedItem`), it is a leftover to
+> be removed, not a pattern to follow.
 
 ## ⚠️ Product Invariants — DO NOT VIOLATE
 
 These are the locked constraints of the system. Treat them as non-negotiable.
 
-1. **Firestore Security Rules are the source of truth for authorization.** Route
-   middleware (`app/middleware/auth.ts`, `app/middleware/admin.ts`) and any UI gating
-   are **UX conveniences only** — they can be bypassed by anyone with the browser
-   console. The real enforcement lives in `firestore.rules`. Every new collection,
-   field, or access pattern needs a matching rule. Never relax a rule to "make a
-   feature work"; tighten the feature instead.
+1. **Row Level Security (RLS) is the source of truth for authorization.** Route
+   middleware (`app/middleware/admin.ts`) and the Supabase module's global auth redirect
+   are **UX conveniences only** — they can be bypassed by anyone with the browser console.
+   The real enforcement lives in the RLS policies in `supabase/migrations/*.sql`. Every
+   new table, column, or access pattern needs a matching policy. Never relax a policy to
+   "make a feature work"; tighten the feature instead.
 
-2. **The TMDB API key is server-only.** It must never reach the browser. All TMDB
-   calls go through `server/api/**` using `runtimeConfig.tmdbApiKey`. The legacy app
-   shipped the key to the client (`process.env.TMDB_API_KEY` in a component) — that is
-   the exact regression to never reintroduce. By contrast, the **Firebase web config**
-   (`runtimeConfig.public.firebase`) is public by design — it is safe in the client and
-   is protected by Security Rules, not by secrecy.
+2. **The TMDB API key and the Supabase service-role key are server-only.** They must
+   never reach the browser — used only in `server/api/**` (`runtimeConfig.tmdbApiKey`;
+   `serverSupabaseServiceRole`). The legacy app shipped the TMDB key to the client — the
+   exact regression to never reintroduce. By contrast, the **Supabase anon key**
+   (`SUPABASE_KEY`) is public by design — safe in the client, protected by RLS, not secrecy.
 
-3. **Vote integrity: one vote per user per suggestion, and `votesCount` must always
-   match `votes[]`.** Votes are stored as `votes: [{ userId, userReference }]` mutated
-   with `arrayUnion`/`arrayRemove`, and `votesCount` is mutated with `increment(±1)` in
-   the **same** `update()` call. Never change one without the other, or the counters
-   drift. Per-event vote/suggestion limits are a product feature — enforce them in
-   Security Rules, not just the UI (see invariant 1).
+3. **Vote integrity is structural.** Votes are normalized rows in `public.votes` with a
+   composite PK `(suggestion_id, user_id)` — one vote per user per suggestion is enforced
+   by the database, and the count is just `votes.length`. There is no counter to drift
+   (the old Firestore `votesCount`/`votes[]` hazard is gone). Per-event vote/suggestion
+   limits are enforced server-side by Postgres triggers **and** mirrored in the UI
+   (`app/utils/limits.ts`); keep the two in sync.
 
-4. **Admin role is assigned out-of-band, never from the app.** `roles/{uid}` is
-   `write: if false` in Security Rules — admin is granted only via the Firebase console
-   or a privileged backend. Do not add client code that writes to `roles`. Reading your
-   own role to toggle admin UI is fine; the UI is not the gate (see invariant 1).
+4. **Admin role is assigned out-of-band, never from the app.** `profiles.is_admin` is
+   granted only via SQL / the service role; the RLS update policy on `profiles` forbids a
+   user from changing their own `is_admin`. Do not add client code that writes it. Reading
+   your own profile to toggle admin UI is fine; the UI is not the gate (see invariant 1).
 
 5. **Stored user-generated HTML must be sanitized before render.** Event descriptions
    are rich text. Never `v-html` stored content without sanitizing it first
    (`app/utils/sanitize.ts`). The legacy app rendered raw admin HTML — an XSS hole.
 
-6. **SPA / client-only auth model (`ssr: false`).** Firebase Auth runs in the browser;
-   there is no Firebase Admin service account wired for server-side sessions. Do not
-   enable SSR for auth-gated pages without also wiring an Admin session cookie — you
-   would render logged-out shells or leak the wrong user's data. Nitro `/api/*` routes
-   still run server-side (that is how the TMDB proxy stays server-only).
+6. **SPA / client-only auth model (`ssr: false`).** Supabase Auth runs in the browser
+   (session in cookies, so server routes can still read it via `serverSupabaseUser`). Do
+   not enable SSR for auth-gated pages without verifying the auth/session flow. Nitro
+   `/api/*` routes still run server-side (that is how the server-only keys stay server-only).
 
 If a problem tempts you to violate one of these, stop and pull a different lever, or
 escalate the question.
@@ -61,13 +60,15 @@ escalate the question.
 - **Framework**: Nuxt 4 (Vue 3, `<script setup>` Composition API, TypeScript strict)
 - **UI**: Nuxt UI 4 (Tailwind CSS v4 + Reka UI) — components are `U*` (e.g. `UButton`,
   `UCard`, `UModal`), theming in `app/app.config.ts` + `app/assets/css/main.css`
-- **Backend**: Firebase — Auth (Google), Cloud Firestore (data), Hosting
-- **Firebase binding**: [VueFire](https://vuefire.vuejs.org) (`useCollection`,
-  `useDocument`, `useCurrentUser`) wired via `app/plugins/vuefire.client.ts`
+- **Backend**: Supabase — Auth (Google), Postgres + RLS, Realtime — via the
+  [`@nuxtjs/supabase`](https://supabase.nuxtjs.org) module (`useSupabaseClient`,
+  `useSupabaseUser`; `serverSupabaseUser`/`serverSupabaseServiceRole` on the server)
+- **Schema**: `supabase/migrations/*.sql` (tables, RLS, triggers, realtime publication);
+  typed client via `app/types/database.types.ts`
 - **External data**: TMDB, proxied through Nuxt server routes (`server/api/movies/*`)
 - **Package Manager**: npm
-- **Testing**: Vitest (`@nuxt/test-utils`) for unit/component; Playwright for E2E
-- **Deploy**: Netlify (Nuxt build → SPA + serverless functions for `/api`)
+- **Testing**: Vitest for unit; Playwright for E2E
+- **Deploy**: Vercel (Nuxt build → SPA + serverless functions for `/api`)
 
 ## Common Commands
 
@@ -98,58 +99,62 @@ app/
 ├── layouts/
 │   └── default.vue               # App shell: nav (avatar menu, color mode), main container
 ├── middleware/
-│   ├── auth.ts                   # Redirect unauthenticated users to /login
-│   └── admin.ts                  # Gate /admin to users with the admin role
+│   └── admin.ts                  # Gate /admin to admins (global auth is the Supabase module)
 ├── pages/
 │   ├── index.vue                 # Landing
 │   ├── login.vue                 # Google sign-in
+│   ├── confirm.vue               # OAuth callback → /overview
 │   ├── overview.vue              # Events + suggest + vote (the core experience)
 │   ├── admin.vue                 # Event CRUD + suggestion moderation
 │   ├── profile.vue               # Profile + account deletion
 │   └── about.vue
 ├── plugins/
-│   └── vuefire.client.ts         # Init Firebase app + VueFire (auth + firestore)
+│   └── auth-profile.client.ts    # Load the user's profile (incl is_admin) into state
+├── types/database.types.ts       # Typed Supabase Database
 └── utils/
     └── sanitize.ts               # HTML sanitization for stored rich text
 server/
-└── api/movies/                   # TMDB proxy (search, details) — server-only key
-shared/
-└── types/                        # Data-model types shared by app + server (Event, Suggestion, ...)
-firestore.rules                   # ⭐ Authorization source of truth
-firestore.indexes.json            # Composite indexes (e.g. suggestions ordered by votesCount)
-firebase.json                     # Hosting + Firestore config
-functions/                        # Firebase Cloud Functions (Python) — currently a stub
+└── api/
+    ├── movies/                   # TMDB proxy (search) — server-only key
+    └── account/delete.post.ts    # Account deletion (service role)
+shared/types/                     # Shared types (MovieEvent, Suggestion, TmdbMovie, Profile)
+supabase/migrations/             # ⭐ Schema + RLS + triggers (authorization source of truth)
+scripts/migrate-firestore-to-supabase.mjs  # One-time Firestore → Supabase ETL
 ```
 
 ## Architecture Notes
 
 ### Auth & roles
 
-- `app/plugins/vuefire.client.ts` initializes the Firebase app from
-  `runtimeConfig.public.firebase` and installs VueFire with the Auth + Firestore modules.
-- `useCurrentUser()` (VueFire) is the reactive source of the signed-in user. On sign-in
-  we upsert `users/{uid}` and read `roles/{uid}` to resolve `isAdmin`.
-- Middleware (`auth`, `admin`) gates routes for UX. **It is not security** — see
-  Invariant 1. Firestore Rules are the real boundary.
+- The `@nuxtjs/supabase` module provides the client (`useSupabaseClient`) and the reactive
+  user (`useSupabaseUser`), plus a global middleware that redirects unauthenticated users
+  to `/login` (config in `nuxt.config.ts`; public routes via `redirectOptions.exclude`).
+- Sign-in is Google OAuth (`signInWithOAuth`), redirecting to `/confirm`. A Postgres
+  trigger (`handle_new_user`) creates the `profiles` row from OAuth metadata.
+- `app/plugins/auth-profile.client.ts` loads the user's profile (incl `is_admin`) into
+  shared state; `useAuth` exposes a merged `account` + `isAdmin`.
+- `app/middleware/admin.ts` gates `/admin` for UX. **It is not security** — see Invariant 1.
+  RLS is the real boundary.
 
-### Firestore data model
+### Data model (Postgres — see `supabase/migrations`)
 
 ```
-users/{uid}                       # { uid, displayName, email, photoURL, providerId, ... }
-roles/{uid}                       # { role: 'admin' }  (write: false — console-only)
-events/{eventId}                  # { title, description (rich text), timestamp }
-events/{eventId}/suggestions/{id} # { suggestedItem (TMDB movie), userReference, userEmail,
-                                  #   createdAt, deleted, votesCount, votes: [{userId, userReference}] }
+profiles(id→auth.users, email, display_name, avatar_url, is_admin)
+events(id, title, description, event_date, created_by, created_at)
+suggestions(id, event_id→events, user_id→profiles, tmdb_movie jsonb, deleted, created_at)
+votes(suggestion_id→suggestions, user_id→profiles)  -- PK (suggestion_id, user_id)
 ```
 
-### Realtime binding (VueFire) — and why it killed a class of bugs
+Triggers enforce the per-event suggestion/vote limits (skipped for service-role inserts so
+historical data can be imported). RLS: read for authenticated; create-as-self; admin-only
+moderation; author/admin delete; users can't change their own `is_admin`.
 
-The legacy app hand-rolled `onSnapshot` handlers that did `forEach(async ...)` and then
-assigned state synchronously, producing races where voters/emails silently never
-rendered. Use VueFire's `useCollection` / `useDocument` for reactive binding instead of
-manual snapshot listeners. When you must hydrate referenced docs (e.g. a suggestion's
-voter profiles), resolve **all** promises with `Promise.all` and assign **after** they
-settle — never push into reactive state from inside an un-awaited async callback.
+### Realtime
+
+Supabase Realtime channels (`supabase.channel(...).on('postgres_changes', ...)`) in the
+data composables keep votes/suggestions/events live. The relevant tables are added to the
+`supabase_realtime` publication in the migration. On a change we re-query (simple and
+reliable for this scale) rather than patching state.
 
 ### TMDB proxy
 
@@ -158,17 +163,13 @@ Client → `GET /api/movies/search?q=...` → server handler reads `runtimeConfi
 
 ## Environment
 
-Copy `.env.example` to `.env` and fill in real values. Nuxt maps env vars to
-`runtimeConfig` by shape:
+Copy `.env.example` to `.env` and fill in real values (Supabase dashboard → Settings → API):
 
 ```
-NUXT_PUBLIC_FIREBASE_API_KEY=...           → runtimeConfig.public.firebase.apiKey
-NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...        → runtimeConfig.public.firebase.authDomain
-NUXT_PUBLIC_FIREBASE_PROJECT_ID=...         → ...projectId
-NUXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...     → ...storageBucket
-NUXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=... → ...messagingSenderId
-NUXT_PUBLIC_FIREBASE_APP_ID=...             → ...appId
-NUXT_TMDB_API_KEY=...                        → runtimeConfig.tmdbApiKey (server-only)
+SUPABASE_URL=https://<ref>.supabase.co     # project URL
+SUPABASE_KEY=<anon key>                     # public — protected by RLS, read by the module
+NUXT_SUPABASE_SECRET_KEY=<service-role key> # SERVER-ONLY (account deletion)
+NUXT_TMDB_API_KEY=<tmdb key>                # SERVER-ONLY → runtimeConfig.tmdbApiKey
 ```
 
 Never commit a real `.env`. `.env.example` carries placeholders only — no live keys.
@@ -226,7 +227,7 @@ Follow the testing pyramid. Violations of its proportions are a code smell.
 I/O or network. Test a single composable, util, or component in isolation (Vitest +
 `@nuxt/test-utils`). If your unit tests are slow, they are not unit tests.
 
-**Integration tests** sit in the middle — a server route against the Firestore emulator, a
+**Integration tests** sit in the middle — a server route against a local Supabase, a
 component plus the composable it consumes. Fewer than unit tests, allowed to be slower.
 
 **End-to-end tests** sit at the top — few, slow, and only the critical user paths
@@ -238,17 +239,17 @@ catastrophic to break silently, not one per feature.
 - Every new composable, util, or component gets unit tests.
 - Test behavior, not implementation. A test that breaks on an internal rename is testing
   the wrong thing.
-- Mock at integration boundaries (Firebase SDK, `$fetch`/TMDB, time). Do not mock your own
-  collaborators — if you must, the design needs work.
+- Mock at integration boundaries (the Supabase client, `$fetch`/TMDB, time). Do not mock
+  your own collaborators — if you must, the design needs work.
 - A test that cannot fail is not a test. Break the implementation once to confirm it fails.
 - Tests are documentation: `it("hides the vote button when the event is locked")`, not
   `it("works")`.
 
 ### Integration Tests
 
-- Server routes, Firestore interactions, and `firestore.rules` all need integration
-  coverage. Prefer the **Firebase emulator** over mocks for rules and data-shape tests —
-  rules bugs are exactly the kind that unit tests can't catch.
+- Server routes, Supabase queries, and RLS policies all need integration coverage. Prefer
+  **Supabase local** (`supabase start`) or a dedicated test project over mocks for RLS and
+  data-shape tests — policy bugs are exactly the kind that unit tests can't catch.
 - Test the contract at the boundary (request/response shape, status codes, side effects),
   not the internal call graph. Seed and tear down data per test.
 
@@ -286,8 +287,8 @@ covering that behavior.
 - **Security is a priority, not an afterthought.**
 - Never commit secrets, tokens, or credentials. Use `.env` (gitignored); `.env.example`
   holds placeholders only. The TMDB key is **server-only** (Invariant 2).
-- **Firestore Security Rules are the authorization boundary** (Invariant 1). Every table/
-  collection needs rules; test them against the emulator. Client middleware is not a gate.
+- **RLS policies are the authorization boundary** (Invariant 1). Every table needs
+  policies; test them against Supabase local. Client middleware is not a gate.
 - Validate and sanitize all user input at boundaries: TMDB query params (server routes),
   form data, and especially stored rich text before render (Invariant 5).
 - Guard against the OWASP top 10 — XSS in particular (`v-html` of stored content is the
@@ -354,7 +355,7 @@ reviewer unfamiliar with this area can verify it. -->
 
 ## Invariants & Risk
 
-<!-- Does this touch authorization (firestore.rules / middleware), the TMDB key,
+<!-- Does this touch authorization (RLS policies / middleware), the TMDB key,
 vote integrity, the admin role, or rendered user HTML? Confirm the Product Invariants
 hold. Call out any rules/schema/index changes explicitly. -->
 
@@ -397,7 +398,7 @@ hold. Call out any rules/schema/index changes explicitly. -->
   ambiguity.
 - Prefer exhaustive checks on unions with an `assertNever(x)` default branch.
 - Keep nullable handling explicit. Lean on `?.` and `??` rather than loose truthiness, which
-  silently swallows `0` and `""`. (Firestore data is full of optional fields — this matters.)
+  silently swallows `0` and `""`. (Supabase rows have many nullable columns — this matters.)
 
 ### Error Handling
 

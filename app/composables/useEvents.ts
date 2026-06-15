@@ -1,11 +1,33 @@
-import { collection, orderBy, query } from 'firebase/firestore'
-import { useCollection } from 'vuefire'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import type { Database } from '~/types/database.types'
 import type { MovieEvent } from '#shared/types/event'
 
-/** Reactive, realtime list of all movie-night events, ordered chronologically. */
+/** Realtime list of all movie-night events, ordered chronologically. */
 export function useEvents() {
-  const { $firestore } = useNuxtApp()
-  const source = query(collection($firestore, 'events'), orderBy('timestamp'))
-  const events = useCollection<MovieEvent>(source, { maxRefDepth: 0 })
-  return { events }
+  const supabase = useSupabaseClient<Database>()
+  const events = ref<MovieEvent[]>([])
+  const pending = ref(true)
+
+  async function refresh(): Promise<void> {
+    const { data } = await supabase
+      .from('events')
+      .select('*')
+      .order('event_date', { ascending: true })
+    events.value = data ?? []
+    pending.value = false
+  }
+
+  let channel: RealtimeChannel | null = null
+  onMounted(() => {
+    refresh()
+    channel = supabase
+      .channel('events-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => refresh())
+      .subscribe()
+  })
+  onUnmounted(() => {
+    if (channel) supabase.removeChannel(channel)
+  })
+
+  return { events, pending, refresh }
 }

@@ -1,29 +1,41 @@
-import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
-import { doc } from 'firebase/firestore'
-import { useCurrentUser, useDocument } from 'vuefire'
+import type { Database } from '~/types/database.types'
+import type { Profile } from '#shared/types/user'
 
 /**
- * Reactive auth state + sign-in/out actions. `isAdmin` is derived from a live
- * binding to `roles/{uid}` — the UI gate only; real enforcement is in
- * firestore.rules (Product Invariant 1).
+ * Reactive auth state + sign-in/out. `account` is a display-friendly merge of the
+ * Supabase user (immediately available from OAuth metadata) and the profile row
+ * (loaded by the auth-profile plugin). `isAdmin` is the UI gate — RLS is the real
+ * authorization boundary.
  */
 export function useAuth() {
-  const { $firebaseAuth, $firestore } = useNuxtApp()
-  const user = useCurrentUser()
+  const supabase = useSupabaseClient<Database>()
+  const user = useSupabaseUser()
+  const profile = useState<Profile | null>('profile', () => null)
 
-  const roleSource = computed(() =>
-    user.value ? doc($firestore, 'roles', user.value.uid) : null
-  )
-  const role = useDocument<{ role?: string }>(roleSource)
-  const isAdmin = computed(() => role.value?.role === 'admin')
+  const isAdmin = computed(() => profile.value?.is_admin ?? false)
+
+  const account = computed(() => {
+    if (!user.value) return null
+    const meta = (user.value.user_metadata ?? {}) as Record<string, string | undefined>
+    return {
+      id: user.value.id,
+      email: profile.value?.email ?? user.value.email ?? null,
+      displayName: profile.value?.display_name ?? meta.full_name ?? meta.name ?? user.value.email ?? null,
+      avatarUrl: profile.value?.avatar_url ?? meta.avatar_url ?? meta.picture ?? null
+    }
+  })
 
   async function signInWithGoogle(): Promise<void> {
-    await signInWithPopup($firebaseAuth, new GoogleAuthProvider())
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/confirm` }
+    })
   }
 
   async function signOutUser(): Promise<void> {
-    await signOut($firebaseAuth)
+    await supabase.auth.signOut()
+    profile.value = null
   }
 
-  return { user, isAdmin, signInWithGoogle, signOutUser }
+  return { user, profile, account, isAdmin, signInWithGoogle, signOutUser }
 }

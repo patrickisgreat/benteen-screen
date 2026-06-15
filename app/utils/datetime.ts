@@ -1,17 +1,14 @@
-import type { Timestamp } from 'firebase/firestore'
+type DateInput = string | Date | null | undefined
 
-type TimestampLike = Timestamp | { seconds: number, nanoseconds: number } | null | undefined
-
-/** Convert a Firestore Timestamp (or plain {seconds,nanoseconds}) to a Date. */
-export function toDate(ts: TimestampLike): Date | null {
-  if (!ts) return null
-  if (typeof (ts as Timestamp).toDate === 'function') return (ts as Timestamp).toDate()
-  const plain = ts as { seconds: number, nanoseconds: number }
-  return new Date(plain.seconds * 1000 + Math.floor(plain.nanoseconds / 1e6))
+/** Parse an ISO timestamp string (or Date) to a Date. */
+export function toDate(value: DateInput): Date | null {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
-export function formatDate(ts: TimestampLike, options: Intl.DateTimeFormatOptions = { dateStyle: 'long' }): string {
-  const date = toDate(ts)
+export function formatDate(value: DateInput, options: Intl.DateTimeFormatOptions = { dateStyle: 'long' }): string {
+  const date = toDate(value)
   return date ? date.toLocaleDateString(undefined, options) : ''
 }
 
@@ -32,8 +29,8 @@ export function toInputDate(date: Date): string {
 }
 
 /** True when the event date is today or in the future. */
-export function isUpcoming(ts: TimestampLike): boolean {
-  const date = toDate(ts)
+export function isUpcoming(value: DateInput): boolean {
+  const date = toDate(value)
   if (!date) return false
   const today = new Date()
   today.setHours(0, 0, 0, 0)

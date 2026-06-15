@@ -8,31 +8,39 @@ the crowd favorite plays at the next screening. _It Really Whips the Movie's Ass
 
 - **[Nuxt 4](https://nuxt.com)** (Vue 3, `<script setup>`, TypeScript) — SPA (`ssr: false`)
 - **[Nuxt UI 4](https://ui.nuxt.com)** (Tailwind CSS v4 + Reka UI) — components & theming
-- **[Firebase](https://firebase.google.com)** — Auth (Google) + Cloud Firestore
-- **[VueFire](https://vuefire.vuejs.org)** — realtime `useCollection` / `useCurrentUser`
+- **[Supabase](https://supabase.com)** — Auth (Google), Postgres + RLS, Realtime
+  (via [`@nuxtjs/supabase`](https://supabase.nuxtjs.org))
 - **[TMDB](https://www.themoviedb.org)** — movie data, proxied server-side (key never hits the browser)
 - **[Vitest](https://vitest.dev)** — unit tests
 
-> Migrated from a legacy Nuxt 2 / Vue 2 / Buefy / Firebase 8 codebase. See
+> Migrated from Nuxt 2 / Vue 2 / Buefy, then from Firebase to Supabase. See
 > [`CLAUDE.md`](./CLAUDE.md) for architecture, product invariants, and code standards.
 
-## Setup
+## Supabase setup
 
-1. Create a Firebase project; enable **Google Authentication** and **Cloud Firestore**.
-2. Get a [TMDB API key](https://www.themoviedb.org/settings/api).
-3. Copy env and fill in your values:
+1. **Create a project** at [supabase.com](https://supabase.com).
+2. **Apply the schema** — paste `supabase/migrations/20260615120000_init.sql` into the
+   Supabase **SQL Editor** and run it (or `supabase db push` if you use the CLI). It
+   creates the tables, RLS policies, triggers, and realtime publication.
+3. **Enable Google auth** — Authentication → Providers → Google: add your Google OAuth
+   client ID/secret, and add `https://<project-ref>.supabase.co/auth/v1/callback` to the
+   authorized redirect URIs in the Google Cloud console. Also add your app's URL(s)
+   (e.g. `http://localhost:3000`, your Vercel domain) under Authentication → URL Configuration.
+4. **Grant yourself admin** — after you've signed in once, in the SQL Editor:
+   ```sql
+   update public.profiles set is_admin = true where email = 'you@example.com';
+   ```
+5. **Keys** — copy env and fill in your values (Settings → API):
    ```bash
    cp .env.example .env
    ```
-   - `NUXT_PUBLIC_FIREBASE_*` — Firebase web config (public by design; protected by Security Rules)
-   - `NUXT_TMDB_API_KEY` — **server-only**, never exposed to the browser
-4. Grant yourself admin (Firestore console): create `roles/{your-uid}` with `{ role: "admin" }`.
+   - `SUPABASE_URL`, `SUPABASE_KEY` (anon/public key — protected by RLS, not secrecy)
+   - `NUXT_SUPABASE_SECRET_KEY` — **server-only** service-role key (account deletion)
+   - `NUXT_TMDB_API_KEY` — **server-only** TMDB key
 
 ## Develop
 
-> Requires **Node 22+** (`.nvmrc` pins 22). The modern toolchain — notably the
-> ESLint flat config — needs Node 21+; dev/build/test will run on Node 20 but
-> `npm run lint` will not.
+> Requires **Node 22+** (`.nvmrc` pins 22) — the ESLint flat config needs Node 21+.
 
 ```bash
 npm install          # install deps (runs `nuxt prepare`)
@@ -43,30 +51,35 @@ npm test             # vitest
 npm run build        # production build (Nitro server + SPA)
 ```
 
-## Deploy
+## Migrating data from Firestore (optional)
 
-### Vercel (recommended)
-
-Zero-config: import the repo in Vercel and it auto-detects Nuxt, runs `nuxt build`,
-and Nitro's Vercel preset ships the static SPA plus serverless functions for the
-`/api/*` routes (the TMDB proxy). No `vercel.json` needed.
-
-Set the env vars under **Project → Settings → Environment Variables** — the same
-`NUXT_*` keys as `.env.example`: the public `NUXT_PUBLIC_FIREBASE_*` config and the
-server-only `NUXT_TMDB_API_KEY`. (Node 22 is picked up from `engines` in package.json.)
-
-### Firebase (rules & indexes)
+A one-time ETL script brings users, events, suggestions, and votes from the old
+Firebase project into Supabase. Apply the schema first, then:
 
 ```bash
-firebase deploy --only firestore:rules,firestore:indexes
+npm install --no-save firebase-admin
+export GOOGLE_APPLICATION_CREDENTIALS=/abs/path/to/firebase-service-account.json
+export SUPABASE_URL=https://<project-ref>.supabase.co
+export SUPABASE_SERVICE_KEY=<service-role key>
+node scripts/migrate-firestore-to-supabase.mjs
 ```
 
-`firestore.rules` is the **authorization source of truth** (route middleware is
-UX only). `firestore.indexes.json` includes the composite index the suggestions
-query needs.
+See the script header for caveats (notably: returning users' Google sign-in maps onto
+their migrated account by confirmed email).
+
+## Deploy (Vercel)
+
+Zero-config: import the repo in Vercel and it auto-detects Nuxt, runs `nuxt build`, and
+Nitro's Vercel preset ships the static SPA plus serverless functions for the `/api/*`
+routes (TMDB proxy, account deletion). No `vercel.json` needed.
+
+Set the env vars under **Project → Settings → Environment Variables** — the same keys as
+`.env.example` (`SUPABASE_URL`, `SUPABASE_KEY`, `NUXT_SUPABASE_SECRET_KEY`, `NUXT_TMDB_API_KEY`).
+Node 22 is picked up from `engines` in `package.json`.
 
 ## Project layout
 
-See [`CLAUDE.md`](./CLAUDE.md) for the full map. In short: `app/` holds the Vue
-app (pages, components, composables, layouts, middleware), `server/api/` holds the
-TMDB proxy, and `shared/types/` holds the data-model types used by both.
+See [`CLAUDE.md`](./CLAUDE.md) for the full map. In short: `app/` holds the Vue app
+(pages, components, composables, layouts, middleware, plugins), `server/api/` holds the
+server routes, `shared/types/` holds shared types, and `supabase/migrations/` holds the
+schema + RLS.

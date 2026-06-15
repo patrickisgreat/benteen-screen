@@ -1,94 +1,92 @@
-import {
-  addDoc,
-  arrayRemove,
-  arrayUnion,
-  collection,
-  deleteDoc,
-  doc,
-  increment,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-  where
-} from 'firebase/firestore'
-import { useCollection } from 'vuefire'
 import type { MaybeRefOrGetter } from 'vue'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import type { Database } from '~/types/database.types'
 import type { Suggestion } from '#shared/types/suggestion'
 import type { TmdbMovie } from '#shared/types/movie'
 
 /**
- * Realtime suggestions for an event + the write actions. Vote actions keep
- * `votesCount` consistent with `votes[]` and guard against double-voting
- * (Product Invariant 3).
+ * Realtime suggestions for an event + the write actions. Votes are normalized
+ * rows, so vote integrity is automatic: one row per (suggestion, user) via the
+ * PK, and the count is just `votes.length`.
  */
 export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefined>) {
-  const { $firestore, $firebaseAuth } = useNuxtApp()
+  const supabase = useSupabaseClient<Database>()
+  const user = useSupabaseUser()
+  const suggestions = ref<Suggestion[]>([])
 
-  const source = computed(() => {
+  async function refresh(): Promise<void> {
     const id = toValue(eventId)
-    if (!id) return null
-    return query(
-      collection($firestore, 'events', id, 'suggestions'),
-      where('deleted', '==', false),
-      orderBy('votesCount', 'desc'),
-      orderBy('createdAt', 'asc')
-    )
-  })
-
-  // maxRefDepth: 0 keeps userReference as a plain ref (we only need its `.id`).
-  const suggestions = useCollection<Suggestion>(source, { maxRefDepth: 0 })
-
-  function suggestionsCollection(id: string) {
-    return collection($firestore, 'events', id, 'suggestions')
+    if (!id) {
+      suggestions.value = []
+      return
+    }
+    const { data } = await supabase
+      .from('suggestions')
+      .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id)')
+      .eq('event_id', id)
+      .eq('deleted', false)
+    suggestions.value = ((data ?? []) as unknown as Suggestion[]).sort((a, b) => {
+      const diff = b.votes.length - a.votes.length
+      return diff !== 0 ? diff : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    })
   }
 
+  let channel: RealtimeChannel | null = null
+  watch(() => toValue(eventId), (id) => {
+    if (channel) {
+      supabase.removeChannel(channel)
+      channel = null
+    }
+    refresh()
+    if (!id) return
+    channel = supabase
+      .channel(`suggestions-${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'suggestions', filter: `event_id=eq.${id}` }, () => refresh())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => refresh())
+      .subscribe()
+  }, { immediate: true })
+  onUnmounted(() => {
+    if (channel) supabase.removeChannel(channel)
+  })
+
   function alreadySuggested(movieId: number): boolean {
-    return suggestions.value.some(s => s.suggestedItem?.id === movieId)
+    return suggestions.value.some(s => s.tmdb_movie?.id === movieId)
   }
 
   async function suggest(movie: TmdbMovie): Promise<void> {
     const id = toValue(eventId)
-    const user = $firebaseAuth.currentUser
-    if (!id || !user) return
-    await addDoc(suggestionsCollection(id), {
-      createdAt: serverTimestamp(),
-      userReference: doc($firestore, 'users', user.uid),
-      userEmail: user.email ?? '',
-      deleted: false,
-      suggestedItem: movie,
-      votesCount: 0,
-      votes: []
-    })
+    if (!id || !user.value) return
+    const { error } = await supabase
+      .from('suggestions')
+      .insert({ event_id: id, user_id: user.value.id, tmdb_movie: movie, deleted: false })
+    if (error) throw error
+    await refresh()
   }
 
   async function vote(suggestion: Suggestion): Promise<void> {
-    const id = toValue(eventId)
-    const user = $firebaseAuth.currentUser
-    if (!id || !user) return
-    // Guard: one vote per user per suggestion, keep votesCount in lockstep.
-    if (suggestion.votes?.some(v => v.userId === user.uid)) return
-    await updateDoc(doc(suggestionsCollection(id), suggestion.id), {
-      votesCount: increment(1),
-      votes: arrayUnion({ userId: user.uid, userReference: doc($firestore, 'users', user.uid) })
-    })
+    if (!user.value) return
+    const uid = user.value.id
+    if (suggestion.votes.some(v => v.user_id === uid)) return
+    const { error } = await supabase.from('votes').insert({ suggestion_id: suggestion.id, user_id: uid })
+    if (error) throw error
+    await refresh()
   }
 
   async function unvote(suggestion: Suggestion): Promise<void> {
-    const id = toValue(eventId)
-    const user = $firebaseAuth.currentUser
-    if (!id || !user) return
-    if (!suggestion.votes?.some(v => v.userId === user.uid)) return
-    await updateDoc(doc(suggestionsCollection(id), suggestion.id), {
-      votesCount: increment(-1),
-      votes: arrayRemove({ userId: user.uid, userReference: doc($firestore, 'users', user.uid) })
-    })
+    if (!user.value) return
+    const { error } = await supabase
+      .from('votes')
+      .delete()
+      .eq('suggestion_id', suggestion.id)
+      .eq('user_id', user.value.id)
+    if (error) throw error
+    await refresh()
   }
 
   async function removeSuggestion(suggestion: Suggestion): Promise<void> {
-    const id = toValue(eventId)
-    if (!id) return
-    await deleteDoc(doc(suggestionsCollection(id), suggestion.id))
+    const { error } = await supabase.from('suggestions').delete().eq('id', suggestion.id)
+    if (error) throw error
+    await refresh()
   }
 
   return { suggestions, alreadySuggested, suggest, vote, unvote, removeSuggestion }

@@ -1,55 +1,66 @@
-import { collection, doc, orderBy, query, updateDoc } from 'firebase/firestore'
-import { useCollection } from 'vuefire'
 import type { MaybeRefOrGetter } from 'vue'
-import type { TmdbMovie } from '#shared/types/movie'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import type { Database } from '~/types/database.types'
+import type { AdminSuggestion } from '#shared/types/suggestion'
 
-/** A user reference that VueFire has resolved into the referenced user document. */
-interface ResolvedUser {
-  id?: string
-  uid?: string
-  displayName?: string
-  email?: string
-  photoURL?: string
-}
-
-export interface AdminSuggestion {
-  id: string
-  suggestedItem: TmdbMovie
-  userEmail?: string
-  userReference?: ResolvedUser
-  deleted: boolean
-  votesCount: number
-  votes: Array<{ userId: string, userReference?: ResolvedUser }>
-}
+const SELECT = `
+  id, event_id, user_id, tmdb_movie, deleted, created_at,
+  author:profiles!suggestions_user_id_fkey(display_name, email),
+  votes(user_id, voter:profiles!votes_user_id_fkey(display_name))
+`
 
 /**
- * Admin view of an event's suggestions — includes soft-deleted ones, and relies
- * on VueFire's default reference resolution to hydrate the suggester and voters
- * reactively. This replaces the legacy hand-rolled onSnapshot + un-awaited
- * forEach that raced and dropped voter/email data.
+ * Admin view of an event's suggestions — includes soft-deleted rows, and joins
+ * the author + each voter's display name. Realtime keeps it live.
  */
 export function useAdminSuggestions(eventId: MaybeRefOrGetter<string | null | undefined>) {
-  const { $firestore } = useNuxtApp()
+  const supabase = useSupabaseClient<Database>()
+  const rows = ref<AdminSuggestion[]>([])
 
-  const source = computed(() => {
+  async function refresh(): Promise<void> {
     const id = toValue(eventId)
-    if (!id) return null
-    return query(
-      collection($firestore, 'events', id, 'suggestions'),
-      orderBy('votesCount', 'desc')
-    )
+    if (!id) {
+      rows.value = []
+      return
+    }
+    const { data } = await supabase
+      .from('suggestions')
+      .select(SELECT)
+      .eq('event_id', id)
+    rows.value = (data ?? []) as unknown as AdminSuggestion[]
+  }
+
+  let channel: RealtimeChannel | null = null
+  watch(() => toValue(eventId), (id) => {
+    if (channel) {
+      supabase.removeChannel(channel)
+      channel = null
+    }
+    refresh()
+    if (!id) return
+    channel = supabase
+      .channel(`admin-suggestions-${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'suggestions', filter: `event_id=eq.${id}` }, () => refresh())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => refresh())
+      .subscribe()
+  }, { immediate: true })
+  onUnmounted(() => {
+    if (channel) supabase.removeChannel(channel)
   })
 
-  const suggestions = useCollection<AdminSuggestion>(source)
+  // Most-voted first for display.
+  const suggestions = computed(() =>
+    [...rows.value].sort((a, b) => (b.votes?.length ?? 0) - (a.votes?.length ?? 0))
+  )
 
-  async function setDeleted(suggestionId: string, deleted: boolean): Promise<void> {
-    const id = toValue(eventId)
-    if (!id) return
-    await updateDoc(doc($firestore, 'events', id, 'suggestions', suggestionId), { deleted })
+  async function setDeleted(id: string, deleted: boolean): Promise<void> {
+    const { error } = await supabase.from('suggestions').update({ deleted }).eq('id', id)
+    if (error) throw error
+    await refresh()
   }
 
   function voterNames(suggestion: AdminSuggestion): string[] {
-    return (suggestion.votes ?? []).map(vote => vote.userReference?.displayName ?? 'Unknown')
+    return (suggestion.votes ?? []).map(vote => vote.voter?.display_name ?? 'Unknown')
   }
 
   return { suggestions, setDeleted, voterNames }

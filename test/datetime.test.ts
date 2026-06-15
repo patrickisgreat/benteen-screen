@@ -2,21 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { formatDate, isSameDay, isUpcoming, toDate, toInputDate } from '../app/utils/datetime'
 
 describe('toDate', () => {
-  it('returns null for nullish input', () => {
+  it('returns null for nullish or invalid input', () => {
     expect(toDate(null)).toBeNull()
     expect(toDate(undefined)).toBeNull()
+    expect(toDate('not-a-date')).toBeNull()
   })
 
-  it('uses a Firestore Timestamp.toDate() when available', () => {
-    const expected = new Date('2026-05-04T00:00:00Z')
-    const stamp = { seconds: 0, nanoseconds: 0, toDate: () => expected }
-    expect(toDate(stamp as never)).toBe(expected)
+  it('parses an ISO timestamp string', () => {
+    expect(toDate('2026-05-04T00:00:00.000Z')?.toISOString()).toBe('2026-05-04T00:00:00.000Z')
   })
 
-  it('converts a plain {seconds, nanoseconds} correctly (nanoseconds → ms)', () => {
-    // 1000s + 0.5s of nanoseconds = 1_000_500 ms
-    const date = toDate({ seconds: 1000, nanoseconds: 500_000_000 })
-    expect(date?.getTime()).toBe(1_000_500)
+  it('passes a Date through unchanged', () => {
+    const now = new Date()
+    expect(toDate(now)).toBe(now)
   })
 })
 
@@ -39,17 +37,14 @@ describe('formatDate', () => {
   it('returns an empty string for nullish input', () => {
     expect(formatDate(null)).toBe('')
   })
-  it('formats a valid timestamp', () => {
-    const stamp = { seconds: 0, nanoseconds: 0, toDate: () => new Date(2026, 4, 4) }
-    expect(formatDate(stamp as never)).not.toBe('')
+  it('formats a valid ISO date', () => {
+    expect(formatDate('2026-05-04T00:00:00.000Z')).not.toBe('')
   })
 })
 
 describe('isUpcoming', () => {
   it('is true for a future date and false for a past one', () => {
-    const future = { seconds: 0, nanoseconds: 0, toDate: () => new Date(Date.now() + 86_400_000) }
-    const past = { seconds: 0, nanoseconds: 0, toDate: () => new Date(Date.now() - 86_400_000) }
-    expect(isUpcoming(future as never)).toBe(true)
-    expect(isUpcoming(past as never)).toBe(false)
+    expect(isUpcoming(new Date(Date.now() + 86_400_000).toISOString())).toBe(true)
+    expect(isUpcoming(new Date(Date.now() - 86_400_000).toISOString())).toBe(false)
   })
 })

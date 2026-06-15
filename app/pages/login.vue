@@ -15,17 +15,16 @@ watchEffect(() => {
 async function handleSignIn(): Promise<void> {
   loading.value = true
   try {
+    // Redirects to Google, then back to /confirm — this page unloads.
     await signInWithGoogle()
-    await navigateTo('/overview')
   } catch (error) {
+    loading.value = false
     toast.add({
       title: 'Sign in failed',
       description: error instanceof Error ? error.message : 'Please try again.',
       color: 'error',
       icon: 'i-lucide-circle-alert'
     })
-  } finally {
-    loading.value = false
   }
 }
 </script>

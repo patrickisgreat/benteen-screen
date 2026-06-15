@@ -1,19 +1,19 @@
-import { doc, getDoc } from 'firebase/firestore'
+import type { Database } from '~/types/database.types'
 
 /**
- * Route guard: require the admin role. UX only — Firestore Security Rules are
- * the real authorization boundary (Product Invariant 1). Implies `auth`.
+ * Route guard: require the admin role. UX only — RLS is the real authorization
+ * boundary. (Global auth protection is handled by the Supabase module.)
  */
 export default defineNuxtRouteMiddleware(async () => {
-  const { $firebaseAuth, $firestore } = useNuxtApp()
-  const user = await awaitCurrentUser($firebaseAuth)
-  if (!user) {
-    return navigateTo('/login')
-  }
+  const user = useSupabaseUser()
+  if (!user.value) return navigateTo('/login')
 
-  const roleSnap = await getDoc(doc($firestore, 'roles', user.uid))
-  const isAdmin = roleSnap.exists() && roleSnap.data().role === 'admin'
-  if (!isAdmin) {
-    return navigateTo('/overview')
-  }
+  const supabase = useSupabaseClient<Database>()
+  const { data } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.value.id)
+    .single()
+
+  if (!data?.is_admin) return navigateTo('/overview')
 })

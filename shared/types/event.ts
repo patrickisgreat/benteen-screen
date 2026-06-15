@@ -1,11 +1,10 @@
-import type { Timestamp } from 'firebase/firestore'
-
-/** A movie-night event document (the `id` is attached by VueFire at read time). */
+/** A movie-night event row. `event_date` is an ISO timestamptz string. */
 export interface MovieEvent {
   id: string
   title: string
   description: string
-  timestamp: Timestamp
+  event_date: string
+  created_at: string
 }
 
 /** Shape used when creating/editing an event. */
