@@ -26,18 +26,10 @@ const {
 const selectedMovie = ref<TmdbMovie | null>(null)
 
 // Real per-user participation limits (replaces the legacy fake counters).
-const usedVotes = computed(() => {
-  const uid = user.value?.uid
-  if (!uid) return 0
-  return suggestions.value.filter(s => (s.votes ?? []).some(v => v.userId === uid)).length
-})
-const usedSuggestions = computed(() => {
-  const uid = user.value?.uid
-  if (!uid) return 0
-  return suggestions.value.filter(s => s.userReference?.id === uid).length
-})
-const votesLeft = computed(() => Math.max(0, VOTE_LIMIT - usedVotes.value))
-const suggestionsLeft = computed(() => Math.max(0, SUGGESTION_LIMIT - usedSuggestions.value))
+const usedVotes = computed(() => (user.value ? countUserVotes(suggestions.value, user.value.uid) : 0))
+const usedSuggestions = computed(() => (user.value ? countUserSuggestions(suggestions.value, user.value.uid) : 0))
+const votesLeft = computed(() => remaining(VOTE_LIMIT, usedVotes.value))
+const suggestionsLeft = computed(() => remaining(SUGGESTION_LIMIT, usedSuggestions.value))
 const voteLocked = computed(() => votesLeft.value <= 0)
 const canSuggest = computed(() => suggestionsLeft.value > 0)
 
