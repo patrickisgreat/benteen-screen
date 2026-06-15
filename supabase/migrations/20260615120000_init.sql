@@ -95,11 +95,13 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- Enforce the per-event suggestion limit server-side.
+-- Enforce the per-event suggestion limit for authenticated users. Skipped when
+-- auth.uid() is null (service-role / migration inserts) so historical data that
+-- predates the limit can be imported.
 create function public.enforce_suggestion_limit() returns trigger
   language plpgsql security definer set search_path = public as $$
 begin
-  if (
+  if auth.uid() is not null and (
     select count(*) from public.suggestions
     where event_id = new.event_id and user_id = new.user_id and deleted = false
   ) >= public.suggestion_limit() then
@@ -121,7 +123,7 @@ declare
   ev uuid;
 begin
   select event_id into ev from public.suggestions where id = new.suggestion_id;
-  if (
+  if auth.uid() is not null and (
     select count(*) from public.votes v
     join public.suggestions s on s.id = v.suggestion_id
     where v.user_id = new.user_id and s.event_id = ev

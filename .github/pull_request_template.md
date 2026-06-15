@@ -26,6 +26,6 @@ for the behavior in this PR. 2) Manual repro: step-by-step so a reviewer can ver
 
 ## Invariants & Risk
 
-<!-- Does this touch authorization (firestore.rules / middleware), the TMDB key,
-vote integrity, the admin role, or rendered user HTML? Confirm the CLAUDE.md
-product invariants hold. Call out any rules/schema/index changes explicitly. -->
+<!-- Does this touch authorization (RLS policies / middleware), the TMDB or Supabase
+service-role key, vote integrity, the admin role, or rendered user HTML? Confirm the
+CLAUDE.md product invariants hold. Call out any schema/RLS/migration changes explicitly. -->

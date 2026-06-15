@@ -32,10 +32,9 @@ yarn-error.log*
 .env.*
 !.env.example
 
-# Firebase
-.firebaserc
-.firebase/
-firebase-debug.log
+# Supabase (CLI)
+supabase/.temp
+supabase/.branches
 
 # Aider (legacy)
 .aider*

@@ -37,9 +37,9 @@ jobs:
 
             Focus, in priority order:
             1. Correctness bugs and regressions.
-            2. Security & the CLAUDE.md product invariants: Firestore rules are the
-               authorization boundary (not the UI middleware); the TMDB key must stay
-               server-only; vote-count integrity (votesCount in lockstep with votes[],
+            2. Security & the CLAUDE.md product invariants: RLS policies are the
+               authorization boundary (not the UI middleware); the TMDB key and Supabase
+               service-role key must stay server-only; vote integrity (normalized votes,
                one vote per user); admin-role handling; sanitize stored HTML before render.
             3. Vue 3 / Nuxt 4 / TypeScript discipline (no `any`, explicit return types on
                exports, no floating promises) and consistent Nuxt UI component usage.

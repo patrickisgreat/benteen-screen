@@ -28,18 +28,6 @@ export default defineNuxtConfig({
     tmdbApiKey: ''
   },
 
-  // @nuxtjs/supabase reads SUPABASE_URL / SUPABASE_KEY (and SUPABASE_SERVICE_KEY
-  // for server-side admin actions) from the environment. The global auth
-  // middleware redirects unauthenticated users to /login for every route except
-  // those excluded below; the login + callback routes are handled by the module.
-  supabase: {
-    redirectOptions: {
-      login: '/login',
-      callback: '/confirm',
-      exclude: ['/', '/about']
-    }
-  },
-
   compatibilityDate: '2025-01-15',
 
   eslint: {
@@ -48,6 +36,18 @@ export default defineNuxtConfig({
         commaDangle: 'never',
         braceStyle: '1tbs'
       }
+    }
+  },
+
+  // @nuxtjs/supabase reads SUPABASE_URL / SUPABASE_KEY (and NUXT_SUPABASE_SECRET_KEY
+  // for server-side admin actions) from the environment. The global auth
+  // middleware redirects unauthenticated users to /login for every route except
+  // those excluded below; the login + callback routes are handled by the module.
+  supabase: {
+    redirectOptions: {
+      login: '/login',
+      callback: '/confirm',
+      exclude: ['/', '/about']
     }
   }
 })
