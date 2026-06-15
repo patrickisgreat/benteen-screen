@@ -1,25 +1,28 @@
-import type { DocumentReference, Timestamp } from 'firebase/firestore'
 import type { TmdbMovie } from './movie'
-import type { AppUser } from './user'
-
-export interface SuggestionVote {
-  userId: string
-  userReference?: DocumentReference
-}
 
 /**
- * A movie suggestion within an event. `votesCount` MUST stay consistent with
- * `votes` (Product Invariant 3). `user` is hydrated client-side from
- * `userReference` and is not stored on the document.
+ * A suggestion as read for the overview. `votes` is the normalized vote rows for
+ * the suggestion; the vote count is just `votes.length` and "did I vote" is a
+ * membership check — no separate counter to drift (was Product Invariant 3).
  */
 export interface Suggestion {
   id: string
-  suggestedItem: TmdbMovie
-  userReference: DocumentReference
-  userEmail?: string
-  createdAt?: Timestamp | null
+  event_id: string
+  user_id: string
+  tmdb_movie: TmdbMovie
   deleted: boolean
-  votesCount: number
-  votes: SuggestionVote[]
-  user?: AppUser | null
+  created_at: string
+  votes: { user_id: string }[]
+}
+
+/** A suggestion as read for the admin view — adds author + voter display names. */
+export interface AdminSuggestion {
+  id: string
+  event_id: string
+  user_id: string
+  tmdb_movie: TmdbMovie
+  deleted: boolean
+  created_at: string
+  author: { display_name: string | null, email: string | null } | null
+  votes: { user_id: string, voter: { display_name: string | null } | null }[]
 }

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { countUserSuggestions, countUserVotes, remaining } from '../app/utils/participation'
 
 const suggestions = [
-  { userReference: { id: 'alice' }, votes: [{ userId: 'alice' }, { userId: 'bob' }] },
-  { userReference: { id: 'bob' }, votes: [{ userId: 'alice' }] },
-  { userReference: { id: 'carol' }, votes: [] }
+  { user_id: 'alice', votes: [{ user_id: 'alice' }, { user_id: 'bob' }] },
+  { user_id: 'bob', votes: [{ user_id: 'alice' }] },
+  { user_id: 'carol', votes: [] }
 ]
 
 describe('countUserVotes', () => {
@@ -15,7 +15,7 @@ describe('countUserVotes', () => {
   })
 
   it('tolerates missing votes arrays', () => {
-    expect(countUserVotes([{ userReference: { id: 'x' } }], 'x')).toBe(0)
+    expect(countUserVotes([{ user_id: 'x' }], 'x')).toBe(0)
   })
 })
 

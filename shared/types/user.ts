@@ -1,9 +1,9 @@
-/** The application's view of a signed-in user (subset of the Firebase user + role). */
-export interface AppUser {
-  uid: string
-  displayName: string | null
+/** A user profile row (public.profiles). */
+export interface Profile {
+  id: string
   email: string | null
-  photoURL: string | null
-  providerId?: string
-  isAdmin?: boolean
+  display_name: string | null
+  avatar_url: string | null
+  is_admin: boolean
+  created_at: string
 }

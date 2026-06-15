@@ -17,7 +17,7 @@ const { suggestions, setDeleted, voterNames } = useAdminSuggestions(selectedEven
 
 const eventOptions = computed(() =>
   events.value.map(event => ({
-    label: `${formatDate(event.timestamp, { dateStyle: 'medium' })} · ${event.title}`,
+    label: `${formatDate(event.event_date, { dateStyle: 'medium' })} · ${event.title}`,
     value: event.id
   }))
 )
@@ -94,9 +94,9 @@ async function toggleSuggestion(id: string, deleted: boolean): Promise<void> {
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="text-sm text-muted">
-                  {{ formatDate(event.timestamp) }}
+                  {{ formatDate(event.event_date) }}
                   <UBadge
-                    v-if="isUpcoming(event.timestamp)"
+                    v-if="isUpcoming(event.event_date)"
                     label="Upcoming"
                     color="primary"
                     variant="subtle"
@@ -159,15 +159,15 @@ async function toggleSuggestion(id: string, deleted: boolean): Promise<void> {
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <h3 class="font-semibold">
-                  {{ suggestion.suggestedItem.title }}
+                  {{ suggestion.tmdb_movie.title }}
                   <UBadge v-if="suggestion.deleted" label="Hidden" color="neutral" variant="subtle" size="xs" />
                 </h3>
                 <p class="text-sm text-muted truncate">
-                  by {{ suggestion.userEmail || suggestion.userReference?.email || 'unknown' }}
+                  by {{ suggestion.author?.email || 'unknown' }}
                 </p>
                 <p class="text-sm mt-1">
                   <UIcon name="i-lucide-heart" class="text-error align-text-bottom" />
-                  {{ suggestion.votesCount ?? suggestion.votes?.length ?? 0 }} votes
+                  {{ suggestion.votes?.length ?? 0 }} votes
                 </p>
                 <div v-if="voterNames(suggestion).length" class="flex flex-wrap gap-1 mt-2">
                   <UBadge

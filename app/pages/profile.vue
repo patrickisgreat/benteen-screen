@@ -1,8 +1,7 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'auth' })
 useSeoMeta({ title: 'Profile · BSOTG' })
 
-const { user, isAdmin } = useAuth()
+const { account, isAdmin } = useAuth()
 const { deleteAccount } = useAccount()
 const toast = useToast()
 
@@ -34,17 +33,17 @@ async function onDelete(): Promise<void> {
       Profile
     </h1>
 
-    <UCard v-if="user">
+    <UCard v-if="account">
       <div class="flex items-center gap-4">
         <UAvatar
-          :src="user.photoURL ?? undefined"
-          :alt="user.displayName ?? 'User'"
+          :src="account.avatarUrl ?? undefined"
+          :alt="account.displayName ?? 'User'"
           size="3xl"
         />
         <div class="min-w-0">
           <div class="flex items-center gap-2">
             <h2 class="text-xl font-semibold truncate">
-              {{ user.displayName }}
+              {{ account.displayName }}
             </h2>
             <UBadge
               v-if="isAdmin"
@@ -55,7 +54,7 @@ async function onDelete(): Promise<void> {
             />
           </div>
           <p class="text-muted truncate">
-            {{ user.email }}
+            {{ account.email }}
           </p>
         </div>
       </div>
@@ -63,7 +62,7 @@ async function onDelete(): Promise<void> {
       <USeparator class="my-6" />
 
       <UFormField label="Email" help="Managed by your Google account.">
-        <UInput :model-value="user.email ?? ''" readonly icon="i-lucide-mail" class="w-full" />
+        <UInput :model-value="account.email ?? ''" readonly icon="i-lucide-mail" class="w-full" />
       </UFormField>
     </UCard>
 

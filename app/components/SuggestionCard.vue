@@ -7,7 +7,7 @@ const emit = defineEmits<{ vote: [], unvote: [], remove: [] }>()
 const { user } = useAuth()
 const { posterUrl } = useTmdb()
 
-const movie = computed(() => props.suggestion.suggestedItem)
+const movie = computed(() => props.suggestion.tmdb_movie)
 const poster = computed(() => posterUrl(movie.value.poster_path))
 const year = computed(() => movie.value.release_date?.slice(0, 4) ?? '')
 const overview = computed(() => {
@@ -15,12 +15,12 @@ const overview = computed(() => {
   if (!text) return ''
   return text.length > 220 ? `${text.slice(0, 220).trimEnd()}…` : text
 })
-const voteCount = computed(() => props.suggestion.votesCount ?? props.suggestion.votes?.length ?? 0)
+const voteCount = computed(() => props.suggestion.votes?.length ?? 0)
 const hasVoted = computed(() =>
-  Boolean(user.value) && (props.suggestion.votes ?? []).some(v => v.userId === user.value!.uid)
+  Boolean(user.value) && (props.suggestion.votes ?? []).some(v => v.user_id === user.value!.id)
 )
 const isOwner = computed(() =>
-  Boolean(user.value) && props.suggestion.userReference?.id === user.value!.uid
+  Boolean(user.value) && props.suggestion.user_id === user.value!.id
 )
 const tmdbUrl = computed(() => `https://www.themoviedb.org/movie/${movie.value.id}`)
 </script>

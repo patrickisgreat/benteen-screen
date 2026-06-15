@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DropdownMenuItem, NavigationMenuItem } from '@nuxt/ui'
 
-const { user, isAdmin, signOutUser } = useAuth()
+const { account, isAdmin, signOutUser } = useAuth()
 
 const links = computed<NavigationMenuItem[]>(() => {
   const items: NavigationMenuItem[] = [
@@ -14,7 +14,7 @@ const links = computed<NavigationMenuItem[]>(() => {
 })
 
 const userMenu = computed<DropdownMenuItem[][]>(() => [
-  [{ label: user.value?.displayName ?? 'Signed in', type: 'label' as const, avatar: { src: user.value?.photoURL ?? undefined } }],
+  [{ label: account.value?.displayName ?? 'Signed in', type: 'label' as const, avatar: { src: account.value?.avatarUrl ?? undefined } }],
   [
     { label: 'Profile', icon: 'i-lucide-user', to: '/profile' },
     ...(isAdmin.value ? [{ label: 'Admin', icon: 'i-lucide-shield', to: '/admin' }] : [])
@@ -41,7 +41,7 @@ async function handleSignOut(): Promise<void> {
         <UColorModeButton />
 
         <UDropdownMenu
-          v-if="user"
+          v-if="account"
           :items="userMenu"
           :content="{ align: 'end' }"
         >
@@ -52,11 +52,11 @@ async function handleSignOut(): Promise<void> {
             class="gap-2"
           >
             <UAvatar
-              :src="user.photoURL ?? undefined"
-              :alt="user.displayName ?? 'User'"
+              :src="account.avatarUrl ?? undefined"
+              :alt="account.displayName ?? 'User'"
               size="2xs"
             />
-            <span class="hidden sm:inline max-w-32 truncate">{{ user.displayName }}</span>
+            <span class="hidden sm:inline max-w-32 truncate">{{ account.displayName }}</span>
           </UButton>
         </UDropdownMenu>
 

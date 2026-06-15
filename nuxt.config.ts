@@ -1,9 +1,9 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  modules: ['@nuxt/ui', '@nuxt/eslint'],
+  modules: ['@nuxt/ui', '@nuxt/eslint', '@nuxtjs/supabase'],
 
-  // Client-rendered SPA: Firebase auth is client-only. Nitro still serves /api/*
-  // routes (e.g. the TMDB proxy) as serverless functions when deployed.
+  // Client-rendered SPA. Nitro still serves /api/* routes (e.g. the TMDB proxy
+  // and account deletion) as serverless functions when deployed.
   ssr: false,
 
   devtools: { enabled: true },
@@ -25,21 +25,18 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Server-only — never shipped to the browser. Nitro overrides this from
     // NUXT_TMDB_API_KEY at runtime.
-    tmdbApiKey: '',
-    public: {
-      // Firebase web config is public by design. Nitro injects these from the
-      // NUXT_PUBLIC_FIREBASE_* environment variables into the served HTML at
-      // request time — so they must be set in the deploy environment (Vercel),
-      // not just locally. Defaults are intentionally empty.
-      firebase: {
-        apiKey: '',
-        authDomain: '',
-        projectId: '',
-        storageBucket: '',
-        messagingSenderId: '',
-        appId: '',
-        databaseURL: ''
-      }
+    tmdbApiKey: ''
+  },
+
+  // @nuxtjs/supabase reads SUPABASE_URL / SUPABASE_KEY (and SUPABASE_SERVICE_KEY
+  // for server-side admin actions) from the environment. The global auth
+  // middleware redirects unauthenticated users to /login for every route except
+  // those excluded below; the login + callback routes are handled by the module.
+  supabase: {
+    redirectOptions: {
+      login: '/login',
+      callback: '/confirm',
+      exclude: ['/', '/about']
     }
   },
 
