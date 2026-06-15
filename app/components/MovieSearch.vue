@@ -48,13 +48,12 @@ function year(movie: TmdbMovie): string {
       icon="i-lucide-search"
       :loading="loading"
       placeholder="Search for a movie to suggest…"
-      size="lg"
       class="w-full"
     />
 
     <ul
       v-if="results.length"
-      class="divide-y divide-default rounded-lg ring ring-default overflow-hidden"
+      class="divide-y divide-default rounded-lg ring ring-default overflow-hidden max-h-80 overflow-y-auto"
     >
       <li v-for="movie in results" :key="movie.id">
         <button

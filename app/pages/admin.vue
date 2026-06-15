@@ -76,11 +76,11 @@ async function toggleSuggestion(id: string, deleted: boolean): Promise<void> {
 
 <template>
   <UContainer class="py-8 max-w-4xl">
-    <div class="flex items-center justify-between mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
       <h1 class="text-3xl font-bold">
         Admin
       </h1>
-      <UButton label="Add movie night" icon="i-lucide-plus" @click="openCreate" />
+      <UButton label="Add movie night" icon="i-lucide-plus" class="w-full sm:w-auto justify-center" @click="openCreate" />
     </div>
 
     <div class="grid gap-8 lg:grid-cols-2">
@@ -113,7 +113,7 @@ async function toggleSuggestion(id: string, deleted: boolean): Promise<void> {
                   icon="i-lucide-pencil"
                   color="neutral"
                   variant="ghost"
-                  size="xs"
+                  size="sm"
                   aria-label="Edit event"
                   @click="openEdit(event)"
                 />
@@ -121,7 +121,7 @@ async function toggleSuggestion(id: string, deleted: boolean): Promise<void> {
                   icon="i-lucide-trash-2"
                   color="error"
                   variant="ghost"
-                  size="xs"
+                  size="sm"
                   aria-label="Delete event"
                   @click="eventPendingDelete = event"
                 />
@@ -186,7 +186,7 @@ async function toggleSuggestion(id: string, deleted: boolean): Promise<void> {
                 icon="i-lucide-rotate-ccw"
                 color="neutral"
                 variant="outline"
-                size="xs"
+                size="sm"
                 class="shrink-0"
                 @click="toggleSuggestion(suggestion.id, false)"
               />
@@ -196,7 +196,7 @@ async function toggleSuggestion(id: string, deleted: boolean): Promise<void> {
                 icon="i-lucide-eye-off"
                 color="error"
                 variant="outline"
-                size="xs"
+                size="sm"
                 class="shrink-0"
                 @click="toggleSuggestion(suggestion.id, true)"
               />
@@ -220,9 +220,9 @@ async function toggleSuggestion(id: string, deleted: boolean): Promise<void> {
       @update:open="(value) => { if (!value) eventPendingDelete = null }"
     >
       <template #footer>
-        <div class="flex justify-end gap-2 w-full">
-          <UButton label="Cancel" color="neutral" variant="ghost" @click="eventPendingDelete = null" />
-          <UButton label="Delete" color="error" icon="i-lucide-trash-2" @click="confirmDelete" />
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full">
+          <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="eventPendingDelete = null" />
+          <UButton label="Delete" color="error" icon="i-lucide-trash-2" class="justify-center" @click="confirmDelete" />
         </div>
       </template>
     </UModal>
