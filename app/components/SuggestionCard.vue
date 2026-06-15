@@ -2,7 +2,7 @@
 import type { Suggestion } from '#shared/types/suggestion'
 
 const props = defineProps<{ suggestion: Suggestion, voteLocked?: boolean }>()
-const emit = defineEmits<{ vote: []; unvote: []; remove: [] }>()
+const emit = defineEmits<{ vote: [], unvote: [], remove: [] }>()
 
 const { user } = useAuth()
 const { posterUrl } = useTmdb()
