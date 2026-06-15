@@ -5,4 +5,4 @@
  * firestore.rules (Product Invariant 3).
  */
 export const VOTE_LIMIT = 3
-export const SUGGESTION_LIMIT = 2
+export const SUGGESTION_LIMIT = 5
