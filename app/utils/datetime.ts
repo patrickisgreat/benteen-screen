@@ -23,6 +23,14 @@ export function isSameDay(a: Date, b: Date): boolean {
   )
 }
 
+/** Format a Date as `YYYY-MM-DD` for an `<input type="date">`. */
+export function toInputDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 /** True when the event date is today or in the future. */
 export function isUpcoming(ts: TimestampLike): boolean {
   const date = toDate(ts)
