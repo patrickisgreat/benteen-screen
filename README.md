@@ -45,11 +45,15 @@ npm run build        # production build (Nitro server + SPA)
 
 ## Deploy
 
-### Netlify (recommended)
+### Vercel (recommended)
 
-`netlify.toml` is preconfigured: `npm run build` produces the Nitro server, and
-the `/api/*` routes (the TMDB proxy) deploy as serverless functions. Set the
-`NUXT_*` environment variables in the Netlify dashboard.
+Zero-config: import the repo in Vercel and it auto-detects Nuxt, runs `nuxt build`,
+and Nitro's Vercel preset ships the static SPA plus serverless functions for the
+`/api/*` routes (the TMDB proxy). No `vercel.json` needed.
+
+Set the env vars under **Project → Settings → Environment Variables** — the same
+`NUXT_*` keys as `.env.example`: the public `NUXT_PUBLIC_FIREBASE_*` config and the
+server-only `NUXT_TMDB_API_KEY`. (Node 22 is picked up from `engines` in package.json.)
 
 ### Firebase (rules & indexes)
 
