@@ -32,9 +32,9 @@ const tmdbUrl = computed(() => `https://www.themoviedb.org/movie/${movie.value.i
         v-if="poster"
         :src="poster"
         :alt="movie.title"
-        class="h-36 w-24 rounded-md object-cover bg-elevated shrink-0"
+        class="h-28 w-20 sm:h-36 sm:w-24 rounded-md object-cover bg-elevated shrink-0"
       >
-      <div v-else class="h-36 w-24 rounded-md bg-elevated shrink-0 flex items-center justify-center">
+      <div v-else class="h-28 w-20 sm:h-36 sm:w-24 rounded-md bg-elevated shrink-0 flex items-center justify-center">
         <UIcon name="i-lucide-film" class="size-8 text-muted" />
       </div>
 
@@ -49,7 +49,8 @@ const tmdbUrl = computed(() => `https://www.themoviedb.org/movie/${movie.value.i
             icon="i-lucide-trash-2"
             color="neutral"
             variant="ghost"
-            size="xs"
+            size="sm"
+            class="shrink-0 -mr-1 -mt-1"
             aria-label="Remove suggestion"
             @click="emit('remove')"
           />

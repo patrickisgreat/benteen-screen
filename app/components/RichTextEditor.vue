@@ -48,13 +48,13 @@ const tools = computed<ToolButton[]>(() => {
 
 <template>
   <div class="rounded-lg ring ring-default focus-within:ring-2 focus-within:ring-primary overflow-hidden">
-    <div class="flex flex-wrap gap-0.5 border-b border-default p-1 bg-elevated/40">
+    <div class="flex flex-wrap gap-1 border-b border-default p-1.5 bg-elevated/40">
       <UButton
         v-for="tool in tools"
         :key="tool.label"
         :icon="tool.icon"
         :aria-label="tool.label"
-        size="xs"
+        size="sm"
         :color="tool.isActive() ? 'primary' : 'neutral'"
         :variant="tool.isActive() ? 'soft' : 'ghost'"
         @click="tool.run()"

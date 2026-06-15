@@ -213,7 +213,7 @@ async function onRemove(suggestion: typeof suggestions.value[number]): Promise<v
               v-if="selectedMovie.poster_path"
               :src="`https://image.tmdb.org/t/p/w500${selectedMovie.poster_path}`"
               :alt="selectedMovie.title"
-              class="h-40 w-28 rounded-md object-cover bg-elevated shrink-0"
+              class="h-32 w-24 sm:h-40 sm:w-28 rounded-md object-cover bg-elevated shrink-0"
             >
             <div class="min-w-0 flex-1">
               <h3 class="font-semibold text-lg">
@@ -229,10 +229,11 @@ async function onRemove(suggestion: typeof suggestions.value[number]): Promise<v
               <p v-if="selectedMovie.overview" class="text-sm text-muted mt-2 line-clamp-4">
                 {{ selectedMovie.overview }}
               </p>
-              <div class="flex gap-2 mt-4">
+              <div class="flex flex-col sm:flex-row gap-2 mt-4">
                 <UButton
                   label="Suggest this"
                   icon="i-lucide-plus"
+                  class="justify-center"
                   :disabled="alreadySuggested(selectedMovie.id)"
                   @click="onSuggest(selectedMovie)"
                 />
@@ -240,6 +241,7 @@ async function onRemove(suggestion: typeof suggestions.value[number]): Promise<v
                   label="Cancel"
                   color="neutral"
                   variant="ghost"
+                  class="justify-center"
                   @click="selectedMovie = null"
                 />
               </div>

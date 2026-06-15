@@ -83,6 +83,7 @@ async function onDelete(): Promise<void> {
           color="error"
           variant="outline"
           icon="i-lucide-trash-2"
+          class="w-full sm:w-auto justify-center"
           @click="confirmOpen = true"
         />
       </div>
@@ -94,9 +95,9 @@ async function onDelete(): Promise<void> {
       description="This permanently deletes your account and sign-in. This action cannot be undone."
     >
       <template #footer>
-        <div class="flex justify-end gap-2 w-full">
-          <UButton label="Cancel" color="neutral" variant="ghost" @click="confirmOpen = false" />
-          <UButton label="Delete account" color="error" icon="i-lucide-trash-2" :loading="deleting" @click="onDelete" />
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full">
+          <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="confirmOpen = false" />
+          <UButton label="Delete account" color="error" icon="i-lucide-trash-2" class="justify-center" :loading="deleting" @click="onDelete" />
         </div>
       </template>
     </UModal>
