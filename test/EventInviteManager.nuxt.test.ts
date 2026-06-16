@@ -1,6 +1,7 @@
 // @vitest-environment nuxt
 import { describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
+import { flushPromises } from '@vue/test-utils'
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import EventInviteManager from '../app/components/EventInviteManager.vue'
 
@@ -10,6 +11,7 @@ const invites = ref([
 ])
 const sent = vi.fn(async () => ({ sent: 0 }))
 const removeMany = vi.fn(async () => {})
+const seedFn = vi.fn(async () => 0)
 
 mockNuxtImport('useEventInvites', () => () => ({
   invites,
@@ -19,7 +21,7 @@ mockNuxtImport('useEventInvites', () => () => ({
   addInvite: async () => {},
   removeInvite: async () => {},
   removeInvites: removeMany,
-  seedFromLastEvent: async () => 0,
+  seedFromLastEvent: seedFn,
   sendInvites: sent
 }))
 mockNuxtImport('useToast', () => () => ({ add: () => {} }))
@@ -50,5 +52,26 @@ describe('EventInviteManager', () => {
     const del = w.findAll('button').find(b => b.text().includes('Delete'))
     await del!.trigger('click')
     expect(removeMany).toHaveBeenCalledWith(['b'])
+  })
+
+  it('does not auto-pull from the last event on load, even when the list is empty', async () => {
+    seedFn.mockClear()
+    const saved = invites.value
+    invites.value = []
+    try {
+      await mountSuspended(EventInviteManager, { props: { eventId: 'fresh-event' } })
+      await flushPromises()
+      expect(seedFn).not.toHaveBeenCalled()
+    } finally {
+      invites.value = saved
+    }
+  })
+
+  it('pulls from the last event only when the button is clicked', async () => {
+    seedFn.mockClear()
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e' } })
+    const pull = w.findAll('button').find(b => b.text().includes('Pull from last event'))
+    await pull!.trigger('click')
+    expect(seedFn).toHaveBeenCalledTimes(1)
   })
 })
