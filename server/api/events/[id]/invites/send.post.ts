@@ -29,13 +29,16 @@ export default defineEventHandler(async (event) => {
   const { data: ev } = await db.from('events').select('title, event_date, location').eq('id', eventId).single()
   if (!ev) throw createError({ statusCode: 404, statusMessage: 'Event not found' })
 
-  const { data: invites } = await db
+  const { data: invites, error: queueError } = await db
     .from('event_invites')
     .select('id, email, display_name, token')
     .eq('event_id', eventId)
     .is('sent_at', null)
+  if (queueError) {
+    throw createError({ statusCode: 500, statusMessage: 'Could not load the guest list', data: { cause: queueError.message, code: queueError.code } })
+  }
   const queue = invites ?? []
-  if (!queue.length) return { ok: true, sent: 0 }
+  if (!queue.length) return { ok: true, sent: 0, failed: 0, error: null }
 
   const config = useRuntimeConfig(event)
   if (!config.resendApiKey) throw createError({ statusCode: 500, statusMessage: 'Email is not configured' })
@@ -44,6 +47,7 @@ export default defineEventHandler(async (event) => {
   const inviterName = meta?.full_name ?? meta?.name ?? user.email ?? null
 
   let sent = 0
+  const failures: { email: string, error: string }[] = []
   for (const invite of queue) {
     const mail = buildEventInviteEmail({
       eventTitle: ev.title,
@@ -70,9 +74,15 @@ export default defineEventHandler(async (event) => {
         .update({ sent_at: new Date().toISOString(), resend_id: resendId })
         .eq('id', invite.id)
       sent++
-    } catch {
-      // Skip this recipient; leave sent_at null so a later send retries it.
+    } catch (e) {
+      // Leave sent_at null so a later send retries — but record WHY (don't swallow:
+      // a swallowed Resend rejection looked like "everyone already invited").
+      const message = e instanceof Error ? e.message : 'Unknown error'
+      failures.push({ email: invite.email, error: message })
+      console.error('[events/invites/send] failed for', invite.email, '-', message)
     }
   }
-  return { ok: true, sent }
+  // `error` carries the first failure (usually identical across recipients, e.g. an
+  // unverified Resend sender domain) so the UI can show the real reason.
+  return { ok: true, sent, failed: failures.length, error: failures[0]?.error ?? null }
 })
