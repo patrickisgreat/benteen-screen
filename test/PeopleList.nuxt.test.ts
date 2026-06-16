@@ -1,7 +1,11 @@
 // @vitest-environment nuxt
 import { describe, expect, it } from 'vitest'
-import { mountSuspended } from '@nuxt/test-utils/runtime'
+import { ref } from 'vue'
+import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import PeopleList from '../app/components/PeopleList.vue'
+
+// "me" is Carol (u3, an admin) — her own row hides the admin toggle.
+mockNuxtImport('useAuth', () => () => ({ myId: ref('u3') }))
 
 const people = [
   { id: 'u1', email: 'alice@x.com', display_name: 'Alice', avatar_url: null, is_admin: false, blocked: false, created_at: '' },
@@ -84,5 +88,20 @@ describe('PeopleList', () => {
   it('does not make pending invites clickable for stats', async () => {
     const w = await mountSuspended(PeopleList, { props: { people, pending } })
     expect(w.find('[aria-label="View Pat\'s activity"]').exists()).toBe(false)
+  })
+
+  it('emits setAdmin to promote a non-admin member', async () => {
+    const w = await mountSuspended(PeopleList, { props: { people } })
+    const makeAdmin = w.findAll('button').find(b => b.text().trim() === 'Make admin')
+    await makeAdmin?.trigger('click')
+    expect(w.emitted('setAdmin')?.[0]).toEqual([people[0], true])
+  })
+
+  it('hides the admin toggle on your own row', async () => {
+    // Carol (u3) is "me" and an admin — no Make/Remove admin button on her row.
+    const w = await mountSuspended(PeopleList, { props: { people } })
+    const labels = w.findAll('button').map(b => b.text().trim())
+    // Two other members get a toggle; Carol (self) does not → exactly two toggles.
+    expect(labels.filter(l => l === 'Make admin' || l === 'Remove admin')).toHaveLength(2)
   })
 })

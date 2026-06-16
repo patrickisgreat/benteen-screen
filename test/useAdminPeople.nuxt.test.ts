@@ -68,6 +68,18 @@ describe('useAdminPeople', () => {
     expect(calls.rpc[0]).toEqual({ fn: 'admin_set_blocked', args: { target_id: 'u1', value: true } })
   })
 
+  it('setAdmin grants admin via the admin RPC', async () => {
+    const { setAdmin } = useAdminPeople()
+    await setAdmin('u1', true)
+    expect(calls.rpc[0]).toEqual({ fn: 'admin_set_admin', args: { target_id: 'u1', value: true } })
+  })
+
+  it('setAdmin revokes admin via the admin RPC', async () => {
+    const { setAdmin } = useAdminPeople()
+    await setAdmin('u2', false)
+    expect(calls.rpc[0]).toEqual({ fn: 'admin_set_admin', args: { target_id: 'u2', value: false } })
+  })
+
   it('revokeInvite deletes the invite by email', async () => {
     const { revokeInvite } = useAdminPeople()
     await revokeInvite('pending@x.com')
