@@ -1,4 +1,4 @@
-import { serverSupabaseClient, serverSupabaseUser } from '#supabase/server'
+import { serverSupabaseServiceRole, serverSupabaseUser } from '#supabase/server'
 import { z } from 'zod'
 import type { Database } from '~/types/database.types'
 
@@ -8,11 +8,11 @@ const bodySchema = z.object({
 })
 
 /**
- * Invite a friend: any allowlisted member adds an email to the allowlist and we
- * send them an e-vite. The insert runs under the member's own session so RLS
- * (must be allowlisted + not blocked) and the total-invite cap trigger apply —
- * the route never bypasses the authorization boundary (Invariant 1). The Resend
- * key stays server-only (Invariant 2).
+ * Invite a friend: an allowlisted, non-blocked member adds an email to the
+ * allowlist and we send them an e-vite. Uses the service role (the caller's
+ * session isn't reliably available in the serverless fn), so we re-check the
+ * inviter is allowed + not blocked here — the same gate RLS would apply
+ * (Invariant 1). The Resend key stays server-only (Invariant 2).
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
@@ -24,20 +24,31 @@ export default defineEventHandler(async (event) => {
   }
   const { email, name } = parsed.data
 
-  const client = await serverSupabaseClient<Database>(event)
-  const { error: insertError } = await client.from('invites').insert({
+  const db = serverSupabaseServiceRole<Database>(event)
+
+  // The inviter must be an allowlisted (admin or on the list), non-blocked member.
+  const { data: me } = await db.from('profiles').select('is_admin, blocked').eq('id', user.id).single()
+  if (!me || me.blocked) throw createError({ statusCode: 403, statusMessage: 'Not allowed to invite' })
+  let allowed = me.is_admin
+  const inviterEmail = (user.email ?? '').trim().toLowerCase()
+  if (!allowed && inviterEmail) {
+    const { data: onList } = await db.from('invites').select('email').eq('email', inviterEmail).maybeSingle()
+    allowed = Boolean(onList)
+  }
+  if (!allowed) throw createError({ statusCode: 403, statusMessage: 'Not allowed to invite' })
+
+  // 23505 = already on the allowlist; that's fine, we still (re)send the e-vite.
+  const { error: insertError } = await db.from('invites').insert({
     email,
     display_name: name ?? null,
     invited_by: user.id
   })
-  // 23505 = already on the allowlist; that's fine, we still (re)send the e-vite.
   if (insertError && insertError.code !== '23505') {
-    // RLS denial / cap reached / blocked all surface here.
-    throw createError({ statusCode: 403, statusMessage: insertError.message || 'Could not add invite' })
+    throw createError({ statusCode: 400, statusMessage: insertError.message || 'Could not add invite' })
   }
 
-  // Enrich the e-vite with the next upcoming event, if any (read is RLS-gated).
-  const { data: nextEvent } = await client
+  // Enrich the e-vite with the next upcoming event, if any.
+  const { data: nextEvent } = await db
     .from('events')
     .select('title, event_date')
     .gte('event_date', new Date().toISOString())

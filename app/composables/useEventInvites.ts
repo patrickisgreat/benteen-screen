@@ -60,28 +60,31 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     await refresh()
   }
 
-  /** Copy the previous event's guest list onto this one (skipping anyone already
-   *  here) — the "auto-add from last event unless we remove them" behavior. */
+  /** Copy the guest list from the most recent OTHER event that actually has one
+   *  onto this event (skipping anyone already here) — the "auto-add from the last
+   *  event unless we remove them" behavior. Walks past events with no list and
+   *  tolerates events added out of date order, instead of only checking the single
+   *  chronologically-previous event. */
   async function seedFromLastEvent(): Promise<number> {
     const id = toValue(eventId)
     if (!id) return 0
-    const { data: current } = await supabase.from('events').select('event_date').eq('id', id).single()
-    if (!current) return 0
-    const { data: prev } = await supabase
+    const { data: others } = await supabase
       .from('events')
       .select('id')
-      .lt('event_date', current.event_date)
+      .neq('id', id)
       .order('event_date', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (!prev) return 0
-    const { data: prevInvites } = await supabase
+    const otherIds = (others ?? []).map(e => e.id)
+    if (!otherIds.length) return 0
+    const { data: pool } = await supabase
       .from('event_invites')
-      .select('email, display_name')
-      .eq('event_id', prev.id)
+      .select('event_id, email, display_name')
+      .in('event_id', otherIds)
+    // otherIds is newest-first; take the first that has any invites.
+    const sourceId = otherIds.find(eid => (pool ?? []).some(p => p.event_id === eid))
+    if (!sourceId) return 0
     const existing = new Set(invites.value.map(i => i.email))
-    const toAdd = (prevInvites ?? [])
-      .filter(p => !existing.has(p.email))
+    const toAdd = (pool ?? [])
+      .filter(p => p.event_id === sourceId && !existing.has(p.email))
       .map(p => ({ event_id: id, email: p.email, display_name: p.display_name }))
     if (!toAdd.length) return 0
     const { error } = await supabase.from('event_invites').insert(toAdd)

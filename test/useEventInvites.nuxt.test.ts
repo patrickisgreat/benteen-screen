@@ -4,12 +4,16 @@ import { ref } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 
-let list: Array<Record<string, unknown>> = []
+let list: Array<Record<string, unknown>> = [] // current event's invites (refresh)
+let eventsList: Array<Record<string, unknown>> = [] // other events (seed)
+let poolList: Array<Record<string, unknown>> = [] // invites across other events (seed pool)
 const ops = { inserted: [] as unknown[], deleted: [] as unknown[] }
 
-// Thenable + chainable stub mirroring the PostgREST builder: awaiting the chain
-// resolves to { data: list }; terminal single()/maybeSingle() resolve explicitly.
+// Thenable + chainable stub mirroring the PostgREST builder. event_invites resolves
+// to the seed `poolList` when filtered with .in() (the pool query) and `list`
+// otherwise (the per-event refresh); events resolves to `eventsList`.
 function builder(table: string) {
+  let usedIn = false
   const c: Record<string, unknown> = {
     select: () => c,
     eq: () => c,
@@ -17,6 +21,11 @@ function builder(table: string) {
     lt: () => c,
     limit: () => c,
     is: () => c,
+    neq: () => c,
+    in: () => {
+      usedIn = true
+      return c
+    },
     single: () => Promise.resolve({ data: { event_date: '2026-01-01' } }),
     maybeSingle: () => Promise.resolve({ data: null }),
     insert: (v: unknown) => {
@@ -29,7 +38,10 @@ function builder(table: string) {
         return Promise.resolve({ error: null })
       }
     }),
-    then: (resolve: (v: unknown) => void) => resolve({ data: table === 'event_invites' ? list : [] })
+    then: (resolve: (v: unknown) => void) => {
+      const data = table === 'events' ? eventsList : table === 'event_invites' ? (usedIn ? poolList : list) : []
+      resolve({ data })
+    }
   }
   return c
 }
@@ -43,6 +55,8 @@ mockNuxtImport('useSupabaseClient', () => () => supabase)
 
 beforeEach(() => {
   list = []
+  eventsList = []
+  poolList = []
   ops.inserted = []
   ops.deleted = []
 })
@@ -73,5 +87,25 @@ describe('useEventInvites', () => {
     await flushPromises()
     await removeInvite('a')
     expect(ops.deleted).toContain('a')
+  })
+
+  it('seedFromLastEvent pulls from the most recent other event that has a list', async () => {
+    // Current event ('e') has no invites; an older event ('prev') does.
+    list = []
+    eventsList = [{ id: 'prev' }]
+    poolList = [{ event_id: 'prev', email: 'guest@x', display_name: 'Guest' }]
+    const { seedFromLastEvent } = useEventInvites(ref('e'))
+    await flushPromises()
+    const added = await seedFromLastEvent()
+    expect(added).toBe(1)
+    expect(ops.inserted.flat().some(i => (i as { email?: string }).email === 'guest@x')).toBe(true)
+  })
+
+  it('seedFromLastEvent returns 0 when no other event has a list', async () => {
+    eventsList = [{ id: 'prev' }]
+    poolList = []
+    const { seedFromLastEvent } = useEventInvites(ref('e'))
+    await flushPromises()
+    expect(await seedFromLastEvent()).toBe(0)
   })
 })
