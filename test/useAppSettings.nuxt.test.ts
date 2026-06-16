@@ -7,13 +7,18 @@ const supabase = {
   from() {
     return {
       select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { max_invites: 10 } }) }) }),
-      update: (payload: unknown) => { updates.push(payload); return { eq: () => Promise.resolve({ error: null }) } }
+      update: (payload: unknown) => {
+        updates.push(payload)
+        return { eq: () => Promise.resolve({ error: null }) }
+      }
     }
   }
 }
 mockNuxtImport('useSupabaseClient', () => () => supabase)
 
-beforeEach(() => { updates.length = 0 })
+beforeEach(() => {
+  updates.length = 0
+})
 
 describe('useAppSettings', () => {
   it('setMaxInvites updates the singleton and reflects the new value', async () => {
