@@ -17,6 +17,12 @@ export interface Database {
         Update: { email?: string, invited_by?: string | null, display_name?: string | null, created_at?: string, accepted_at?: string | null }
         Relationships: []
       }
+      app_settings: {
+        Row: { id: boolean, max_invites: number | null, updated_at: string }
+        Insert: { id?: boolean, max_invites?: number | null, updated_at?: string }
+        Update: { id?: boolean, max_invites?: number | null, updated_at?: string }
+        Relationships: []
+      }
       events: {
         Row: { id: string, title: string, description: string, event_date: string, start_time: string | null, location: string | null, location_url: string | null, poster_url: string | null, created_by: string | null, created_at: string }
         Insert: { id?: string, title: string, description?: string, event_date: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, created_by?: string | null, created_at?: string }

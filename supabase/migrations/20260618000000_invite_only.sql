@@ -62,21 +62,43 @@ from public.profiles
 where email is not null and trim(email) <> ''
 on conflict (email) do nothing;
 
--- ---------- Per-member invite cap ----------
--- Any member may invite friends, but not unboundedly. Admins and the system
--- seed (invited_by null) are exempt. Adjust the cap by editing this function.
+-- ---------- App settings (admin-tunable, single row) ----------
+-- max_invites caps the TOTAL allowlist size (null = unlimited). Admins set it
+-- from the command center; the invite cap trigger reads it.
+create table public.app_settings (
+  id          boolean primary key default true check (id), -- single-row guard
+  max_invites int,
+  updated_at  timestamptz not null default now()
+);
+insert into public.app_settings (id) values (true) on conflict (id) do nothing;
+
+alter table public.app_settings enable row level security;
+grant select, update on public.app_settings to authenticated;
+-- The cap number isn't sensitive — any authenticated user can read it (so the
+-- invite UI can show "X of Y invites used"); only admins may change it.
+create policy "app_settings: read" on public.app_settings
+  for select to authenticated using (true);
+create policy "app_settings: admin update" on public.app_settings
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- ---------- Total invite cap ----------
+-- Any member may invite friends, but the total allowlist can't exceed the
+-- admin-set max_invites. Admins and the system seed (invited_by null) are exempt.
 create function public.enforce_invite_cap() returns trigger
   language plpgsql security definer set search_path = '' as $$
 declare
-  cnt int;
-  cap constant int := 25;
+  cap   int;
+  total int;
 begin
   if new.invited_by is null or public.is_admin() then
     return new;
   end if;
-  select count(*) into cnt from public.invites where invited_by = new.invited_by;
-  if cnt >= cap then
-    raise exception 'Invite limit (%) reached', cap using errcode = 'check_violation';
+  select max_invites into cap from public.app_settings where id;
+  if cap is not null then
+    select count(*) into total from public.invites;
+    if total >= cap then
+      raise exception 'Total invite limit (%) reached', cap using errcode = 'check_violation';
+    end if;
   end if;
   return new;
 end;
