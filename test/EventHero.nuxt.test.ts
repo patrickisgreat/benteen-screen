@@ -44,4 +44,11 @@ describe('EventHero', () => {
     await w.find('button').trigger('click')
     expect(w.emitted('open')).toHaveLength(1)
   })
+
+  it('signals it is clickable (cursor + link-styled title)', async () => {
+    const w = await mountSuspended(EventHero, { props: { event: baseEvent, backdrop: null } })
+    expect(w.find('button').classes()).toContain('cursor-pointer')
+    // The title underlines on hover so it reads as the link that opens details.
+    expect(w.find('h1').classes()).toContain('group-hover:underline')
+  })
 })
