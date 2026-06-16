@@ -1,0 +1,114 @@
+import type { MaybeRefOrGetter } from 'vue'
+import type { Database } from '~/types/database.types'
+import type { EventInvite, InviteStats } from '#shared/types/event-invite'
+
+/**
+ * Admin-only per-event guest list (public.event_invites). Loads the invitees for
+ * an event, supports add/remove, auto-rolls the list forward from the previous
+ * event, and exposes Evite-style tracking stats. Sending the e-vites is a server
+ * route (Resend key is server-only); RSVP/opens flow back in via realtime.
+ */
+export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
+  const supabase = useSupabaseClient<Database>()
+  const invites = ref<EventInvite[]>([])
+  const pending = ref(false)
+
+  async function refresh(): Promise<void> {
+    const id = toValue(eventId)
+    if (!id) { invites.value = []; return }
+    pending.value = true
+    const { data } = await supabase
+      .from('event_invites')
+      .select('*')
+      .eq('event_id', id)
+      .order('created_at')
+    invites.value = (data as EventInvite[] | null) ?? []
+    pending.value = false
+  }
+
+  const stats = computed<InviteStats>(() => {
+    const all = invites.value
+    return {
+      invited: all.length,
+      sent: all.filter(i => i.sent_at).length,
+      opened: all.filter(i => i.opened_at).length,
+      clicked: all.filter(i => i.clicked_at).length,
+      going: all.filter(i => i.rsvp === 'going').length,
+      maybe: all.filter(i => i.rsvp === 'maybe').length,
+      no: all.filter(i => i.rsvp === 'no').length,
+      noReply: all.filter(i => !i.rsvp).length
+    }
+  })
+
+  async function addInvite(email: string, displayName?: string): Promise<void> {
+    const id = toValue(eventId)
+    if (!id) return
+    const { error } = await supabase
+      .from('event_invites')
+      .insert({ event_id: id, email, display_name: displayName ?? null })
+    // 23505 = already on this event's list — harmless.
+    if (error && error.code !== '23505') throw error
+    await refresh()
+  }
+
+  async function removeInvite(inviteId: string): Promise<void> {
+    const { error } = await supabase.from('event_invites').delete().eq('id', inviteId)
+    if (error) throw error
+    await refresh()
+  }
+
+  /** Copy the previous event's guest list onto this one (skipping anyone already
+   *  here) — the "auto-add from last event unless we remove them" behavior. */
+  async function seedFromLastEvent(): Promise<number> {
+    const id = toValue(eventId)
+    if (!id) return 0
+    const { data: current } = await supabase.from('events').select('event_date').eq('id', id).single()
+    if (!current) return 0
+    const { data: prev } = await supabase
+      .from('events')
+      .select('id')
+      .lt('event_date', current.event_date)
+      .order('event_date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!prev) return 0
+    const { data: prevInvites } = await supabase
+      .from('event_invites')
+      .select('email, display_name')
+      .eq('event_id', prev.id)
+    const existing = new Set(invites.value.map(i => i.email))
+    const toAdd = (prevInvites ?? [])
+      .filter(p => !existing.has(p.email))
+      .map(p => ({ event_id: id, email: p.email, display_name: p.display_name }))
+    if (!toAdd.length) return 0
+    const { error } = await supabase.from('event_invites').insert(toAdd)
+    if (error) throw error
+    await refresh()
+    return toAdd.length
+  }
+
+  /** Send (or re-send) the tokenized e-vites for this event via the server route. */
+  async function sendInvites(): Promise<{ sent: number }> {
+    const id = toValue(eventId)
+    if (!id) return { sent: 0 }
+    const result = await $fetch<{ ok: boolean, sent: number }>(`/api/events/${id}/invites/send`, { method: 'POST' })
+    await refresh()
+    return { sent: result.sent }
+  }
+
+  // Live updates as RSVPs / opens land (event_invites is in the realtime publication).
+  let channel: ReturnType<typeof supabase.channel> | null = null
+  watch(() => toValue(eventId), (id) => {
+    if (channel) { supabase.removeChannel(channel); channel = null }
+    void refresh()
+    if (!id) return
+    channel = supabase
+      .channel(`event_invites:${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_invites', filter: `event_id=eq.${id}` }, () => { void refresh() })
+      .subscribe()
+  }, { immediate: true })
+
+  onScopeDispose(() => { if (channel) supabase.removeChannel(channel) })
+
+  return { invites, pending, stats, refresh, addInvite, removeInvite, seedFromLastEvent, sendInvites }
+}

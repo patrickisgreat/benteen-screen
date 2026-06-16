@@ -1,11 +1,34 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildAnnounceEmail,
+  buildEventInviteEmail,
   buildInviteEmail,
   escapeHtml,
   formatEmailDate,
   uniqueEmails
 } from '../server/utils/email'
+
+describe('buildEventInviteEmail', () => {
+  it('includes tokenized Going/Maybe/No RSVP links', () => {
+    const m = buildEventInviteEmail({
+      eventTitle: 'Jaws',
+      eventDate: 'Friday',
+      location: 'The Green',
+      inviterName: 'Sam',
+      rsvpUrl: 'https://x/rsvp?token=abc'
+    })
+    expect(m.subject).toContain('Jaws')
+    expect(m.html).toContain('https://x/rsvp?token=abc&amp;status=going')
+    expect(m.html).toContain('status=maybe')
+    expect(m.html).toContain('status=no')
+    expect(m.text).toContain('token=abc&status=going')
+  })
+
+  it('falls back to "Your host" without an inviter name', () => {
+    const m = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, location: null, inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc' })
+    expect(m.html).toContain('Your host')
+  })
+})
 
 describe('email utils', () => {
   it('escapeHtml neutralizes angle brackets and quotes', () => {
