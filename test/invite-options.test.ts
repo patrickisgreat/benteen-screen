@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_INVITE_OPTIONS } from '../shared/types/invite-options'
-import { normalizeInviteOptions } from '../shared/utils/inviteOptions'
+import { normalizeInviteOptions } from '../shared/utils/invite-options'
 
 describe('normalizeInviteOptions', () => {
   it('returns the defaults for null/garbage input', () => {

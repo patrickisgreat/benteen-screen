@@ -50,6 +50,21 @@ const previewHtml = computed(() => {
   }).html
 })
 
+// Debounce the iframe srcdoc so typing in the message doesn't refetch the
+// preview's <link> font on every keystroke. Seed it synchronously so the preview
+// is there on first paint.
+const debouncedPreview = ref(previewHtml.value)
+let previewTimer: ReturnType<typeof setTimeout> | null = null
+watch(previewHtml, (html) => {
+  if (previewTimer) clearTimeout(previewTimer)
+  previewTimer = setTimeout(() => {
+    debouncedPreview.value = html
+  }, 250)
+})
+onScopeDispose(() => {
+  if (previewTimer) clearTimeout(previewTimer)
+})
+
 async function onSaveOptions(): Promise<void> {
   savingOptions.value = true
   try {
@@ -247,6 +262,7 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
                   size="sm"
                   :color="options.theme === t ? 'primary' : 'neutral'"
                   :variant="options.theme === t ? 'solid' : 'outline'"
+                  :aria-pressed="options.theme === t"
                   @click="options.theme = t"
                 />
               </div>
@@ -293,7 +309,7 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
               Live preview
             </p>
             <iframe
-              :srcdoc="previewHtml"
+              :srcdoc="debouncedPreview"
               title="E-vite preview"
               sandbox=""
               class="w-full h-[460px] rounded-lg ring ring-default bg-white"

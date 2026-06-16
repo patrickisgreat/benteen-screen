@@ -2,9 +2,13 @@ import type { MaybeRefOrGetter } from 'vue'
 import type { Database } from '~/types/database.types'
 import type { InviteOptions } from '#shared/types/invite-options'
 
+interface UseInviteOptions {
+  save: (options: InviteOptions) => Promise<void>
+}
+
 /** Save an event's e-vite customization. Admin-only writes are enforced by the
  *  `events: admin update` RLS policy. */
-export function useInviteOptions(eventId: MaybeRefOrGetter<string | null>) {
+export function useInviteOptions(eventId: MaybeRefOrGetter<string | null>): UseInviteOptions {
   const supabase = useSupabaseClient<Database>()
 
   async function save(options: InviteOptions): Promise<void> {

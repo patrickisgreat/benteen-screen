@@ -214,6 +214,7 @@ export function buildEventInviteEmail(opts: {
     `You're invited: ${opts.eventTitle}`,
     o.showDetails ? [opts.eventDate, opts.eventTime, opts.location].filter(Boolean).join(' · ') : '',
     note,
+    descText,
     `RSVP:\nGoing: ${opts.rsvpUrl}&status=going\nMaybe: ${opts.rsvpUrl}&status=maybe\nCan't make it: ${opts.rsvpUrl}&status=no`,
     opts.appUrl ? `See the lineup & vote: ${opts.appUrl}` : ''
   ].filter(Boolean)
