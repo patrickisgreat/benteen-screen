@@ -2,6 +2,7 @@
 import type { MovieEvent } from '#shared/types/event'
 import type { BringItem } from '#shared/types/bring'
 import type { Profile } from '#shared/types/user'
+import type { Invite } from '#shared/types/invite'
 
 definePageMeta({ middleware: 'admin' })
 useSeoMeta({ title: 'Admin · BSOTG' })
@@ -9,9 +10,10 @@ useSeoMeta({ title: 'Admin · BSOTG' })
 const toast = useToast()
 const { events } = useEvents()
 const { createEvent, updateEvent, deleteEvent } = useEventAdmin()
-const { people, setBlocked } = useAdminPeople()
+const { people, pendingInvites, loadError, setBlocked, revokeInvite } = useAdminPeople()
 
 const modalOpen = ref(false)
+const inviteOpen = ref(false)
 const editingEvent = ref<MovieEvent | null>(null)
 const eventPendingDelete = ref<MovieEvent | null>(null)
 
@@ -38,7 +40,8 @@ const tabs = [
   { label: 'Events', icon: 'i-lucide-calendar', slot: 'events' },
   { label: 'People', icon: 'i-lucide-users', slot: 'people' },
   { label: 'Suggestions', icon: 'i-lucide-clapperboard', slot: 'suggestions' },
-  { label: 'Bring list', icon: 'i-lucide-utensils', slot: 'bring' }
+  { label: 'Bring list', icon: 'i-lucide-utensils', slot: 'bring' },
+  { label: 'Comms', icon: 'i-lucide-megaphone', slot: 'comms' }
 ]
 
 // --- Overview stats (for the focused event) ---
@@ -144,6 +147,14 @@ async function onUnblock(person: Profile): Promise<void> {
     toast.add({ title: `${person.display_name ?? 'User'} unbanned`, icon: 'i-lucide-check', color: 'success' })
   } catch {
     toast.add({ title: 'Could not unban user', color: 'error' })
+  }
+}
+async function onRevoke(invite: Invite): Promise<void> {
+  try {
+    await revokeInvite(invite.email)
+    toast.add({ title: `Invite to ${invite.email} revoked`, color: 'neutral' })
+  } catch {
+    toast.add({ title: 'Could not revoke invite', color: 'error' })
   }
 }
 </script>
@@ -279,7 +290,34 @@ async function onUnblock(person: Profile): Promise<void> {
 
       <!-- PEOPLE -->
       <template #people>
-        <PeopleList :people="people" @block="onBlock" @unblock="onUnblock" />
+        <div class="space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <p class="text-sm text-muted">
+              {{ people.length }} member{{ people.length === 1 ? '' : 's' }}
+              <template v-if="pendingInvites.length">· {{ pendingInvites.length }} pending</template>
+            </p>
+            <UButton label="Invite someone" icon="i-lucide-user-plus" size="sm" @click="inviteOpen = true" />
+          </div>
+
+          <InviteLimitSetting />
+
+          <UAlert
+            v-if="loadError"
+            color="error"
+            variant="subtle"
+            icon="i-lucide-circle-alert"
+            title="Couldn't load the directory"
+            :description="loadError"
+          />
+
+          <PeopleList
+            :people="people"
+            :pending="pendingInvites"
+            @block="onBlock"
+            @unblock="onUnblock"
+            @revoke="onRevoke"
+          />
+        </div>
       </template>
 
       <!-- SUGGESTIONS -->
@@ -379,10 +417,32 @@ async function onUnblock(person: Profile): Promise<void> {
           Select an event to manage its bring list.
         </UCard>
       </template>
+
+      <!-- COMMS -->
+      <template #comms>
+        <p class="text-sm text-muted mb-4">
+          Email an announcement or reminder about an event. Recipients are BCC'd.
+        </p>
+        <USelectMenu
+          v-model="selectedEventId"
+          :items="eventOptions"
+          value-key="value"
+          :search-input="false"
+          placeholder="Select an event"
+          class="w-full sm:max-w-sm mb-4"
+        />
+        <EventAnnounceComposer v-if="selectedEventId" :event-id="selectedEventId" class="max-w-xl" />
+        <UCard v-else variant="subtle" class="text-center text-muted">
+          Select an event to send a blast.
+        </UCard>
+      </template>
     </UTabs>
 
     <!-- Create / edit modal -->
     <EventFormModal v-model:open="modalOpen" :event="editingEvent" @save="onSave" />
+
+    <!-- Admin invite a friend -->
+    <InviteFriendModal v-model:open="inviteOpen" />
 
     <!-- Delete confirmation -->
     <UModal
