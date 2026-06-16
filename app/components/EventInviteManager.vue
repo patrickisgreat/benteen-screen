@@ -89,12 +89,17 @@ async function onSeed(): Promise<void> {
 async function onSend(): Promise<void> {
   sending.value = true
   try {
-    const { sent } = await sendInvites()
-    toast.add({
-      title: sent ? `Sent ${sent} invite${sent === 1 ? '' : 's'}` : 'Everyone has already been invited',
-      icon: 'i-lucide-send',
-      color: 'success'
-    })
+    const { sent, failed, error } = await sendInvites()
+    if (sent && failed) {
+      toast.add({ title: `Sent ${sent}, ${failed} failed`, description: error ?? undefined, icon: 'i-lucide-send', color: 'warning' })
+    } else if (sent) {
+      toast.add({ title: `Sent ${sent} invite${sent === 1 ? '' : 's'}`, icon: 'i-lucide-send', color: 'success' })
+    } else if (failed) {
+      // The send reached Resend but was rejected — show the reason, don't pretend success.
+      toast.add({ title: `Couldn't send ${failed} invite${failed === 1 ? '' : 's'}`, description: error ?? undefined, color: 'error' })
+    } else {
+      toast.add({ title: 'Everyone has already been invited', color: 'neutral' })
+    }
   } catch (error) {
     toast.add({ title: 'Could not send invites', description: error instanceof Error ? error.message : undefined, color: 'error' })
   } finally {

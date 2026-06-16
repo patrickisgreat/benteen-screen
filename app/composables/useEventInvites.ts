@@ -125,13 +125,18 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     return toAdd.length
   }
 
-  /** Send (or re-send) the tokenized e-vites for this event via the server route. */
-  async function sendInvites(): Promise<{ sent: number }> {
+  /** Send (or re-send) the tokenized e-vites for this event via the server route.
+   *  Returns how many sent/failed and the first failure reason (e.g. a Resend
+   *  rejection) so the UI can show why instead of a misleading success. */
+  async function sendInvites(): Promise<{ sent: number, failed: number, error: string | null }> {
     const id = toValue(eventId)
-    if (!id) return { sent: 0 }
-    const result = await $fetch<{ ok: boolean, sent: number }>(`/api/events/${id}/invites/send`, { method: 'POST' })
+    if (!id) return { sent: 0, failed: 0, error: null }
+    const result = await $fetch<{ ok: boolean, sent: number, failed: number, error: string | null }>(
+      `/api/events/${id}/invites/send`,
+      { method: 'POST' }
+    )
     await refresh()
-    return { sent: result.sent }
+    return { sent: result.sent, failed: result.failed, error: result.error }
   }
 
   // Live updates as RSVPs / opens land (event_invites is in the realtime publication).
