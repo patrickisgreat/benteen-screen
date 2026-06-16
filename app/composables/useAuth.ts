@@ -29,11 +29,42 @@ export function useAuth() {
     }
   })
 
-  async function signInWithGoogle(): Promise<void> {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/confirm` }
+  const callbackUrl = (): string => `${window.location.origin}/confirm`
+
+  // OAuth providers redirect away to the provider then back to /confirm; the
+  // page unloads, so there's nothing to await beyond kicking it off.
+  async function oauth(provider: 'google' | 'facebook'): Promise<void> {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: callbackUrl() }
     })
+    if (error) throw error
+  }
+  const signInWithGoogle = (): Promise<void> => oauth('google')
+  const signInWithFacebook = (): Promise<void> => oauth('facebook')
+
+  // Email/password. Sign-in sets the session immediately (no redirect); sign-up
+  // sends a confirmation email whose link returns to /confirm. Both still pass
+  // through the invite-only gate after auth (middleware/invited.global.ts).
+  async function signInWithEmail(email: string, password: string): Promise<void> {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+  }
+
+  async function signUpWithEmail(email: string, password: string): Promise<void> {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: callbackUrl() }
+    })
+    if (error) throw error
+  }
+
+  async function sendPasswordReset(email: string): Promise<void> {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: callbackUrl()
+    })
+    if (error) throw error
   }
 
   async function signOutUser(): Promise<void> {
@@ -43,5 +74,17 @@ export function useAuth() {
     isAllowed.value = null
   }
 
-  return { user, myId, profile, account, isAdmin, signInWithGoogle, signOutUser }
+  return {
+    user,
+    myId,
+    profile,
+    account,
+    isAdmin,
+    signInWithGoogle,
+    signInWithFacebook,
+    signInWithEmail,
+    signUpWithEmail,
+    sendPasswordReset,
+    signOutUser
+  }
 }
