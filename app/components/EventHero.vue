@@ -13,7 +13,7 @@ const upcoming = computed(() => isUpcoming(props.event.event_date))
 <template>
   <button
     type="button"
-    class="group relative block w-full overflow-hidden rounded-xl text-left ring ring-default min-h-44 sm:min-h-56 transition group-hover:ring-primary/30"
+    class="group relative block w-full cursor-pointer overflow-hidden rounded-xl text-left ring ring-default min-h-44 sm:min-h-56 transition hover:ring-primary/40"
     :aria-label="`${event.title} — view event details`"
     @click="$emit('open')"
   >
@@ -40,9 +40,16 @@ const upcoming = computed(() => isUpcoming(props.event.event_date))
         />
         <span class="text-sm text-white/80">{{ formatDate(event.event_date) }}</span>
       </div>
-      <h1 class="text-2xl sm:text-3xl font-bold text-white drop-shadow-md text-balance">
+      <h1 class="text-2xl sm:text-3xl font-bold text-white drop-shadow-md text-balance underline-offset-4 decoration-2 decoration-white/40 group-hover:underline">
         {{ event.title }}
       </h1>
+      <WeatherForecast
+        v-if="upcoming && event.location"
+        :location="event.location"
+        :date="event.event_date"
+        tone="light"
+        class="mt-2"
+      />
       <p class="mt-1.5 inline-flex items-center gap-1 text-xs text-white/70">
         <UIcon name="i-lucide-info" /> Tap for details
       </p>

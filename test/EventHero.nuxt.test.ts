@@ -44,4 +44,26 @@ describe('EventHero', () => {
     await w.find('button').trigger('click')
     expect(w.emitted('open')).toHaveLength(1)
   })
+
+  it('signals it is clickable (cursor + link-styled title)', async () => {
+    const w = await mountSuspended(EventHero, { props: { event: baseEvent, backdrop: null } })
+    expect(w.find('button').classes()).toContain('cursor-pointer')
+    expect(w.find('h1').classes()).toContain('group-hover:underline')
+  })
+
+  it('surfaces the weather line for an upcoming event with a location', async () => {
+    const w = await mountSuspended(EventHero, {
+      props: { event: { ...baseEvent, location: 'The Green' }, backdrop: null },
+      global: { stubs: { WeatherForecast: { template: '<div class="wf-stub" />' } } }
+    })
+    expect(w.find('.wf-stub').exists()).toBe(true)
+  })
+
+  it('omits the weather line when the event has no location', async () => {
+    const w = await mountSuspended(EventHero, {
+      props: { event: baseEvent, backdrop: null },
+      global: { stubs: { WeatherForecast: { template: '<div class="wf-stub" />' } } }
+    })
+    expect(w.find('.wf-stub').exists()).toBe(false)
+  })
 })
