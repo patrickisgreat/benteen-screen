@@ -1,13 +1,14 @@
-import { serverSupabaseServiceRole, serverSupabaseUser } from '#supabase/server'
+import { serverSupabaseClient, serverSupabaseUser } from '#supabase/server'
 import type { Database } from '~/types/database.types'
 
 /**
- * Sends (or re-sends) the tokenized e-vites for an event's guest list. Admin-only,
- * verified explicitly via is_admin. Uses the service role for the DB work because
- * the caller's session isn't reliably available inside the serverless function
- * (an RLS-scoped client there read no rows and 403'd a real admin). For each
- * not-yet-sent invitee we email the one-click RSVP links, add them to the
- * allowlist so they can sign in too, and stamp sent_at + the Resend message id.
+ * Sends (or re-sends) the tokenized e-vites for an event's guest list. Admin-only.
+ * Runs under the caller's own session (RLS) — every table here has an admin policy
+ * (`event_invites: admin all`, `invites: create` as self with the cap trigger
+ * exempting admins), so the service role isn't needed and a misconfigured
+ * service-role key can't break sending. For each not-yet-sent invitee we email the
+ * one-click RSVP links, add them to the allowlist so they can sign in too, and
+ * stamp sent_at + the Resend message id.
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
@@ -16,22 +17,13 @@ export default defineEventHandler(async (event) => {
   const eventId = getRouterParam(event, 'id')
   if (!eventId) throw createError({ statusCode: 400, statusMessage: 'Missing event id' })
 
-  const db = serverSupabaseServiceRole<Database>(event)
+  // RLS-scoped client: runs as the signed-in user via their session cookie.
+  const db = await serverSupabaseClient<Database>(event)
   const { data: me, error: meError } = await db.from('profiles').select('is_admin').eq('id', user.id).single()
-  // If the service-role read fails outright, NUXT_SUPABASE_SECRET_KEY is wrong
-  // (it should be the service-role / sb_secret_ key) — surface that, not "Admins only".
-  // Bubble the underlying cause so the actual fault is diagnosable: an "Invalid API
-  // key" means a bad/mismatched key; a PGRST116 "0 rows" means the key isn't really
-  // service-role (RLS applied) or no profile row exists for this user.
-  if (meError || !me) {
-    console.error('[invites/send] admin verify failed', { code: meError?.code, message: meError?.message, userId: user.id })
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Could not verify admin — check NUXT_SUPABASE_SECRET_KEY (must be the service-role key)',
-      data: { cause: meError?.message ?? 'no profile row returned', code: meError?.code ?? null }
-    })
+  if (meError) {
+    throw createError({ statusCode: 500, statusMessage: 'Could not load your profile', data: { cause: meError.message, code: meError.code } })
   }
-  if (!me.is_admin) throw createError({ statusCode: 403, statusMessage: 'Admins only' })
+  if (!me?.is_admin) throw createError({ statusCode: 403, statusMessage: 'Admins only' })
 
   const { data: ev } = await db.from('events').select('title, event_date, location').eq('id', eventId).single()
   if (!ev) throw createError({ statusCode: 404, statusMessage: 'Event not found' })

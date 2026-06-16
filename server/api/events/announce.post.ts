@@ -1,4 +1,4 @@
-import { serverSupabaseServiceRole, serverSupabaseUser } from '#supabase/server'
+import { serverSupabaseClient, serverSupabaseUser } from '#supabase/server'
 import { z } from 'zod'
 import type { Database } from '~/types/database.types'
 
@@ -10,9 +10,11 @@ const bodySchema = z.object({
 })
 
 /**
- * Admin event blast: emails members about an event. Admin-gated server-side
- * (service role checks is_admin) rather than trusting the client. Recipients are
- * BCC'd so addresses aren't leaked. Resend key is server-only (Invariant 2).
+ * Admin event blast: emails members about an event. Runs under the caller's own
+ * session (RLS): an admin is allowlisted, so they can read invites/rsvps/profiles
+ * — no service role needed (a misconfigured service-role key can't break it).
+ * Recipients are BCC'd so addresses aren't leaked. Resend key is server-only
+ * (Invariant 2).
  *
  *  - invited: everyone on the allowlist (incl. not-yet-joined)
  *  - members: people who've actually signed in (accepted invites)
@@ -22,7 +24,8 @@ export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
   if (!user) throw createError({ statusCode: 401, statusMessage: 'Not authenticated' })
 
-  const admin = serverSupabaseServiceRole<Database>(event)
+  // RLS-scoped client: runs as the signed-in user via their session cookie.
+  const admin = await serverSupabaseClient<Database>(event)
   const { data: me } = await admin.from('profiles').select('is_admin').eq('id', user.id).single()
   if (!me?.is_admin) throw createError({ statusCode: 403, statusMessage: 'Admins only' })
 
