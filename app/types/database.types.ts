@@ -12,9 +12,21 @@ export interface Database {
         Relationships: []
       }
       events: {
-        Row: { id: string, title: string, description: string, event_date: string, created_by: string | null, created_at: string }
-        Insert: { id?: string, title: string, description?: string, event_date: string, created_by?: string | null, created_at?: string }
-        Update: { id?: string, title?: string, description?: string, event_date?: string, created_by?: string | null, created_at?: string }
+        Row: { id: string, title: string, description: string, event_date: string, start_time: string | null, location: string | null, location_url: string | null, poster_url: string | null, created_by: string | null, created_at: string }
+        Insert: { id?: string, title: string, description?: string, event_date: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, created_by?: string | null, created_at?: string }
+        Update: { id?: string, title?: string, description?: string, event_date?: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, created_by?: string | null, created_at?: string }
+        Relationships: []
+      }
+      rsvps: {
+        Row: { event_id: string, user_id: string, status: string, updated_at: string }
+        Insert: { event_id: string, user_id?: string, status: string, updated_at?: string }
+        Update: { event_id?: string, user_id?: string, status?: string, updated_at?: string }
+        Relationships: []
+      }
+      bring_items: {
+        Row: { id: string, event_id: string, label: string, note: string | null, user_id: string | null, created_by: string | null, created_at: string }
+        Insert: { id?: string, event_id: string, label: string, note?: string | null, user_id?: string | null, created_by?: string | null, created_at?: string }
+        Update: { id?: string, event_id?: string, label?: string, note?: string | null, user_id?: string | null, created_by?: string | null, created_at?: string }
         Relationships: []
       }
       suggestions: {

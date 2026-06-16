@@ -15,15 +15,18 @@ const eventPendingDelete = ref<MovieEvent | null>(null)
 const selectedEventId = ref<string>()
 const { suggestions, setDeleted, voterNames } = useAdminSuggestions(selectedEventId)
 
+// Upcoming events first (soonest first), then past events descending (oldest last).
+const sortedEvents = computed(() => sortEventsForAdmin(events.value))
+
 const eventOptions = computed(() =>
-  events.value.map(event => ({
+  sortedEvents.value.map(event => ({
     label: `${formatDate(event.event_date, { dateStyle: 'medium' })} · ${event.title}`,
     value: event.id
   }))
 )
 
-// Default the moderation selector to the first event once data loads.
-watch(events, (list) => {
+// Default the moderation selector to the most relevant (next upcoming) event once data loads.
+watch(sortedEvents, (list) => {
   if (!selectedEventId.value && list.length) selectedEventId.value = list[0]!.id
 }, { immediate: true })
 
@@ -36,7 +39,16 @@ function openEdit(event: MovieEvent): void {
   modalOpen.value = true
 }
 
-async function onSave(payload: { id?: string, title: string, description: string, date: Date }): Promise<void> {
+async function onSave(payload: {
+  id?: string
+  title: string
+  description: string
+  date: Date
+  startTime: string | null
+  location: string | null
+  locationUrl: string | null
+  posterUrl: string | null
+}): Promise<void> {
   try {
     if (payload.id) {
       await updateEvent(payload.id, payload)
@@ -89,8 +101,8 @@ async function toggleSuggestion(id: string, deleted: boolean): Promise<void> {
         <h2 class="text-xl font-semibold mb-4">
           Events
         </h2>
-        <div v-if="events.length" class="space-y-3">
-          <UCard v-for="event in events" :key="event.id" variant="subtle">
+        <div v-if="sortedEvents.length" class="space-y-3">
+          <UCard v-for="event in sortedEvents" :key="event.id" variant="subtle">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="text-sm text-muted">
