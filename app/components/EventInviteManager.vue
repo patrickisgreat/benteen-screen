@@ -2,9 +2,9 @@
 import { z } from 'zod'
 import type { EventInvite } from '#shared/types/event-invite'
 
-// Admin guest-list manager + Evite tracker for one event. Auto-rolls the list
-// forward from the previous event, lets admins add/remove, sends tokenized
-// e-vites, and shows live RSVP / open / click tracking.
+// Admin guest-list manager + Evite tracker for one event. Lets admins add/remove
+// guests, pull last event's list in on demand, send tokenized e-vites, and shows
+// live RSVP / open / click tracking.
 const props = defineProps<{ eventId: string }>()
 const toast = useToast()
 const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites } = useEventInvites(() => props.eventId)
@@ -50,17 +50,6 @@ async function onDeleteSelected(): Promise<void> {
     deleting.value = false
   }
 }
-
-// Auto-roll: the first time we see an empty list for this event, pull last
-// event's invitees ("auto add from last event unless we remove them").
-const seededFor = ref<string | null>(null)
-watch([() => props.eventId, invites], async ([id, list]) => {
-  if (id && seededFor.value !== id && list.length === 0) {
-    seededFor.value = id
-    const n = await seedFromLastEvent().catch(() => 0)
-    if (n) toast.add({ title: `Pulled ${n} from the last movie night`, color: 'neutral' })
-  }
-}, { immediate: true })
 
 async function onAdd(): Promise<void> {
   const email = newEmail.value.trim()
