@@ -1,12 +1,13 @@
-import { serverSupabaseClient, serverSupabaseUser } from '#supabase/server'
+import { serverSupabaseServiceRole, serverSupabaseUser } from '#supabase/server'
 import type { Database } from '~/types/database.types'
 
 /**
- * Sends (or re-sends) the tokenized e-vites for an event's guest list. Admin-only
- * (checked via the caller's own profile). For each not-yet-sent invitee we email
- * the one-click RSVP links, add them to the allowlist so they can also sign in
- * (per the product decision), and stamp sent_at + the Resend message id (used to
- * correlate open/click webhooks). Runs under the admin's session — RLS holds.
+ * Sends (or re-sends) the tokenized e-vites for an event's guest list. Admin-only,
+ * verified explicitly via is_admin. Uses the service role for the DB work because
+ * the caller's session isn't reliably available inside the serverless function
+ * (an RLS-scoped client there read no rows and 403'd a real admin). For each
+ * not-yet-sent invitee we email the one-click RSVP links, add them to the
+ * allowlist so they can sign in too, and stamp sent_at + the Resend message id.
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
@@ -15,14 +16,14 @@ export default defineEventHandler(async (event) => {
   const eventId = getRouterParam(event, 'id')
   if (!eventId) throw createError({ statusCode: 400, statusMessage: 'Missing event id' })
 
-  const client = await serverSupabaseClient<Database>(event)
-  const { data: me } = await client.from('profiles').select('is_admin').eq('id', user.id).single()
+  const db = serverSupabaseServiceRole<Database>(event)
+  const { data: me } = await db.from('profiles').select('is_admin').eq('id', user.id).single()
   if (!me?.is_admin) throw createError({ statusCode: 403, statusMessage: 'Admins only' })
 
-  const { data: ev } = await client.from('events').select('title, event_date, location').eq('id', eventId).single()
+  const { data: ev } = await db.from('events').select('title, event_date, location').eq('id', eventId).single()
   if (!ev) throw createError({ statusCode: 404, statusMessage: 'Event not found' })
 
-  const { data: invites } = await client
+  const { data: invites } = await db
     .from('event_invites')
     .select('id, email, display_name, token')
     .eq('event_id', eventId)
@@ -54,11 +55,11 @@ export default defineEventHandler(async (event) => {
         replyTo: user.email ?? undefined
       })
       // Allowlist them so they can sign in too (idempotent).
-      await client.from('invites').upsert(
+      await db.from('invites').upsert(
         { email: invite.email, display_name: invite.display_name, invited_by: user.id },
         { onConflict: 'email', ignoreDuplicates: true }
       )
-      await client
+      await db
         .from('event_invites')
         .update({ sent_at: new Date().toISOString(), resend_id: resendId })
         .eq('id', invite.id)
