@@ -10,6 +10,7 @@ const emit = defineEmits<{
   block: [person: Profile]
   unblock: [person: Profile]
   revoke: [invite: Invite]
+  select: [person: Profile]
 }>()
 
 type Row
@@ -78,7 +79,15 @@ function initials(name: string, email: string): string {
           size="sm"
           class="shrink-0"
         />
-        <div class="min-w-0 flex-1">
+        <!-- Member rows open a stats drill-down; pending invites have no activity yet. -->
+        <component
+          :is="row.kind === 'member' ? 'button' : 'div'"
+          :type="row.kind === 'member' ? 'button' : undefined"
+          class="min-w-0 flex-1 text-left"
+          :class="row.kind === 'member' ? 'hover:opacity-80 cursor-pointer' : ''"
+          :aria-label="row.kind === 'member' ? `View ${row.name}'s activity` : undefined"
+          @click="row.kind === 'member' && emit('select', row.profile)"
+        >
           <p class="font-medium truncate flex items-center gap-1.5">
             {{ row.name }}
             <UBadge v-if="row.kind === 'member' && row.profile.is_admin" label="Admin" color="primary" variant="subtle" size="xs" />
@@ -88,7 +97,7 @@ function initials(name: string, email: string): string {
           <p class="text-xs text-muted truncate">
             {{ row.email || '—' }}
           </p>
-        </div>
+        </component>
 
         <!-- Member actions: ban/unban (admins can't be banned from the UI). -->
         <template v-if="row.kind === 'member'">

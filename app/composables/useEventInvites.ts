@@ -60,32 +60,44 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     await refresh()
   }
 
-  /** Copy the guest list from the most recent OTHER event that actually has one
-   *  onto this event (skipping anyone already here) — the "auto-add from the last
-   *  event unless we remove them" behavior. Walks past events with no list and
-   *  tolerates events added out of date order, instead of only checking the single
-   *  chronologically-previous event. */
+  /** Build this event's guest list from the most recent OTHER event that has one
+   *  (newest-first, skipping empty events). Falls back to the household roster
+   *  (everyone on the allowlist) when no prior event has a guest list yet — so the
+   *  first time you use it, you still get your people. Skips anyone already here. */
   async function seedFromLastEvent(): Promise<number> {
     const id = toValue(eventId)
     if (!id) return 0
+
+    let candidates: Array<{ email: string, display_name: string | null }> = []
     const { data: others } = await supabase
       .from('events')
       .select('id')
       .neq('id', id)
       .order('event_date', { ascending: false })
     const otherIds = (others ?? []).map(e => e.id)
-    if (!otherIds.length) return 0
-    const { data: pool } = await supabase
-      .from('event_invites')
-      .select('event_id, email, display_name')
-      .in('event_id', otherIds)
-    // otherIds is newest-first; take the first that has any invites.
-    const sourceId = otherIds.find(eid => (pool ?? []).some(p => p.event_id === eid))
-    if (!sourceId) return 0
+    if (otherIds.length) {
+      const { data: pool } = await supabase
+        .from('event_invites')
+        .select('event_id, email, display_name')
+        .in('event_id', otherIds)
+      // otherIds is newest-first; take the first event that actually has invites.
+      const sourceId = otherIds.find(eid => (pool ?? []).some(p => p.event_id === eid))
+      if (sourceId) {
+        candidates = (pool ?? [])
+          .filter(p => p.event_id === sourceId)
+          .map(p => ({ email: p.email, display_name: p.display_name }))
+      }
+    }
+    // Fallback: no prior event guest list → pull the whole allowlist roster.
+    if (!candidates.length) {
+      const { data: roster } = await supabase.from('invites').select('email, display_name')
+      candidates = (roster ?? []).map(r => ({ email: r.email, display_name: r.display_name }))
+    }
+
     const existing = new Set(invites.value.map(i => i.email))
-    const toAdd = (pool ?? [])
-      .filter(p => p.event_id === sourceId && !existing.has(p.email))
-      .map(p => ({ event_id: id, email: p.email, display_name: p.display_name }))
+    const toAdd = candidates
+      .filter(c => !existing.has(c.email))
+      .map(c => ({ event_id: id, email: c.email, display_name: c.display_name }))
     if (!toAdd.length) return 0
     const { error } = await supabase.from('event_invites').insert(toAdd)
     if (error) throw error

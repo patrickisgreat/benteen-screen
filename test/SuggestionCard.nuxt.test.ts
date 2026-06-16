@@ -38,4 +38,21 @@ describe('SuggestionCard', () => {
     await trailerBtn?.trigger('click')
     expect(w.emitted('trailer')).toBeTruthy()
   })
+
+  it('shows a static vote count and no vote button once locked', async () => {
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion, rank: 1, maxVotes: 2, locked: true } })
+    expect(w.text()).toContain('2')
+    expect(w.find('[aria-label="Remove vote"]').exists()).toBe(false)
+    expect(w.find('[aria-label="Vote"]').exists()).toBe(false)
+  })
+
+  it('hides the remove button for the owner once locked', async () => {
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion, rank: 1, maxVotes: 2, locked: true } })
+    expect(w.find('[aria-label="Remove suggestion"]').exists()).toBe(false)
+  })
+
+  it('still lets the owner remove while voting is open', async () => {
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion, rank: 1, maxVotes: 2 } })
+    expect(w.find('[aria-label="Remove suggestion"]').exists()).toBe(true)
+  })
 })

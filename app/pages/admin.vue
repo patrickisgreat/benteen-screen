@@ -9,13 +9,21 @@ useSeoMeta({ title: 'Admin · BSOTG' })
 
 const toast = useToast()
 const { events } = useEvents()
-const { createEvent, updateEvent, deleteEvent } = useEventAdmin()
+const { createEvent, updateEvent, deleteEvent, setVotingLocked } = useEventAdmin()
 const { people, pendingInvites, loadError, setBlocked, revokeInvite } = useAdminPeople()
 
 const modalOpen = ref(false)
 const inviteOpen = ref(false)
 const editingEvent = ref<MovieEvent | null>(null)
 const eventPendingDelete = ref<MovieEvent | null>(null)
+
+// People drill-down: the member whose activity stats are open.
+const statsPerson = ref<Profile | null>(null)
+const statsOpen = ref(false)
+
+// Event drill-down: the event whose stats are open.
+const statsEvent = ref<MovieEvent | null>(null)
+const eventStatsOpen = ref(false)
 
 const selectedEventId = ref<string>()
 const { suggestions, setDeleted, voterNames } = useAdminSuggestions(selectedEventId)
@@ -134,6 +142,50 @@ async function onRemoveBring(item: BringItem): Promise<void> {
   }
 }
 
+const votingLocked = computed(() => Boolean(selectedEvent.value?.voting_locked_at))
+const winners = computed(() => topWinners(suggestions.value))
+
+async function onLockVoting(): Promise<void> {
+  const ev = selectedEvent.value
+  if (!ev) return
+  try {
+    await setVotingLocked(ev.id, true)
+    toast.add({ title: 'Voting ended', icon: 'i-lucide-lock', color: 'success' })
+    // Auto-announce the winners (best-effort — needs Resend + service key).
+    const won = winners.value
+    if (won.length) {
+      const list = won.map(s => s.tmdb_movie.title).join(' and ')
+      try {
+        await $fetch('/api/events/announce', {
+          method: 'POST',
+          body: {
+            eventId: ev.id,
+            subject: `🍿 ${ev.title} — the winners are in!`,
+            message: `Voting has ended! The ${won.length > 1 ? 'double feature' : 'movie'} is: ${list}. See you there!`,
+            scope: 'members'
+          }
+        })
+        toast.add({ title: 'Winners announcement sent', icon: 'i-lucide-send', color: 'success' })
+      } catch {
+        toast.add({ title: 'Voting locked, but the announcement could not be sent', color: 'warning' })
+      }
+    }
+  } catch {
+    toast.add({ title: 'Could not end voting', color: 'error' })
+  }
+}
+
+async function onReopenVoting(): Promise<void> {
+  const ev = selectedEvent.value
+  if (!ev) return
+  try {
+    await setVotingLocked(ev.id, false)
+    toast.add({ title: 'Voting reopened', color: 'neutral' })
+  } catch {
+    toast.add({ title: 'Could not reopen voting', color: 'error' })
+  }
+}
+
 async function toggleSuggestion(id: string, deleted: boolean): Promise<void> {
   try {
     await setDeleted(id, deleted)
@@ -166,6 +218,14 @@ async function onRevoke(invite: Invite): Promise<void> {
   } catch {
     toast.add({ title: 'Could not revoke invite', color: 'error' })
   }
+}
+function onSelectPerson(person: Profile): void {
+  statsPerson.value = person
+  statsOpen.value = true
+}
+function onSelectEvent(event: MovieEvent): void {
+  statsEvent.value = event
+  eventStatsOpen.value = true
 }
 </script>
 
@@ -274,6 +334,14 @@ async function onRevoke(invite: Invite): Promise<void> {
               </div>
               <div class="flex gap-1 shrink-0">
                 <UButton
+                  icon="i-lucide-bar-chart-3"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="View event stats"
+                  @click="onSelectEvent(event)"
+                />
+                <UButton
                   icon="i-lucide-pencil"
                   color="neutral"
                   variant="ghost"
@@ -328,6 +396,7 @@ async function onRevoke(invite: Invite): Promise<void> {
             @block="onBlock"
             @unblock="onUnblock"
             @revoke="onRevoke"
+            @select="onSelectPerson"
           />
         </div>
       </template>
@@ -342,6 +411,34 @@ async function onRevoke(invite: Invite): Promise<void> {
           placeholder="Select an event"
           class="w-full sm:max-w-sm mb-4"
         />
+
+        <!-- End / reopen voting -->
+        <div v-if="selectedEvent" class="mb-4 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm" :class="votingLocked ? 'text-muted' : ''">
+              <UIcon :name="votingLocked ? 'i-lucide-lock' : 'i-lucide-vote'" class="align-text-bottom" />
+              {{ votingLocked ? 'Voting has ended for this event.' : 'Voting is open.' }}
+            </p>
+            <UButton
+              v-if="!votingLocked"
+              label="End voting"
+              icon="i-lucide-lock"
+              color="primary"
+              size="sm"
+              @click="onLockVoting"
+            />
+            <UButton
+              v-else
+              label="Reopen voting"
+              icon="i-lucide-lock-open"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              @click="onReopenVoting"
+            />
+          </div>
+          <WinnersBanner v-if="votingLocked && winners.length" :winners="winners" />
+        </div>
 
         <div v-if="suggestions.length" class="space-y-3">
           <UCard
@@ -474,6 +571,10 @@ async function onRevoke(invite: Invite): Promise<void> {
 
     <!-- Admin invite a friend -->
     <InviteFriendModal v-model:open="inviteOpen" />
+
+    <UserStatsModal v-model:open="statsOpen" :person="statsPerson" />
+
+    <EventStatsModal v-model:open="eventStatsOpen" :event="statsEvent" />
 
     <!-- Delete confirmation -->
     <UModal

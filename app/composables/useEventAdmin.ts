@@ -46,6 +46,15 @@ export function useEventAdmin() {
     if (error) throw error
   }
 
+  /** End voting for an event (locks new votes/suggestions via RLS), or reopen it. */
+  async function setVotingLocked(id: string, locked: boolean): Promise<void> {
+    const { error } = await supabase
+      .from('events')
+      .update({ voting_locked_at: locked ? new Date().toISOString() : null })
+      .eq('id', id)
+    if (error) throw error
+  }
+
   /** Upload a poster image to the public `event-posters` bucket; returns its public URL. */
   async function uploadPoster(file: File): Promise<string> {
     const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
@@ -60,5 +69,5 @@ export function useEventAdmin() {
     return data.publicUrl
   }
 
-  return { createEvent, updateEvent, deleteEvent, uploadPoster }
+  return { createEvent, updateEvent, deleteEvent, setVotingLocked, uploadPoster }
 }

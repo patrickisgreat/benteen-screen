@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Suggestion } from '#shared/types/suggestion'
 
-const props = defineProps<{ suggestion: Suggestion, rank: number, maxVotes: number }>()
+const props = defineProps<{ suggestion: Suggestion, rank: number, maxVotes: number, locked?: boolean }>()
 const emit = defineEmits<{ vote: [], unvote: [], remove: [], trailer: [] }>()
 
 const { myId } = useAuth()
@@ -59,7 +59,17 @@ const highlight = computed(() => props.rank === 1 && voteCount.value > 0)
             {{ movie.title }}
             <span v-if="year" class="text-muted font-normal">({{ year }})</span>
           </h3>
+          <UBadge
+            v-if="locked"
+            icon="i-lucide-heart"
+            :label="String(voteCount)"
+            :color="highlight ? 'primary' : 'neutral'"
+            variant="subtle"
+            size="md"
+            class="shrink-0"
+          />
           <UButton
+            v-else
             :color="hasVoted ? 'error' : 'neutral'"
             :variant="hasVoted ? 'soft' : 'outline'"
             icon="i-lucide-heart"
@@ -86,7 +96,7 @@ const highlight = computed(() => props.rank === 1 && voteCount.value > 0)
             @click="emit('trailer')"
           />
           <UButton
-            v-if="isOwner"
+            v-if="isOwner && !locked"
             icon="i-lucide-trash-2"
             color="neutral"
             variant="ghost"

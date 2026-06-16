@@ -74,4 +74,15 @@ describe('PeopleList', () => {
     const w = await mountSuspended(PeopleList, { props: { people, pending: dupe } })
     expect(w.text()).not.toContain('Alice Dupe')
   })
+
+  it('emits select with the member when their row is clicked', async () => {
+    const w = await mountSuspended(PeopleList, { props: { people } })
+    await w.get('[aria-label="View Alice\'s activity"]').trigger('click')
+    expect(w.emitted('select')?.[0]).toEqual([people[0]])
+  })
+
+  it('does not make pending invites clickable for stats', async () => {
+    const w = await mountSuspended(PeopleList, { props: { people, pending } })
+    expect(w.find('[aria-label="View Pat\'s activity"]').exists()).toBe(false)
+  })
 })

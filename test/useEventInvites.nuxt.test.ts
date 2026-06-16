@@ -7,11 +7,13 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 let list: Array<Record<string, unknown>> = [] // current event's invites (refresh)
 let eventsList: Array<Record<string, unknown>> = [] // other events (seed)
 let poolList: Array<Record<string, unknown>> = [] // invites across other events (seed pool)
+let rosterList: Array<Record<string, unknown>> = [] // allowlist roster (seed fallback)
 const ops = { inserted: [] as unknown[], deleted: [] as unknown[] }
 
 // Thenable + chainable stub mirroring the PostgREST builder. event_invites resolves
 // to the seed `poolList` when filtered with .in() (the pool query) and `list`
-// otherwise (the per-event refresh); events resolves to `eventsList`.
+// otherwise (the per-event refresh); events resolves to `eventsList`; invites (the
+// allowlist roster, used as the seed fallback) resolves to `rosterList`.
 function builder(table: string) {
   let usedIn = false
   const c: Record<string, unknown> = {
@@ -39,7 +41,11 @@ function builder(table: string) {
       }
     }),
     then: (resolve: (v: unknown) => void) => {
-      const data = table === 'events' ? eventsList : table === 'event_invites' ? (usedIn ? poolList : list) : []
+      const data = table === 'events'
+        ? eventsList
+        : table === 'event_invites'
+          ? (usedIn ? poolList : list)
+          : table === 'invites' ? rosterList : []
       resolve({ data })
     }
   }
@@ -57,6 +63,7 @@ beforeEach(() => {
   list = []
   eventsList = []
   poolList = []
+  rosterList = []
   ops.inserted = []
   ops.deleted = []
 })
@@ -101,11 +108,43 @@ describe('useEventInvites', () => {
     expect(ops.inserted.flat().some(i => (i as { email?: string }).email === 'guest@x')).toBe(true)
   })
 
-  it('seedFromLastEvent returns 0 when no other event has a list', async () => {
+  it('seedFromLastEvent returns 0 when no prior event has a list and the roster is empty', async () => {
     eventsList = [{ id: 'prev' }]
     poolList = []
+    rosterList = []
     const { seedFromLastEvent } = useEventInvites(ref('e'))
     await flushPromises()
     expect(await seedFromLastEvent()).toBe(0)
+  })
+
+  it('seedFromLastEvent falls back to the allowlist roster when no prior event has a list', async () => {
+    // First-ever event: no other event has a guest list, but the household roster does.
+    list = []
+    eventsList = []
+    poolList = []
+    rosterList = [
+      { email: 'mom@x', display_name: 'Mom' },
+      { email: 'dad@x', display_name: 'Dad' }
+    ]
+    const { seedFromLastEvent } = useEventInvites(ref('e'))
+    await flushPromises()
+    const added = await seedFromLastEvent()
+    expect(added).toBe(2)
+    const emails = ops.inserted.flat().map(i => (i as { email?: string }).email)
+    expect(emails).toContain('mom@x')
+    expect(emails).toContain('dad@x')
+  })
+
+  it('seedFromLastEvent skips roster entries already invited to this event', async () => {
+    list = [{ id: 'x', event_id: 'e', email: 'mom@x', rsvp: null, sent_at: null, opened_at: null, clicked_at: null, display_name: 'Mom', token: 't' }]
+    eventsList = []
+    rosterList = [{ email: 'mom@x', display_name: 'Mom' }, { email: 'dad@x', display_name: 'Dad' }]
+    const { seedFromLastEvent } = useEventInvites(ref('e'))
+    await flushPromises()
+    const added = await seedFromLastEvent()
+    expect(added).toBe(1)
+    const emails = ops.inserted.flat().map(i => (i as { email?: string }).email)
+    expect(emails).toContain('dad@x')
+    expect(emails).not.toContain('mom@x')
   })
 })

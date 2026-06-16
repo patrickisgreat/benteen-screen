@@ -34,6 +34,10 @@ const leadPoster = computed(() => (totalVotes.value > 0 ? posterUrl(suggestions.
 // Prefer the event's own poster; fall back to the current leader's movie poster.
 const cardBackdrop = computed(() => currentEvent.value?.poster_url || leadPoster.value)
 
+// Voting ended → show the double-feature winners and hide vote/suggest controls.
+const votingLocked = computed(() => Boolean(currentEvent.value?.voting_locked_at))
+const winners = computed(() => topWinners(suggestions.value))
+
 const eventOptions = computed(() =>
   events.value.map((event, index) => ({
     // Date only — the full (often long) title is shown on the event card below,
@@ -189,40 +193,48 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
             </template>
           </UCard>
 
-          <!-- Suggest (desktop inline) -->
-          <div class="hidden lg:block">
-            <h2 class="text-sm font-semibold text-muted mb-2">
-              Suggest a movie
-            </h2>
-            <SuggestSection :suggested-movie-ids="suggestedMovieIds" @suggest="onSuggest" />
-          </div>
+          <!-- Suggest + finder (hidden once voting is locked) -->
+          <template v-if="!votingLocked">
+            <!-- Suggest (desktop inline) -->
+            <div class="hidden lg:block">
+              <h2 class="text-sm font-semibold text-muted mb-2">
+                Suggest a movie
+              </h2>
+              <SuggestSection :suggested-movie-ids="suggestedMovieIds" @suggest="onSuggest" />
+            </div>
 
-          <!-- Suggest (mobile) -->
-          <UButton
-            class="lg:hidden justify-center"
-            block
-            label="Suggest a movie"
-            icon="i-lucide-plus"
-            @click="suggestOpen = true"
-          />
+            <!-- Suggest (mobile) -->
+            <UButton
+              class="lg:hidden justify-center"
+              block
+              label="Suggest a movie"
+              icon="i-lucide-plus"
+              @click="suggestOpen = true"
+            />
 
-          <!-- Movie finder (all sizes) -->
-          <UButton
-            class="justify-center"
-            block
-            color="neutral"
-            variant="outline"
-            label="Help me find a movie"
-            icon="i-lucide-clapperboard"
-            @click="finderOpen = true"
-          />
+            <!-- Movie finder (all sizes) -->
+            <UButton
+              class="justify-center"
+              block
+              color="neutral"
+              variant="outline"
+              label="Help me find a movie"
+              icon="i-lucide-clapperboard"
+              @click="finderOpen = true"
+            />
+          </template>
+          <p v-else class="text-sm text-muted text-center inline-flex items-center justify-center gap-1.5">
+            <UIcon name="i-lucide-lock" /> Voting has ended for this movie night.
+          </p>
         </aside>
 
         <!-- RIGHT: rankings -->
         <section class="lg:col-span-2 min-w-0">
+          <WinnersBanner v-if="votingLocked && winners.length" :winners="winners" class="mb-4" />
+
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-semibold">
-              Rankings
+              {{ votingLocked ? 'Final results' : 'Rankings' }}
             </h2>
             <UBadge :label="`${suggestions.length}`" color="neutral" variant="subtle" />
           </div>
@@ -234,6 +246,7 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
               :suggestion="suggestion"
               :rank="index + 1"
               :max-votes="maxVotes"
+              :locked="votingLocked"
               @vote="onVote(suggestion)"
               @unvote="onUnvote(suggestion)"
               @remove="onRemove(suggestion)"

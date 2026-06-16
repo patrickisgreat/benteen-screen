@@ -17,8 +17,13 @@ export default defineEventHandler(async (event) => {
   if (!eventId) throw createError({ statusCode: 400, statusMessage: 'Missing event id' })
 
   const db = serverSupabaseServiceRole<Database>(event)
-  const { data: me } = await db.from('profiles').select('is_admin').eq('id', user.id).single()
-  if (!me?.is_admin) throw createError({ statusCode: 403, statusMessage: 'Admins only' })
+  const { data: me, error: meError } = await db.from('profiles').select('is_admin').eq('id', user.id).single()
+  // If the service-role read fails outright, NUXT_SUPABASE_SECRET_KEY is wrong
+  // (it should be the service-role / sb_secret_ key) — surface that, not "Admins only".
+  if (meError || !me) {
+    throw createError({ statusCode: 500, statusMessage: 'Could not verify admin — check NUXT_SUPABASE_SECRET_KEY (must be the service-role key)' })
+  }
+  if (!me.is_admin) throw createError({ statusCode: 403, statusMessage: 'Admins only' })
 
   const { data: ev } = await db.from('events').select('title, event_date, location').eq('id', eventId).single()
   if (!ev) throw createError({ statusCode: 404, statusMessage: 'Event not found' })
