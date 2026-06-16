@@ -31,7 +31,7 @@ const embedUrl = computed(() =>
   <UModal
     v-model:open="open"
     :title="movie ? `${movie.title} — Trailer` : 'Trailer'"
-    :ui="{ content: 'sm:max-w-3xl' }"
+    :ui="{ content: 'sm:max-w-4xl' }"
   >
     <template #body>
       <div class="aspect-video w-full rounded-lg overflow-hidden bg-black flex items-center justify-center">

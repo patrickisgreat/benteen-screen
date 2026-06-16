@@ -29,7 +29,9 @@ const leadPoster = computed(() => (totalVotes.value > 0 ? posterUrl(suggestions.
 
 const eventOptions = computed(() =>
   events.value.map((event, index) => ({
-    label: `${formatDate(event.event_date, { dateStyle: 'medium' })} · ${event.title}`,
+    // Date only — the full (often long) title is shown on the event card below,
+    // and a long label here can blow out the row width on mobile.
+    label: formatDate(event.event_date, { dateStyle: 'medium' }),
     value: index
   }))
 )
@@ -202,7 +204,7 @@ async function onRemove(suggestion: Suggestion): Promise<void> {
         </aside>
 
         <!-- RIGHT: rankings -->
-        <section class="lg:col-span-2">
+        <section class="lg:col-span-2 min-w-0">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-semibold">
               Rankings
