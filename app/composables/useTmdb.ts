@@ -18,9 +18,14 @@ export function useTmdb() {
     return await $fetch('/api/movies/videos', { query: { id: movieId } })
   }
 
-  /** A fresh handful of critically acclaimed, lesser-known movies ("hidden gems"). */
-  async function discoverGems(): Promise<TmdbMovie[]> {
-    return await $fetch<TmdbMovie[]>('/api/movies/discover')
+  /**
+   * A fresh handful of critically acclaimed, lesser-known movies ("hidden gems").
+   * Pass a TMDB genre id to filter to a category; omit it for "I'm feeling lucky".
+   */
+  async function discoverGems(genreId?: number | null): Promise<TmdbMovie[]> {
+    return await $fetch<TmdbMovie[]>('/api/movies/discover', {
+      query: genreId ? { genre: genreId } : {}
+    })
   }
 
   return { searchMovies, posterUrl, getTrailer, discoverGems }
