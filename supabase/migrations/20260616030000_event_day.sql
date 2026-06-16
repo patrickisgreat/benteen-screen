@@ -16,7 +16,10 @@ values (
   5242880, -- 5 MB
   array['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 )
-on conflict (id) do nothing;
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
 
 create policy "event-posters: public read" on storage.objects
   for select using (bucket_id = 'event-posters');
