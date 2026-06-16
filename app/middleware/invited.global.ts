@@ -4,7 +4,7 @@ import type { Database } from '~/types/database.types'
 // module already bounces *unauthenticated* users to /login; this catches users
 // who are authenticated but whose email isn't on the allowlist (public.invites):
 // it ends their session and sends them to /request-access.
-const PUBLIC_PATHS = new Set(['/', '/about', '/login', '/confirm', '/request-access'])
+const PUBLIC_PATHS = new Set(['/', '/about', '/login', '/confirm', '/request-access', '/reset-password'])
 
 export default defineNuxtRouteMiddleware(async (to) => {
   if (PUBLIC_PATHS.has(to.path)) return

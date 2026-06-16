@@ -51,18 +51,26 @@ export function useAuth() {
     if (error) throw error
   }
 
-  async function signUpWithEmail(email: string, password: string): Promise<void> {
-    const { error } = await supabase.auth.signUp({
+  // Returns whether a confirmation email is pending. With email confirmation on,
+  // signUp returns no session (the user must confirm first); with it off, a live
+  // session comes back and they're signed in immediately — the caller branches
+  // on this so it never tells a signed-in user to "check your inbox".
+  async function signUpWithEmail(email: string, password: string): Promise<{ needsConfirmation: boolean }> {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: callbackUrl() }
     })
     if (error) throw error
+    return { needsConfirmation: !data.session }
   }
 
+  // The recovery link lands on /reset-password (a public page that sets the new
+  // password), not /confirm — /confirm would just bounce the recovery session
+  // straight into the app without ever changing the password.
   async function sendPasswordReset(email: string): Promise<void> {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: callbackUrl()
+      redirectTo: `${window.location.origin}/reset-password`
     })
     if (error) throw error
   }

@@ -58,13 +58,18 @@ async function onSubmit(event: FormSubmitEvent<{ email: string, password: string
   const { email, password } = event.data
   try {
     if (mode.value === 'signup') {
-      await signUpWithEmail(email, password)
-      toast.add({
-        title: 'Check your email',
-        description: 'Confirm your address to finish signing up.',
-        color: 'success',
-        icon: 'i-lucide-mail-check'
-      })
+      const { needsConfirmation } = await signUpWithEmail(email, password)
+      if (needsConfirmation) {
+        // Email confirmation is on — there's no session yet; tell them to confirm.
+        toast.add({
+          title: 'Check your email',
+          description: 'Confirm your address to finish signing up.',
+          color: 'success',
+          icon: 'i-lucide-mail-check'
+        })
+      }
+      // Otherwise a session came back: the user is signed in and watchEffect
+      // routes them onward — no "check your inbox" prompt.
     } else {
       await signInWithEmail(email, password)
       // On success the user populates and watchEffect routes to /overview.
@@ -155,13 +160,22 @@ async function onForgotPassword(): Promise<void> {
           />
         </UForm>
 
-        <div class="w-full flex items-center justify-between text-sm">
-          <button type="button" class="text-primary hover:underline" @click="mode = mode === 'signup' ? 'signin' : 'signup'">
-            {{ mode === 'signup' ? 'Have an account? Sign in' : 'New here? Create an account' }}
-          </button>
-          <button v-if="mode === 'signin'" type="button" class="text-muted hover:underline" @click="onForgotPassword">
-            Forgot password?
-          </button>
+        <div class="w-full flex items-center justify-between gap-2">
+          <UButton
+            variant="link"
+            color="primary"
+            class="px-0"
+            :label="mode === 'signup' ? 'Have an account? Sign in' : 'New here? Create an account'"
+            @click="mode = mode === 'signup' ? 'signin' : 'signup'"
+          />
+          <UButton
+            v-if="mode === 'signin'"
+            variant="link"
+            color="neutral"
+            class="px-0"
+            label="Forgot password?"
+            @click="onForgotPassword"
+          />
         </div>
 
         <p class="text-xs text-dimmed">
