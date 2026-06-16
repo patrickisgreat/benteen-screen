@@ -17,13 +17,21 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const allowed = useState<boolean | null>('is-allowed', () => null)
   if (allowed.value === null) {
     const { data, error } = await supabase.rpc('is_allowed')
-    allowed.value = !error && (data ?? false)
+    if (error) {
+      // Couldn't determine allow-status (e.g. the is_allowed function/migration
+      // isn't present yet, or a transient RPC failure). This gate is UX only —
+      // RLS is the real boundary (Invariant 1) — so we must NOT lock everyone out
+      // on an infra hiccup. Let the user through; RLS still governs their data.
+      console.warn('[invited] is_allowed check failed; allowing through (RLS still enforces access):', error.message)
+      return
+    }
+    allowed.value = data ?? false
   }
   if (allowed.value) return
 
-  // Clear the cached verdict before signing out so a *different* user signing in
-  // later in the same SPA session (e.g. email/password, which doesn't reload the
-  // page) is re-checked rather than inheriting this stale "denied".
+  // Explicit deny. Clear the cached verdict before signing out so a *different*
+  // user signing in later in the same SPA session (e.g. email/password, which
+  // doesn't reload the page) is re-checked rather than inheriting this stale deny.
   allowed.value = null
   await supabase.auth.signOut()
   return navigateTo('/request-access')
