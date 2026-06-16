@@ -18,14 +18,20 @@ function from(table: string) {
     order: () => result,
     is: () => chain,
     delete: () => chain,
-    eq: (col: string, val: unknown) => { calls.del.push({ col, val }); return Promise.resolve({ error: null }) }
+    eq: (col: string, val: unknown) => {
+      calls.del.push({ col, val })
+      return Promise.resolve({ error: null })
+    }
   }
   return chain
 }
 
 const supabase = {
   from,
-  rpc: (fn: string, args: unknown) => { calls.rpc.push({ fn, args }); return Promise.resolve({ error: null }) }
+  rpc: (fn: string, args: unknown) => {
+    calls.rpc.push({ fn, args })
+    return Promise.resolve({ error: null })
+  }
 }
 
 mockNuxtImport('useSupabaseClient', () => () => supabase)
