@@ -12,6 +12,9 @@ export function useAuth() {
   const user = useSupabaseUser()
   const myId = useState<string | null>('my-id', () => null)
   const profile = useState<Profile | null>('profile', () => null)
+  // Cached allowlist verdict (set by middleware/invited.global.ts); cleared on
+  // sign-out so the next user is re-checked within the same SPA session.
+  const isAllowed = useState<boolean | null>('is-allowed', () => null)
 
   const isAdmin = computed(() => profile.value?.is_admin ?? false)
 
@@ -37,6 +40,7 @@ export function useAuth() {
     await supabase.auth.signOut()
     profile.value = null
     myId.value = null
+    isAllowed.value = null
   }
 
   return { user, myId, profile, account, isAdmin, signInWithGoogle, signOutUser }
