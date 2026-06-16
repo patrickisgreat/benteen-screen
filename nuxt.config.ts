@@ -23,9 +23,14 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
-    // Server-only — never shipped to the browser. Nitro overrides this from
-    // NUXT_TMDB_API_KEY at runtime.
-    tmdbApiKey: ''
+    // Server-only — never shipped to the browser. Nitro overrides these from
+    // the matching NUXT_* env vars at runtime (Product Invariant 2).
+    tmdbApiKey: '',
+    resendApiKey: '',
+    // Verified Resend sender for e-vites / event blasts. Override per env.
+    resendFrom: 'Benteen Screen On The Green <movienight@benteenscreenonthegreen.com>',
+    // Absolute site URL used in email links; falls back to the request origin.
+    siteUrl: ''
   },
 
   compatibilityDate: '2025-01-15',
