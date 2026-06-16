@@ -6,9 +6,9 @@ export interface Database {
   public: {
     Tables: {
       profiles: {
-        Row: { id: string, email: string | null, display_name: string | null, avatar_url: string | null, is_admin: boolean, created_at: string }
-        Insert: { id: string, email?: string | null, display_name?: string | null, avatar_url?: string | null, is_admin?: boolean, created_at?: string }
-        Update: { id?: string, email?: string | null, display_name?: string | null, avatar_url?: string | null, is_admin?: boolean, created_at?: string }
+        Row: { id: string, email: string | null, display_name: string | null, avatar_url: string | null, is_admin: boolean, blocked: boolean, created_at: string }
+        Insert: { id: string, email?: string | null, display_name?: string | null, avatar_url?: string | null, is_admin?: boolean, blocked?: boolean, created_at?: string }
+        Update: { id?: string, email?: string | null, display_name?: string | null, avatar_url?: string | null, is_admin?: boolean, blocked?: boolean, created_at?: string }
         Relationships: []
       }
       events: {
@@ -43,7 +43,9 @@ export interface Database {
       }
     }
     Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
+    Functions: {
+      admin_set_blocked: { Args: { target_id: string, value: boolean }, Returns: undefined }
+    }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }
   }
