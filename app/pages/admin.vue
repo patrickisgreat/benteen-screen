@@ -10,7 +10,7 @@ useSeoMeta({ title: 'Admin · BSOTG' })
 const toast = useToast()
 const { events } = useEvents()
 const { createEvent, updateEvent, deleteEvent, setVotingLocked } = useEventAdmin()
-const { people, pendingInvites, loadError, setBlocked, revokeInvite } = useAdminPeople()
+const { people, pendingInvites, loadError, setBlocked, setAdmin, revokeInvite } = useAdminPeople()
 
 const modalOpen = ref(false)
 const inviteOpen = ref(false)
@@ -223,6 +223,18 @@ function onSelectPerson(person: Profile): void {
   statsPerson.value = person
   statsOpen.value = true
 }
+async function onSetAdmin(person: Profile, value: boolean): Promise<void> {
+  try {
+    await setAdmin(person.id, value)
+    toast.add({
+      title: `${person.display_name ?? 'User'} ${value ? 'is now an admin' : 'is no longer an admin'}`,
+      icon: 'i-lucide-shield',
+      color: value ? 'success' : 'neutral'
+    })
+  } catch (error) {
+    toast.add({ title: 'Could not change admin status', description: error instanceof Error ? error.message : undefined, color: 'error' })
+  }
+}
 function onSelectEvent(event: MovieEvent): void {
   statsEvent.value = event
   eventStatsOpen.value = true
@@ -397,6 +409,7 @@ function onSelectEvent(event: MovieEvent): void {
             @unblock="onUnblock"
             @revoke="onRevoke"
             @select="onSelectPerson"
+            @set-admin="onSetAdmin"
           />
         </div>
       </template>

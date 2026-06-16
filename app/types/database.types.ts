@@ -62,6 +62,7 @@ export interface Database {
     }
     Views: { [_ in never]: never }
     Functions: {
+      admin_set_admin: { Args: { target_id: string, value: boolean }, Returns: undefined }
       admin_set_blocked: { Args: { target_id: string, value: boolean }, Returns: undefined }
       is_allowed: { Args: Record<string, never>, Returns: boolean }
     }
