@@ -59,6 +59,17 @@ describe('BringList (admin manage view)', () => {
     expect(w.emitted('remove')?.[0]).toEqual([items[0]])
   })
 
+  it('edits an item inline and emits update on save', async () => {
+    const w = await mountSuspended(BringList, { props: { items, manage: true } })
+    const editBtn = w.findAll('button').find(b => b.attributes('aria-label') === 'Edit item')
+    await editBtn?.trigger('click')
+    // The first item's label is now an input (the add field is last).
+    await w.findAll('input')[0].setValue('Tortilla chips')
+    const saveBtn = w.findAll('button').find(b => b.attributes('aria-label') === 'Save item')
+    await saveBtn?.trigger('click')
+    expect(w.emitted('update')?.[0]).toEqual([items[0], 'Tortilla chips'])
+  })
+
   it('shows no claim buttons in manage mode', async () => {
     const w = await mountSuspended(BringList, { props: { items, manage: true } })
     expect(w.findAll('button').some(b => b.text().includes('I\'ll bring it'))).toBe(false)

@@ -21,7 +21,7 @@ const selectedEventId = ref<string>()
 const { suggestions, setDeleted, voterNames } = useAdminSuggestions(selectedEventId)
 
 // Bring list + headcount for the selected event (admins curate; people claim on the event page).
-const { items: bringItems, addItem: addBringItem, remove: removeBringItem } = useBringList(selectedEventId)
+const { items: bringItems, addItem: addBringItem, updateItem: updateBringItem, remove: removeBringItem } = useBringList(selectedEventId)
 const { counts: rsvpCounts } = useRsvp(selectedEventId)
 
 // Upcoming events first (soonest first), then past events descending (oldest last).
@@ -113,6 +113,15 @@ async function onAddBring(label: string): Promise<void> {
     toast.add({ title: 'Added to bring list', icon: 'i-lucide-check', color: 'success' })
   } catch {
     toast.add({ title: 'Could not add item', color: 'error' })
+  }
+}
+
+async function onUpdateBring(item: BringItem, label: string): Promise<void> {
+  try {
+    await updateBringItem(item, label)
+    toast.add({ title: 'Item updated', icon: 'i-lucide-check', color: 'success' })
+  } catch {
+    toast.add({ title: 'Could not update item', color: 'error' })
   }
 }
 
@@ -412,6 +421,7 @@ async function onRevoke(invite: Invite): Promise<void> {
             :items="bringItems"
             manage
             @add="onAddBring"
+            @update="onUpdateBring"
             @remove="onRemoveBring"
           />
         </div>

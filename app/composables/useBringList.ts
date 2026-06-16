@@ -75,5 +75,16 @@ export function useBringList(eventId: MaybeRefOrGetter<string | null | undefined
     await refresh()
   }
 
-  return { items, addItem, claim, unclaim, remove }
+  async function updateItem(item: BringItem, label: string, note?: string): Promise<void> {
+    const trimmed = label.trim()
+    if (!trimmed) return
+    const { error } = await supabase
+      .from('bring_items')
+      .update({ label: trimmed, note: note?.trim() || null })
+      .eq('id', item.id)
+    if (error) throw error
+    await refresh()
+  }
+
+  return { items, addItem, claim, unclaim, updateItem, remove }
 }

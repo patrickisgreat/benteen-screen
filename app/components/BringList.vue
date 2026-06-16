@@ -1,24 +1,41 @@
 <script setup lang="ts">
 import type { BringItem } from '#shared/types/bring'
 
-// `manage` = admin curation (add + remove items); otherwise it's the public
-// claim view (volunteer for an open slot, or unclaim your own).
+// `manage` = admin curation (add + edit + remove items); otherwise it's the
+// public claim view (volunteer for an open slot, or unclaim your own).
 defineProps<{ items: BringItem[], manage?: boolean }>()
 const emit = defineEmits<{
   add: [label: string]
   claim: [item: BringItem]
   unclaim: [item: BringItem]
+  update: [item: BringItem, label: string]
   remove: [item: BringItem]
 }>()
 
 const { myId } = useAuth()
 const newItem = ref('')
+const editingId = ref<string | null>(null)
+const draft = ref('')
 
 function add(): void {
   const label = newItem.value.trim()
   if (!label) return
   emit('add', label)
   newItem.value = ''
+}
+
+function startEdit(item: BringItem): void {
+  editingId.value = item.id
+  draft.value = item.label
+}
+function cancelEdit(): void {
+  editingId.value = null
+  draft.value = ''
+}
+function saveEdit(item: BringItem): void {
+  const label = draft.value.trim()
+  if (label && label !== item.label) emit('update', item, label)
+  cancelEdit()
 }
 
 function mine(item: BringItem): boolean {
@@ -36,12 +53,23 @@ function mine(item: BringItem): boolean {
           class="shrink-0"
         />
         <div class="min-w-0 flex-1">
-          <p class="font-medium truncate">
-            {{ item.label }}
-          </p>
-          <p class="text-xs text-muted truncate">
-            {{ item.user_id ? (item.bringer?.display_name ?? 'Someone') : 'Open — needs a volunteer' }}
-          </p>
+          <UInput
+            v-if="manage && editingId === item.id"
+            v-model="draft"
+            size="sm"
+            autofocus
+            class="w-full"
+            @keydown.enter="saveEdit(item)"
+            @keydown.esc="cancelEdit"
+          />
+          <template v-else>
+            <p class="font-medium truncate">
+              {{ item.label }}
+            </p>
+            <p class="text-xs text-muted truncate">
+              {{ item.user_id ? (item.bringer?.display_name ?? 'Someone') : 'Open — needs a volunteer' }}
+            </p>
+          </template>
         </div>
 
         <!-- Public claim view -->
@@ -50,17 +78,15 @@ function mine(item: BringItem): boolean {
           <UButton v-else-if="mine(item)" label="Unclaim" size="xs" color="neutral" variant="ghost" class="shrink-0" @click="emit('unclaim', item)" />
         </template>
 
-        <!-- Admin curation: remove an item -->
-        <UButton
-          v-else
-          icon="i-lucide-trash-2"
-          size="xs"
-          color="neutral"
-          variant="ghost"
-          class="shrink-0"
-          aria-label="Remove item"
-          @click="emit('remove', item)"
-        />
+        <!-- Admin curation: edit / remove an item -->
+        <template v-else-if="editingId === item.id">
+          <UButton icon="i-lucide-check" size="xs" color="primary" variant="ghost" class="shrink-0" aria-label="Save item" @click="saveEdit(item)" />
+          <UButton icon="i-lucide-x" size="xs" color="neutral" variant="ghost" class="shrink-0" aria-label="Cancel edit" @click="cancelEdit" />
+        </template>
+        <template v-else>
+          <UButton icon="i-lucide-pencil" size="xs" color="neutral" variant="ghost" class="shrink-0" aria-label="Edit item" @click="startEdit(item)" />
+          <UButton icon="i-lucide-trash-2" size="xs" color="neutral" variant="ghost" class="shrink-0" aria-label="Remove item" @click="emit('remove', item)" />
+        </template>
       </li>
     </ul>
     <p v-else class="text-sm text-muted">
