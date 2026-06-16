@@ -29,6 +29,8 @@ export default defineNuxtConfig({
     resendApiKey: '',
     // Verified Resend sender for e-vites / event blasts. Override per env.
     resendFrom: 'Benteen Screen On The Green <movienight@benteenscreenonthegreen.com>',
+    // Signing secret for Resend (Svix) webhooks → /api/webhooks/resend.
+    resendWebhookSecret: '',
     // Absolute site URL used in email links; falls back to the request origin.
     siteUrl: ''
   },
@@ -52,10 +54,10 @@ export default defineNuxtConfig({
     redirectOptions: {
       login: '/login',
       callback: '/confirm',
-      // /request-access is shown to signed-out, non-invited users; /reset-password
-      // handles the recovery link. The invite-only gate lives in RLS +
-      // middleware/invited.global.ts.
-      exclude: ['/', '/about', '/request-access', '/reset-password']
+      // Public routes: landing/about, the invite-only request page, the password
+      // recovery page, and /rsvp (guests RSVP from an e-vite without an account).
+      // The invite-only gate lives in RLS + middleware/invited.global.ts.
+      exclude: ['/', '/about', '/request-access', '/reset-password', '/rsvp']
     }
   }
 })
