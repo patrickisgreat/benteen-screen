@@ -21,6 +21,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
   if (allowed.value) return
 
+  // Clear the cached verdict before signing out so a *different* user signing in
+  // later in the same SPA session (e.g. email/password, which doesn't reload the
+  // page) is re-checked rather than inheriting this stale "denied".
+  allowed.value = null
   await supabase.auth.signOut()
   return navigateTo('/request-access')
 })

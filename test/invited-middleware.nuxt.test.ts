@@ -71,6 +71,13 @@ describe('invited.global middleware', () => {
     expect(state.navigatedTo).toBe('/request-access')
   })
 
+  it('clears the cached verdict on deny so a later sign-in is re-checked', async () => {
+    state.user.value = { id: 'u1' }
+    state.rpcData = false
+    await run('/overview')
+    expect(useState('is-allowed').value).toBeNull()
+  })
+
   it('treats an RPC error as not allowed (fails closed)', async () => {
     state.user.value = { id: 'u1' }
     state.rpcData = null

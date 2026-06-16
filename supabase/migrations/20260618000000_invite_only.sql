@@ -67,7 +67,7 @@ on conflict (email) do nothing;
 -- from the command center; the invite cap trigger reads it.
 create table public.app_settings (
   id          boolean primary key default true check (id), -- single-row guard
-  max_invites int,
+  max_invites int check (max_invites is null or max_invites >= 0), -- guard fat-fingers
   updated_at  timestamptz not null default now()
 );
 insert into public.app_settings (id) values (true) on conflict (id) do nothing;
