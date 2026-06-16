@@ -19,7 +19,10 @@ const isOwner = computed(() =>
 )
 const barPct = computed(() => (props.maxVotes > 0 ? Math.round((voteCount.value / props.maxVotes) * 100) : 0))
 
+// Only award medals once there are votes — otherwise the order is just by
+// created_at and "rank 1" is meaningless (and ties are arbitrary).
 const rankClass = computed(() => {
+  if (voteCount.value === 0) return 'bg-elevated text-muted'
   switch (props.rank) {
     case 1: return 'bg-amber-400 text-black'
     case 2: return 'bg-zinc-300 text-black'
@@ -27,10 +30,11 @@ const rankClass = computed(() => {
     default: return 'bg-elevated text-muted'
   }
 })
+const highlight = computed(() => props.rank === 1 && voteCount.value > 0)
 </script>
 
 <template>
-  <UCard variant="subtle" :class="rank === 1 ? 'ring-2 ring-primary/40' : ''" :ui="{ body: 'sm:p-4 p-3' }">
+  <UCard variant="subtle" :class="highlight ? 'ring-2 ring-primary/40' : ''" :ui="{ body: 'sm:p-4 p-3' }">
     <div class="flex items-center gap-3">
       <!-- rank -->
       <div class="shrink-0 flex items-center justify-center size-7 rounded-full font-bold text-sm" :class="rankClass">

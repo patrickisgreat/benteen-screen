@@ -23,8 +23,9 @@ const { suggestions, alreadySuggested, suggest, vote, unvote, removeSuggestion }
 const suggestedMovieIds = computed(() => suggestions.value.map(s => s.tmdb_movie.id))
 const maxVotes = computed(() => Math.max(1, ...suggestions.value.map(s => s.votes?.length ?? 0)))
 const totalVotes = computed(() => suggestions.value.reduce((sum, s) => sum + (s.votes?.length ?? 0), 0))
-const leadingTitle = computed(() => suggestions.value[0]?.tmdb_movie.title ?? null)
-const leadPoster = computed(() => posterUrl(suggestions.value[0]?.tmdb_movie.poster_path))
+// Only surface a "leader" once votes exist — before that the order is just by date.
+const leadingTitle = computed(() => (totalVotes.value > 0 ? suggestions.value[0]?.tmdb_movie.title ?? null : null))
+const leadPoster = computed(() => (totalVotes.value > 0 ? posterUrl(suggestions.value[0]?.tmdb_movie.poster_path) : null))
 
 const eventOptions = computed(() =>
   events.value.map((event, index) => ({

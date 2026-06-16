@@ -1,10 +1,4 @@
-interface TmdbVideo {
-  key: string
-  site: string
-  type: string
-  official: boolean
-  name: string
-}
+import { pickBestTrailer, type TmdbVideo } from '#shared/utils/trailer'
 
 /**
  * Returns the best YouTube trailer key for a TMDB movie. Server-side so the
@@ -28,11 +22,6 @@ export default defineEventHandler(async (event): Promise<{ key: string | null, n
     throw createError({ statusCode: 502, statusMessage: 'Failed to reach the movie database' })
   }
 
-  const videos = (data.results ?? []).filter(v => v.site === 'YouTube')
-  const pick = videos.find(v => v.type === 'Trailer' && v.official)
-    ?? videos.find(v => v.type === 'Trailer')
-    ?? videos.find(v => v.type === 'Teaser')
-    ?? videos[0]
-
+  const pick = pickBestTrailer(data.results)
   return { key: pick?.key ?? null, name: pick?.name ?? null }
 })

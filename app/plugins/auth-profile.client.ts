@@ -19,7 +19,8 @@ export default defineNuxtPlugin(() => {
       profile.value = null
       return
     }
-    const { data: { user: authUser } } = await supabase.auth.getUser()
+    const { data: { user: authUser }, error } = await supabase.auth.getUser()
+    if (error) console.error('Failed to resolve the current user', error)
     myId.value = authUser?.id ?? null
     if (!myId.value) {
       profile.value = null

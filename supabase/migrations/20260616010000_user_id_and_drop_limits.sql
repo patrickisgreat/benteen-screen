@@ -8,7 +8,7 @@
 -- ============================================================================
 
 create or replace function public.set_user_id() returns trigger
-  language plpgsql as $$
+  language plpgsql set search_path = '' as $$
 begin
   if auth.uid() is not null then
     new.user_id := auth.uid();
@@ -35,5 +35,6 @@ drop function if exists public.enforce_suggestion_limit();
 drop function if exists public.vote_limit();
 drop function if exists public.suggestion_limit();
 
--- The UI checks admin via this RPC (auth.uid()-based) instead of a cached client id.
+-- is_admin() is invoked by the RLS policies on events/suggestions; make sure the
+-- authenticated role can execute it when those policies are evaluated.
 grant execute on function public.is_admin() to authenticated;
