@@ -47,7 +47,7 @@ export function useUserStats(userId: MaybeRefOrGetter<string | null>) {
         winningSuggestionIds
       })
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load stats'
+      error.value = errorMessage(e, 'Failed to load stats')
       stats.value = null
     } finally {
       pending.value = false
