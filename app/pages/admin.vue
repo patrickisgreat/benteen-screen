@@ -17,6 +17,10 @@ const inviteOpen = ref(false)
 const editingEvent = ref<MovieEvent | null>(null)
 const eventPendingDelete = ref<MovieEvent | null>(null)
 
+// People drill-down: the member whose activity stats are open.
+const statsPerson = ref<Profile | null>(null)
+const statsOpen = ref(false)
+
 const selectedEventId = ref<string>()
 const { suggestions, setDeleted, voterNames } = useAdminSuggestions(selectedEventId)
 
@@ -211,6 +215,10 @@ async function onRevoke(invite: Invite): Promise<void> {
     toast.add({ title: 'Could not revoke invite', color: 'error' })
   }
 }
+function onSelectPerson(person: Profile): void {
+  statsPerson.value = person
+  statsOpen.value = true
+}
 </script>
 
 <template>
@@ -372,6 +380,7 @@ async function onRevoke(invite: Invite): Promise<void> {
             @block="onBlock"
             @unblock="onUnblock"
             @revoke="onRevoke"
+            @select="onSelectPerson"
           />
         </div>
       </template>
@@ -546,6 +555,8 @@ async function onRevoke(invite: Invite): Promise<void> {
 
     <!-- Admin invite a friend -->
     <InviteFriendModal v-model:open="inviteOpen" />
+
+    <UserStatsModal v-model:open="statsOpen" :person="statsPerson" />
 
     <!-- Delete confirmation -->
     <UModal
