@@ -21,7 +21,7 @@ export function useEvents() {
   onMounted(() => {
     refresh()
     channel = supabase
-      .channel('events-changes')
+      .channel(`events-${crypto.randomUUID()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => refresh())
       .subscribe()
   })

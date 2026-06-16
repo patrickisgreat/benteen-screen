@@ -40,7 +40,7 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
     refresh()
     if (!id) return
     channel = supabase
-      .channel(`suggestions-${id}`)
+      .channel(`suggestions-${crypto.randomUUID()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'suggestions', filter: `event_id=eq.${id}` }, () => refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => refresh())
       .subscribe()
