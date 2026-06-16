@@ -294,7 +294,9 @@ async function onRevoke(invite: Invite): Promise<void> {
           <div class="flex flex-wrap items-center justify-between gap-3">
             <p class="text-sm text-muted">
               {{ people.length }} member{{ people.length === 1 ? '' : 's' }}
-              <template v-if="pendingInvites.length">· {{ pendingInvites.length }} pending</template>
+              <template v-if="pendingInvites.length">
+                · {{ pendingInvites.length }} pending
+              </template>
             </p>
             <UButton label="Invite someone" icon="i-lucide-user-plus" size="sm" @click="inviteOpen = true" />
           </div>
@@ -407,7 +409,6 @@ async function onRevoke(invite: Invite): Promise<void> {
         <div v-if="selectedEventId" class="max-w-xl">
           <BringList
             :items="bringItems"
-            :doughs="rsvpCounts.going"
             manage
             @add="onAddBring"
             @remove="onRemoveBring"

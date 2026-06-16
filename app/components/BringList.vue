@@ -3,7 +3,7 @@ import type { BringItem } from '#shared/types/bring'
 
 // `manage` = admin curation (add + remove items); otherwise it's the public
 // claim view (volunteer for an open slot, or unclaim your own).
-defineProps<{ items: BringItem[], doughs?: number, manage?: boolean }>()
+defineProps<{ items: BringItem[], manage?: boolean }>()
 const emit = defineEmits<{
   add: [label: string]
   claim: [item: BringItem]
@@ -28,11 +28,6 @@ function mine(item: BringItem): boolean {
 
 <template>
   <div class="space-y-3">
-    <div v-if="doughs !== undefined" class="text-sm font-medium flex items-center gap-1.5">
-      🍕 {{ doughs }} pizza dough{{ doughs === 1 ? '' : 's' }} needed
-      <span class="text-xs text-muted font-normal">(one per "Going")</span>
-    </div>
-
     <ul v-if="items.length" class="divide-y divide-default rounded-lg ring ring-default overflow-hidden">
       <li v-for="item in items" :key="item.id" class="flex items-center gap-2 p-3">
         <UIcon
