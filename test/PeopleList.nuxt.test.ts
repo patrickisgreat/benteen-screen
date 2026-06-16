@@ -9,6 +9,10 @@ const people = [
   { id: 'u3', email: 'carol@x.com', display_name: 'Carol', avatar_url: null, is_admin: true, blocked: false, created_at: '' }
 ]
 
+const pending = [
+  { email: 'pat@x.com', invited_by: null, display_name: 'Pat', created_at: '', accepted_at: null }
+]
+
 describe('PeopleList', () => {
   it('lists every member', async () => {
     const w = await mountSuspended(PeopleList, { props: { people } })
@@ -42,5 +46,32 @@ describe('PeopleList', () => {
     await w.find('input').setValue('bob')
     expect(w.text()).toContain('Bob')
     expect(w.text()).not.toContain('Alice')
+  })
+
+  it('lists pending invites with a Revoke action', async () => {
+    const w = await mountSuspended(PeopleList, { props: { people, pending } })
+    expect(w.text()).toContain('Pat')
+    expect(w.text()).toContain('Pending')
+    expect(w.findAll('button').some(b => b.text().trim() === 'Revoke')).toBe(true)
+  })
+
+  it('emits revoke with the pending invite', async () => {
+    const w = await mountSuspended(PeopleList, { props: { people, pending } })
+    const revoke = w.findAll('button').find(b => b.text().trim() === 'Revoke')
+    await revoke?.trigger('click')
+    expect(w.emitted('revoke')?.[0]).toEqual([pending[0]])
+  })
+
+  it('searches across pending invites too', async () => {
+    const w = await mountSuspended(PeopleList, { props: { people, pending } })
+    await w.find('input').setValue('pat')
+    expect(w.text()).toContain('Pat')
+    expect(w.text()).not.toContain('Alice')
+  })
+
+  it('hides a pending invite that already belongs to a member', async () => {
+    const dupe = [{ email: 'alice@x.com', invited_by: null, display_name: 'Alice Dupe', created_at: '', accepted_at: null }]
+    const w = await mountSuspended(PeopleList, { props: { people, pending: dupe } })
+    expect(w.text()).not.toContain('Alice Dupe')
   })
 })
