@@ -13,6 +13,7 @@ const eventIndex = ref(0)
 const initialized = ref(false)
 const eventInfoOpen = ref(false)
 const suggestOpen = ref(false)
+const finderOpen = ref(false)
 const trailerOpen = ref(false)
 const trailerMovie = ref<TmdbMovie | null>(null)
 
@@ -54,9 +55,12 @@ function nextEvent(): void {
   if (eventIndex.value < events.value.length - 1) eventIndex.value++
 }
 
-function openTrailer(suggestion: Suggestion): void {
-  trailerMovie.value = suggestion.tmdb_movie
+function openTrailerMovie(movie: TmdbMovie): void {
+  trailerMovie.value = movie
   trailerOpen.value = true
+}
+function openTrailer(suggestion: Suggestion): void {
+  openTrailerMovie(suggestion.tmdb_movie)
 }
 
 async function onSuggest(movie: TmdbMovie): Promise<void> {
@@ -226,6 +230,17 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
             icon="i-lucide-plus"
             @click="suggestOpen = true"
           />
+
+          <!-- Movie finder (all sizes) -->
+          <UButton
+            class="justify-center"
+            block
+            color="neutral"
+            variant="outline"
+            label="Help me find a movie"
+            icon="i-lucide-clapperboard"
+            @click="finderOpen = true"
+          />
         </aside>
 
         <!-- RIGHT: rankings -->
@@ -277,6 +292,13 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
         <SuggestSection :suggested-movie-ids="suggestedMovieIds" @suggest="onSuggest" />
       </template>
     </USlideover>
+
+    <MovieFinder
+      v-model:open="finderOpen"
+      :suggested-movie-ids="suggestedMovieIds"
+      @suggest="onSuggest"
+      @trailer="openTrailerMovie"
+    />
 
     <EventInfoModal v-model:open="eventInfoOpen" :event="currentEvent" />
     <TrailerModal v-model:open="trailerOpen" :movie="trailerMovie" />
