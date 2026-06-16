@@ -55,7 +55,7 @@ const highlight = computed(() => props.rank === 1 && voteCount.value > 0)
       <!-- content -->
       <div class="min-w-0 flex-1">
         <div class="flex items-start justify-between gap-2">
-          <h3 class="font-semibold leading-tight truncate">
+          <h3 class="font-semibold leading-tight truncate min-w-0 flex-1">
             {{ movie.title }}
             <span v-if="year" class="text-muted font-normal">({{ year }})</span>
           </h3>
