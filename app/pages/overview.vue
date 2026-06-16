@@ -202,7 +202,7 @@ async function onRemove(suggestion: Suggestion): Promise<void> {
         </aside>
 
         <!-- RIGHT: rankings -->
-        <section class="lg:col-span-2">
+        <section class="lg:col-span-2 min-w-0">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-semibold">
               Rankings
