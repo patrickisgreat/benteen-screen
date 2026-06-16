@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { MovieEvent } from '#shared/types/event'
+import type { BringItem } from '#shared/types/bring'
 
 definePageMeta({ middleware: 'admin' })
 useSeoMeta({ title: 'Admin · BSOTG' })
@@ -14,6 +15,10 @@ const eventPendingDelete = ref<MovieEvent | null>(null)
 
 const selectedEventId = ref<string>()
 const { suggestions, setDeleted, voterNames } = useAdminSuggestions(selectedEventId)
+
+// Bring list + headcount for the selected event (admins curate; people claim on the event page).
+const { items: bringItems, addItem: addBringItem, remove: removeBringItem } = useBringList(selectedEventId)
+const { counts: rsvpCounts } = useRsvp(selectedEventId)
 
 // Upcoming events first (soonest first), then past events descending (oldest last).
 const sortedEvents = computed(() => sortEventsForAdmin(events.value))
@@ -73,6 +78,24 @@ async function confirmDelete(): Promise<void> {
     toast.add({ title: 'Could not delete event', color: 'error' })
   } finally {
     eventPendingDelete.value = null
+  }
+}
+
+async function onAddBring(label: string): Promise<void> {
+  try {
+    await addBringItem(label, undefined, false) // open slot anyone can claim
+    toast.add({ title: 'Added to bring list', icon: 'i-lucide-check', color: 'success' })
+  } catch {
+    toast.add({ title: 'Could not add item', color: 'error' })
+  }
+}
+
+async function onRemoveBring(item: BringItem): Promise<void> {
+  try {
+    await removeBringItem(item)
+    toast.add({ title: 'Item removed', color: 'neutral' })
+  } catch {
+    toast.add({ title: 'Could not remove item', color: 'error' })
   }
 }
 
@@ -220,6 +243,40 @@ async function toggleSuggestion(id: string, deleted: boolean): Promise<void> {
         </UCard>
       </section>
     </div>
+
+    <!-- Bring list management (for the selected event) -->
+    <section class="mt-8">
+      <div class="mb-4">
+        <h2 class="text-xl font-semibold">
+          Bring list
+        </h2>
+        <p class="text-sm text-muted">
+          Add what the group needs for this event — people claim items on the event page.
+        </p>
+      </div>
+
+      <USelectMenu
+        v-model="selectedEventId"
+        :items="eventOptions"
+        value-key="value"
+        :search-input="false"
+        placeholder="Select an event"
+        class="w-full sm:max-w-sm mb-4"
+      />
+
+      <div v-if="selectedEventId" class="max-w-xl">
+        <BringList
+          :items="bringItems"
+          :doughs="rsvpCounts.going"
+          manage
+          @add="onAddBring"
+          @remove="onRemoveBring"
+        />
+      </div>
+      <UCard v-else variant="subtle" class="text-center text-muted">
+        Select an event to manage its bring list.
+      </UCard>
+    </section>
 
     <!-- Create / edit modal -->
     <EventFormModal v-model:open="modalOpen" :event="editingEvent" @save="onSave" />

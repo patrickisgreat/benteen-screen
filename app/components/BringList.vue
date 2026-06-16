@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { BringItem } from '#shared/types/bring'
 
-defineProps<{ items: BringItem[], doughs?: number }>()
+// `manage` = admin curation (add + remove items); otherwise it's the public
+// claim view (volunteer for an open slot, or unclaim your own).
+defineProps<{ items: BringItem[], doughs?: number, manage?: boolean }>()
 const emit = defineEmits<{
   add: [label: string]
   claim: [item: BringItem]
@@ -9,7 +11,7 @@ const emit = defineEmits<{
   remove: [item: BringItem]
 }>()
 
-const { myId, isAdmin } = useAuth()
+const { myId } = useAuth()
 const newItem = ref('')
 
 function add(): void {
@@ -46,10 +48,16 @@ function mine(item: BringItem): boolean {
             {{ item.user_id ? (item.bringer?.display_name ?? 'Someone') : 'Open — needs a volunteer' }}
           </p>
         </div>
-        <UButton v-if="!item.user_id" label="I'll bring it" size="xs" class="shrink-0" @click="emit('claim', item)" />
-        <UButton v-else-if="mine(item)" label="Unclaim" size="xs" color="neutral" variant="ghost" class="shrink-0" @click="emit('unclaim', item)" />
+
+        <!-- Public claim view -->
+        <template v-if="!manage">
+          <UButton v-if="!item.user_id" label="I'll bring it" size="xs" class="shrink-0" @click="emit('claim', item)" />
+          <UButton v-else-if="mine(item)" label="Unclaim" size="xs" color="neutral" variant="ghost" class="shrink-0" @click="emit('unclaim', item)" />
+        </template>
+
+        <!-- Admin curation: remove an item -->
         <UButton
-          v-if="mine(item) || isAdmin"
+          v-else
           icon="i-lucide-trash-2"
           size="xs"
           color="neutral"
@@ -61,11 +69,12 @@ function mine(item: BringItem): boolean {
       </li>
     </ul>
     <p v-else class="text-sm text-muted">
-      Nothing on the list yet — add what you're bringing.
+      {{ manage ? 'Nothing on the list yet — add what the group needs.' : 'Nothing to bring yet — the organizer will add items.' }}
     </p>
 
-    <div class="flex gap-2">
-      <UInput v-model="newItem" placeholder="e.g. toppings, drinks, a blanket…" class="flex-1" @keydown.enter="add" />
+    <!-- Add an item (admin only) -->
+    <div v-if="manage" class="flex gap-2">
+      <UInput v-model="newItem" placeholder="e.g. pepperoni, drinks, plates…" class="flex-1" @keydown.enter="add" />
       <UButton label="Add" icon="i-lucide-plus" :disabled="!newItem.trim()" @click="add" />
     </div>
   </div>
