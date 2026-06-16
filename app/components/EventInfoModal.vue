@@ -75,6 +75,11 @@ function downloadIcs(): void {
             >{{ event.location }}</a>
             <span v-else>{{ event.location }}</span>
           </p>
+          <WeatherForecast
+            v-if="isUpcoming(event.event_date) && event.location"
+            :location="event.location"
+            :date="event.event_date"
+          />
         </div>
 
         <!-- Add to calendar -->
