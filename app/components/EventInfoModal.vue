@@ -9,9 +9,6 @@ const eventId = computed(() => props.event?.id ?? null)
 const { myStatus, counts, setStatus } = useRsvp(eventId)
 const { items, claim, unclaim } = useBringList(eventId)
 
-// One pizza dough per person who's "Going".
-const doughs = computed(() => counts.value.going)
-
 const calEvent = computed<CalendarEvent | null>(() => {
   const e = props.event
   if (!e) return null
@@ -124,7 +121,6 @@ function downloadIcs(): void {
           </h3>
           <BringList
             :items="items"
-            :doughs="doughs"
             @claim="claim"
             @unclaim="unclaim"
           />

@@ -369,7 +369,6 @@ async function onUnblock(person: Profile): Promise<void> {
         <div v-if="selectedEventId" class="max-w-xl">
           <BringList
             :items="bringItems"
-            :doughs="rsvpCounts.going"
             manage
             @add="onAddBring"
             @remove="onRemoveBring"
