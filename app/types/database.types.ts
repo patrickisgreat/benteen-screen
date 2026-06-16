@@ -11,6 +11,12 @@ export interface Database {
         Update: { id?: string, email?: string | null, display_name?: string | null, avatar_url?: string | null, is_admin?: boolean, blocked?: boolean, created_at?: string }
         Relationships: []
       }
+      invites: {
+        Row: { email: string, invited_by: string | null, display_name: string | null, created_at: string, accepted_at: string | null }
+        Insert: { email: string, invited_by?: string | null, display_name?: string | null, created_at?: string, accepted_at?: string | null }
+        Update: { email?: string, invited_by?: string | null, display_name?: string | null, created_at?: string, accepted_at?: string | null }
+        Relationships: []
+      }
       events: {
         Row: { id: string, title: string, description: string, event_date: string, start_time: string | null, location: string | null, location_url: string | null, poster_url: string | null, created_by: string | null, created_at: string }
         Insert: { id?: string, title: string, description?: string, event_date: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, created_by?: string | null, created_at?: string }
@@ -45,6 +51,7 @@ export interface Database {
     Views: { [_ in never]: never }
     Functions: {
       admin_set_blocked: { Args: { target_id: string, value: boolean }, Returns: undefined }
+      is_allowed: { Args: Record<string, never>, Returns: boolean }
     }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }
