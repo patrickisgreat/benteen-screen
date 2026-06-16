@@ -7,7 +7,7 @@ const props = defineProps<{ event: MovieEvent | null }>()
 
 const eventId = computed(() => props.event?.id ?? null)
 const { myStatus, counts, setStatus } = useRsvp(eventId)
-const { items, addItem, claim, unclaim, remove } = useBringList(eventId)
+const { items, claim, unclaim } = useBringList(eventId)
 
 // One pizza dough per person who's "Going".
 const doughs = computed(() => counts.value.going)
@@ -35,12 +35,6 @@ function downloadIcs(): void {
   a.download = `${(props.event?.title || 'event').replace(/[^\w-]+/g, '-')}.ics`
   a.click()
   URL.revokeObjectURL(url)
-}
-
-async function onAdd(label: string): Promise<void> {
-  try {
-    await addItem(label)
-  } catch { /* surfaced via realtime state staying unchanged */ }
 }
 </script>
 
@@ -131,10 +125,8 @@ async function onAdd(label: string): Promise<void> {
           <BringList
             :items="items"
             :doughs="doughs"
-            @add="onAdd"
             @claim="claim"
             @unclaim="unclaim"
-            @remove="remove"
           />
         </div>
       </div>

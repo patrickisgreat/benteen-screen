@@ -18,5 +18,10 @@ export function useTmdb() {
     return await $fetch('/api/movies/videos', { query: { id: movieId } })
   }
 
-  return { searchMovies, posterUrl, getTrailer }
+  /** A fresh handful of critically acclaimed, lesser-known movies ("hidden gems"). */
+  async function discoverGems(): Promise<TmdbMovie[]> {
+    return await $fetch<TmdbMovie[]>('/api/movies/discover')
+  }
+
+  return { searchMovies, posterUrl, getTrailer, discoverGems }
 }

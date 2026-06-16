@@ -25,6 +25,8 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
       .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id)')
       .eq('event_id', id)
       .eq('deleted', false)
+    // Drop a stale response: the selected event changed while this was in flight.
+    if (toValue(eventId) !== id) return
     suggestions.value = ((data ?? []) as unknown as Suggestion[]).sort((a, b) => {
       const diff = b.votes.length - a.votes.length
       return diff !== 0 ? diff : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()

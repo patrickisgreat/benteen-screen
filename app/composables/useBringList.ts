@@ -18,6 +18,8 @@ export function useBringList(eventId: MaybeRefOrGetter<string | null | undefined
       return
     }
     const { data } = await supabase.from('bring_items').select(SELECT).eq('event_id', id).order('created_at')
+    // Drop a stale response: the selected event changed while this was in flight.
+    if (toValue(eventId) !== id) return
     // Supabase types the embedded `bringer` join as an array, but the FK is to a
     // single profile — assert to our `BringItem` (single bringer-or-null) shape.
     items.value = (data ?? []) as unknown as BringItem[]

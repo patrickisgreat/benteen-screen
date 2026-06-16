@@ -16,6 +16,8 @@ export function useRsvp(eventId: MaybeRefOrGetter<string | null | undefined>) {
       return
     }
     const { data } = await supabase.from('rsvps').select('user_id, status').eq('event_id', id)
+    // Drop a stale response: the selected event changed while this was in flight.
+    if (toValue(eventId) !== id) return
     rsvps.value = data ?? []
   }
 
