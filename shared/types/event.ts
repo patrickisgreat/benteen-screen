@@ -4,6 +4,10 @@ export interface MovieEvent {
   title: string
   description: string
   event_date: string
+  start_time: string | null
+  location: string | null
+  location_url: string | null
+  poster_url: string | null
   created_at: string
 }
 
@@ -11,4 +15,8 @@ export interface MovieEvent {
 export interface EventDraft {
   title: string
   description: string
+  start_time?: string | null
+  location?: string | null
+  location_url?: string | null
+  poster_url?: string | null
 }

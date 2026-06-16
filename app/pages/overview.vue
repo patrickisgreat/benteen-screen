@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TmdbMovie } from '#shared/types/movie'
 import type { Suggestion } from '#shared/types/suggestion'
+import type { RsvpStatus } from '#shared/types/rsvp'
 
 useSeoMeta({ title: 'Overview · BSOTG' })
 
@@ -19,6 +20,7 @@ const currentEvent = computed(() => events.value[eventIndex.value] ?? null)
 const currentEventId = computed(() => currentEvent.value?.id ?? null)
 
 const { suggestions, alreadySuggested, suggest, vote, unvote, removeSuggestion } = useSuggestions(currentEventId)
+const { myStatus, counts, setStatus } = useRsvp(currentEventId)
 
 const suggestedMovieIds = computed(() => suggestions.value.map(s => s.tmdb_movie.id))
 const maxVotes = computed(() => Math.max(1, ...suggestions.value.map(s => s.votes?.length ?? 0)))
@@ -26,6 +28,8 @@ const totalVotes = computed(() => suggestions.value.reduce((sum, s) => sum + (s.
 // Only surface a "leader" once votes exist — before that the order is just by date.
 const leadingTitle = computed(() => (totalVotes.value > 0 ? suggestions.value[0]?.tmdb_movie.title ?? null : null))
 const leadPoster = computed(() => (totalVotes.value > 0 ? posterUrl(suggestions.value[0]?.tmdb_movie.poster_path) : null))
+// Prefer the event's own poster; fall back to the current leader's movie poster.
+const cardBackdrop = computed(() => currentEvent.value?.poster_url || leadPoster.value)
 
 const eventOptions = computed(() =>
   events.value.map((event, index) => ({
@@ -90,6 +94,13 @@ async function onRemove(suggestion: Suggestion): Promise<void> {
     toast.add({ title: 'Could not remove suggestion', color: 'error' })
   }
 }
+async function onRsvp(status: RsvpStatus): Promise<void> {
+  try {
+    await setStatus(status)
+  } catch {
+    toast.add({ title: 'Could not update RSVP', color: 'error' })
+  }
+}
 </script>
 
 <template>
@@ -129,9 +140,9 @@ async function onRemove(suggestion: Suggestion): Promise<void> {
           <button type="button" class="w-full text-left group" @click="eventInfoOpen = true">
             <UCard variant="subtle" class="overflow-hidden group-hover:ring-2 group-hover:ring-primary/30 transition" :ui="{ body: 'relative' }">
               <div
-                v-if="leadPoster"
-                class="absolute inset-0 opacity-15 bg-cover bg-center"
-                :style="{ backgroundImage: `url(${leadPoster})` }"
+                v-if="cardBackdrop"
+                class="absolute inset-0 opacity-20 bg-cover bg-center"
+                :style="{ backgroundImage: `url(${cardBackdrop})` }"
               />
               <div class="relative">
                 <div class="flex flex-wrap items-center gap-2 mb-1">
@@ -153,6 +164,20 @@ async function onRemove(suggestion: Suggestion): Promise<void> {
               </div>
             </UCard>
           </button>
+
+          <!-- RSVP (upcoming only) -->
+          <UCard v-if="isUpcoming(currentEvent.event_date)" variant="subtle">
+            <h2 class="text-sm font-semibold text-muted mb-2">
+              Are you coming?
+            </h2>
+            <RsvpControl :my-status="myStatus" :counts="counts" @set="onRsvp" />
+            <p v-if="counts.going" class="text-xs text-muted mt-3 flex items-center gap-1.5 justify-center">
+              🍕 {{ counts.going }} pizza dough{{ counts.going === 1 ? '' : 's' }} needed —
+              <button type="button" class="text-primary underline" @click="eventInfoOpen = true">
+                bring list
+              </button>
+            </p>
+          </UCard>
 
           <!-- Stats -->
           <UCard variant="subtle">
