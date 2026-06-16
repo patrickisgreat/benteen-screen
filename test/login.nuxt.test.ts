@@ -11,7 +11,10 @@ const auth = {
   signInWithGoogle: async () => { calls.push('google') },
   signInWithFacebook: async () => { calls.push('facebook') },
   signInWithEmail: async (email: string) => { calls.push(`email:${email}`) },
-  signUpWithEmail: async (email: string) => { calls.push(`signup:${email}`); return { needsConfirmation: true } },
+  signUpWithEmail: async (email: string) => {
+    calls.push(`signup:${email}`)
+    return { needsConfirmation: true }
+  },
   sendPasswordReset: async (email: string) => { calls.push(`reset:${email}`) }
 }
 

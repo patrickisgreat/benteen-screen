@@ -14,9 +14,9 @@ const phase = ref<'saving' | 'done' | 'error'>('saving')
 const current = ref<RsvpStatus | null>(null)
 
 const HEADLINE: Record<RsvpStatus, string> = {
-  going: "You're going! 🎉",
+  going: 'You\'re going! 🎉',
   maybe: 'Marked as maybe 🤔',
-  no: "Sorry you'll miss it"
+  no: 'Sorry you\'ll miss it'
 }
 
 function isStatus(value: string): value is RsvpStatus {
@@ -24,7 +24,10 @@ function isStatus(value: string): value is RsvpStatus {
 }
 
 async function rsvp(status: RsvpStatus): Promise<void> {
-  if (!token.value) { phase.value = 'error'; return }
+  if (!token.value) {
+    phase.value = 'error'
+    return
+  }
   phase.value = 'saving'
   try {
     await $fetch('/api/rsvp', { method: 'POST', body: { token: token.value, status } })

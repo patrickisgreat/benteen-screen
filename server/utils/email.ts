@@ -105,7 +105,7 @@ export function buildEventInviteEmail(opts: {
     `<h1 style="font-size:20px;margin:0 0 8px">You're invited to ${escapeHtml(opts.eventTitle)} 🎬</h1>`
     + (opts.eventDate ? `<p style="color:#6b7280;margin:0 0 4px">${escapeHtml(opts.eventDate)}${opts.location ? ` · ${escapeHtml(opts.location)}` : ''}</p>` : '')
     + `<p>${inviter} hopes you can make it for movie night. Will you be there?</p>`
-    + `<p style="margin:20px 0">${rsvp('going', "I'm going", '#16a34a')}${rsvp('maybe', 'Maybe', '#d97706')}${rsvp('no', "Can't make it", '#6b7280')}</p>`
+    + `<p style="margin:20px 0">${rsvp('going', 'I\'m going', '#16a34a')}${rsvp('maybe', 'Maybe', '#d97706')}${rsvp('no', 'Can\'t make it', '#6b7280')}</p>`
   )
   const text = `You're invited: ${opts.eventTitle}${opts.eventDate ? ` — ${opts.eventDate}` : ''}`
     + `\n\nRSVP:\nGoing: ${opts.rsvpUrl}&status=going\nMaybe: ${opts.rsvpUrl}&status=maybe\nCan't make it: ${opts.rsvpUrl}&status=no`

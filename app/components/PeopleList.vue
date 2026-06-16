@@ -12,9 +12,9 @@ const emit = defineEmits<{
   revoke: [invite: Invite]
 }>()
 
-type Row =
-  | { kind: 'member', key: string, name: string, email: string, profile: Profile }
-  | { kind: 'pending', key: string, name: string, email: string, invite: Invite }
+type Row
+  = | { kind: 'member', key: string, name: string, email: string, profile: Profile }
+    | { kind: 'pending', key: string, name: string, email: string, invite: Invite }
 
 const query = ref('')
 

@@ -15,7 +15,10 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
 
   async function refresh(): Promise<void> {
     const id = toValue(eventId)
-    if (!id) { invites.value = []; return }
+    if (!id) {
+      invites.value = []
+      return
+    }
     pending.value = true
     const { data } = await supabase
       .from('event_invites')
@@ -99,16 +102,23 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
   // Live updates as RSVPs / opens land (event_invites is in the realtime publication).
   let channel: ReturnType<typeof supabase.channel> | null = null
   watch(() => toValue(eventId), (id) => {
-    if (channel) { supabase.removeChannel(channel); channel = null }
+    if (channel) {
+      supabase.removeChannel(channel)
+      channel = null
+    }
     void refresh()
     if (!id) return
     channel = supabase
       .channel(`event_invites:${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_invites', filter: `event_id=eq.${id}` }, () => { void refresh() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_invites', filter: `event_id=eq.${id}` }, () => {
+        void refresh()
+      })
       .subscribe()
   }, { immediate: true })
 
-  onScopeDispose(() => { if (channel) supabase.removeChannel(channel) })
+  onScopeDispose(() => {
+    if (channel) supabase.removeChannel(channel)
+  })
 
   return { invites, pending, stats, refresh, addInvite, removeInvite, seedFromLastEvent, sendInvites }
 }

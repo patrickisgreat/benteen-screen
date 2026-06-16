@@ -22,6 +22,6 @@ describe('rsvp page', () => {
     const w = await mountSuspended(RsvpPage)
     await flushPromises()
     expect(calls[0]).toMatchObject({ url: '/api/rsvp', body: { token: 'abc', status: 'going' } })
-    expect(w.text()).toContain("You're going")
+    expect(w.text()).toContain('You\'re going')
   })
 })

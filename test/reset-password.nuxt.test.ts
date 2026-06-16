@@ -9,11 +9,17 @@ let navTarget: string | null = null
 
 mockNuxtImport('useSupabaseClient', () => () => ({
   auth: {
-    updateUser: async (args: { password: string }) => { updateCalls.push(args); return { error: null } }
+    updateUser: async (args: { password: string }) => {
+      updateCalls.push(args)
+      return { error: null }
+    }
   }
 }))
 mockNuxtImport('useToast', () => () => ({ add: () => {} }))
-mockNuxtImport('navigateTo', () => (to: string) => { navTarget = to; return to })
+mockNuxtImport('navigateTo', () => (to: string) => {
+  navTarget = to
+  return to
+})
 
 beforeEach(() => {
   updateCalls.length = 0

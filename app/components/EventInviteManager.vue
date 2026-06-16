@@ -82,7 +82,7 @@ const unsent = computed(() => invites.value.filter(i => !i.sent_at).length)
 function statusBadge(invite: EventInvite): { label: string, color: 'success' | 'warning' | 'neutral' | 'info' } {
   if (invite.rsvp === 'going') return { label: 'Going', color: 'success' }
   if (invite.rsvp === 'maybe') return { label: 'Maybe', color: 'warning' }
-  if (invite.rsvp === 'no') return { label: "Can't make it", color: 'neutral' }
+  if (invite.rsvp === 'no') return { label: 'Can\'t make it', color: 'neutral' }
   if (invite.clicked_at) return { label: 'Clicked', color: 'info' }
   if (invite.opened_at) return { label: 'Opened', color: 'info' }
   if (invite.sent_at) return { label: 'Sent', color: 'neutral' }

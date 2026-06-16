@@ -19,8 +19,16 @@ function builder(table: string) {
     is: () => c,
     single: () => Promise.resolve({ data: { event_date: '2026-01-01' } }),
     maybeSingle: () => Promise.resolve({ data: null }),
-    insert: (v: unknown) => { ops.inserted.push(v); return Promise.resolve({ error: null }) },
-    delete: () => ({ eq: (_col: string, val: unknown) => { ops.deleted.push(val); return Promise.resolve({ error: null }) } }),
+    insert: (v: unknown) => {
+      ops.inserted.push(v)
+      return Promise.resolve({ error: null })
+    },
+    delete: () => ({
+      eq: (_col: string, val: unknown) => {
+        ops.deleted.push(val)
+        return Promise.resolve({ error: null })
+      }
+    }),
     then: (resolve: (v: unknown) => void) => resolve({ data: table === 'event_invites' ? list : [] })
   }
   return c

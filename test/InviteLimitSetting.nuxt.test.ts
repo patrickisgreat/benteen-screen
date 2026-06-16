@@ -12,7 +12,9 @@ mockNuxtImport('useAppSettings', () => () => ({
 }))
 mockNuxtImport('useToast', () => () => ({ add: () => {} }))
 
-beforeEach(() => { saved = undefined })
+beforeEach(() => {
+  saved = undefined
+})
 
 async function clickSave(w: { findAll: (s: string) => Array<{ text: () => string, trigger: (e: string) => Promise<void> }> }): Promise<void> {
   const btn = w.findAll('button').find(b => b.text().includes('Save'))
