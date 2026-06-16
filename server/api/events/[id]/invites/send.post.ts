@@ -20,8 +20,16 @@ export default defineEventHandler(async (event) => {
   const { data: me, error: meError } = await db.from('profiles').select('is_admin').eq('id', user.id).single()
   // If the service-role read fails outright, NUXT_SUPABASE_SECRET_KEY is wrong
   // (it should be the service-role / sb_secret_ key) — surface that, not "Admins only".
+  // Bubble the underlying cause so the actual fault is diagnosable: an "Invalid API
+  // key" means a bad/mismatched key; a PGRST116 "0 rows" means the key isn't really
+  // service-role (RLS applied) or no profile row exists for this user.
   if (meError || !me) {
-    throw createError({ statusCode: 500, statusMessage: 'Could not verify admin — check NUXT_SUPABASE_SECRET_KEY (must be the service-role key)' })
+    console.error('[invites/send] admin verify failed', { code: meError?.code, message: meError?.message, userId: user.id })
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Could not verify admin — check NUXT_SUPABASE_SECRET_KEY (must be the service-role key)',
+      data: { cause: meError?.message ?? 'no profile row returned', code: meError?.code ?? null }
+    })
   }
   if (!me.is_admin) throw createError({ statusCode: 403, statusMessage: 'Admins only' })
 
