@@ -21,6 +21,10 @@ const eventPendingDelete = ref<MovieEvent | null>(null)
 const statsPerson = ref<Profile | null>(null)
 const statsOpen = ref(false)
 
+// Event drill-down: the event whose stats are open.
+const statsEvent = ref<MovieEvent | null>(null)
+const eventStatsOpen = ref(false)
+
 const selectedEventId = ref<string>()
 const { suggestions, setDeleted, voterNames } = useAdminSuggestions(selectedEventId)
 
@@ -219,6 +223,10 @@ function onSelectPerson(person: Profile): void {
   statsPerson.value = person
   statsOpen.value = true
 }
+function onSelectEvent(event: MovieEvent): void {
+  statsEvent.value = event
+  eventStatsOpen.value = true
+}
 </script>
 
 <template>
@@ -325,6 +333,14 @@ function onSelectPerson(person: Profile): void {
                 </h3>
               </div>
               <div class="flex gap-1 shrink-0">
+                <UButton
+                  icon="i-lucide-bar-chart-3"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="View event stats"
+                  @click="onSelectEvent(event)"
+                />
                 <UButton
                   icon="i-lucide-pencil"
                   color="neutral"
@@ -557,6 +573,8 @@ function onSelectPerson(person: Profile): void {
     <InviteFriendModal v-model:open="inviteOpen" />
 
     <UserStatsModal v-model:open="statsOpen" :person="statsPerson" />
+
+    <EventStatsModal v-model:open="eventStatsOpen" :event="statsEvent" />
 
     <!-- Delete confirmation -->
     <UModal
