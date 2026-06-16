@@ -47,9 +47,10 @@ export default defineNuxtConfig({
     redirectOptions: {
       login: '/login',
       callback: '/confirm',
-      // /request-access is shown to signed-out, non-invited users (the
-      // invite-only gate lives in RLS + middleware/invited.global.ts).
-      exclude: ['/', '/about', '/request-access']
+      // /request-access is shown to signed-out, non-invited users; /reset-password
+      // handles the recovery link. The invite-only gate lives in RLS +
+      // middleware/invited.global.ts.
+      exclude: ['/', '/about', '/request-access', '/reset-password']
     }
   }
 })

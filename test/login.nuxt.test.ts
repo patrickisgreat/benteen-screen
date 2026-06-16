@@ -11,8 +11,8 @@ const auth = {
   signInWithGoogle: async () => { calls.push('google') },
   signInWithFacebook: async () => { calls.push('facebook') },
   signInWithEmail: async (email: string) => { calls.push(`email:${email}`) },
-  signUpWithEmail: async (email: string) => { calls.push(`signup:${email}`) },
-  sendPasswordReset: async () => { calls.push('reset') }
+  signUpWithEmail: async (email: string) => { calls.push(`signup:${email}`); return { needsConfirmation: true } },
+  sendPasswordReset: async (email: string) => { calls.push(`reset:${email}`) }
 }
 
 mockNuxtImport('useAuth', () => () => auth)
@@ -64,5 +64,14 @@ describe('login page', () => {
     await w.find('form').trigger('submit')
     await flushPromises()
     expect(calls).toContain('signup:new@b.com')
+  })
+
+  it('sends a reset link from the forgot-password action', async () => {
+    const w = await mountSuspended(LoginPage)
+    await w.find('input[type="email"]').setValue('a@b.com')
+    const forgot = w.findAll('button').find(b => b.text().includes('Forgot password'))
+    await forgot?.trigger('click')
+    await flushPromises()
+    expect(calls).toContain('reset:a@b.com')
   })
 })
