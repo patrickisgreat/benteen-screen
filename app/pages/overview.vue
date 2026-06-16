@@ -8,6 +8,8 @@ useSeoMeta({ title: 'Overview · BSOTG' })
 const toast = useToast()
 const { posterUrl } = useTmdb()
 const { events } = useEvents()
+// Admins can flip between events; everyone else just sees the active one.
+const { isAdmin } = useAuth()
 
 const eventIndex = ref(0)
 const initialized = ref(false)
@@ -110,8 +112,8 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
 <template>
   <UContainer class="py-6 sm:py-8">
     <template v-if="events.length && currentEvent">
-      <!-- Event selector -->
-      <div class="flex items-center gap-2 mb-6">
+      <!-- Event selector (admin-only: members just see the active event) -->
+      <div v-if="isAdmin" class="flex items-center gap-2 mb-6">
         <UButton
           icon="i-lucide-chevron-left"
           color="neutral"
@@ -137,48 +139,21 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
         />
       </div>
 
+      <!-- Poster-backed header for the active event -->
+      <EventHero :event="currentEvent" :backdrop="cardBackdrop" class="mb-6" @open="eventInfoOpen = true" />
+
       <div class="grid lg:grid-cols-3 gap-6">
         <!-- LEFT: control panel -->
         <aside class="lg:col-span-1 space-y-4 lg:sticky lg:top-20 lg:self-start">
-          <!-- Event header card → details modal -->
-          <button type="button" class="w-full text-left group" @click="eventInfoOpen = true">
-            <UCard variant="subtle" class="overflow-hidden group-hover:ring-2 group-hover:ring-primary/30 transition" :ui="{ body: 'relative' }">
-              <div
-                v-if="cardBackdrop"
-                class="absolute inset-0 opacity-20 bg-cover bg-center"
-                :style="{ backgroundImage: `url(${cardBackdrop})` }"
-              />
-              <div class="relative">
-                <div class="flex flex-wrap items-center gap-2 mb-1">
-                  <UBadge
-                    :color="isUpcoming(currentEvent.event_date) ? 'primary' : 'neutral'"
-                    :variant="isUpcoming(currentEvent.event_date) ? 'solid' : 'subtle'"
-                    :label="isUpcoming(currentEvent.event_date) ? 'Upcoming' : 'Past'"
-                    icon="i-lucide-calendar"
-                    size="sm"
-                  />
-                  <span class="text-sm text-muted">{{ formatDate(currentEvent.event_date) }}</span>
-                </div>
-                <h1 class="text-xl font-bold">
-                  {{ currentEvent.title }}
-                </h1>
-                <p class="text-xs text-dimmed mt-1 inline-flex items-center gap-1">
-                  <UIcon name="i-lucide-info" /> Tap for details
-                </p>
-              </div>
-            </UCard>
-          </button>
-
           <!-- RSVP (upcoming only) -->
           <UCard v-if="isUpcoming(currentEvent.event_date)" variant="subtle">
             <h2 class="text-sm font-semibold text-muted mb-2">
               Are you coming?
             </h2>
             <RsvpControl :my-status="myStatus" :counts="counts" @set="onRsvp" />
-            <p v-if="counts.going" class="text-xs text-muted mt-3 flex items-center gap-1.5 justify-center">
-              🍕 {{ counts.going }} pizza dough{{ counts.going === 1 ? '' : 's' }} needed —
-              <button type="button" class="text-primary underline" @click="eventInfoOpen = true">
-                bring list
+            <p class="text-xs text-muted mt-3 text-center">
+              <button type="button" class="text-primary underline inline-flex items-center gap-1" @click="eventInfoOpen = true">
+                <UIcon name="i-lucide-list" /> See the bring list
               </button>
             </p>
           </UCard>
