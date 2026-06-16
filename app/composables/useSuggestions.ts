@@ -11,7 +11,7 @@ import type { TmdbMovie } from '#shared/types/movie'
  */
 export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefined>) {
   const supabase = useSupabaseClient<Database>()
-  const user = useSupabaseUser()
+  const myId = useState<string | null>('my-id', () => null)
   const suggestions = ref<Suggestion[]>([])
 
   async function refresh(): Promise<void> {
@@ -53,32 +53,29 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
     return suggestions.value.some(s => s.tmdb_movie?.id === movieId)
   }
 
+  // user_id is omitted on inserts — a DB trigger stamps it with auth.uid().
   async function suggest(movie: TmdbMovie): Promise<void> {
     const id = toValue(eventId)
-    if (!id || !user.value) return
+    if (!id || !myId.value) return
     const { error } = await supabase
       .from('suggestions')
-      .insert({ event_id: id, user_id: user.value.id, tmdb_movie: movie, deleted: false })
+      .insert({ event_id: id, tmdb_movie: movie, deleted: false })
     if (error) throw error
     await refresh()
   }
 
   async function vote(suggestion: Suggestion): Promise<void> {
-    if (!user.value) return
-    const uid = user.value.id
-    if (suggestion.votes.some(v => v.user_id === uid)) return
-    const { error } = await supabase.from('votes').insert({ suggestion_id: suggestion.id, user_id: uid })
+    if (!myId.value) return
+    if (suggestion.votes.some(v => v.user_id === myId.value)) return
+    const { error } = await supabase.from('votes').insert({ suggestion_id: suggestion.id })
     if (error) throw error
     await refresh()
   }
 
   async function unvote(suggestion: Suggestion): Promise<void> {
-    if (!user.value) return
-    const { error } = await supabase
-      .from('votes')
-      .delete()
-      .eq('suggestion_id', suggestion.id)
-      .eq('user_id', user.value.id)
+    if (!myId.value) return
+    // No user_id filter needed — the RLS delete policy scopes this to my own vote.
+    const { error } = await supabase.from('votes').delete().eq('suggestion_id', suggestion.id)
     if (error) throw error
     await refresh()
   }

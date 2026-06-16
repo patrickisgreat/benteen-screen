@@ -1,36 +1,31 @@
 <script setup lang="ts">
 import type { TmdbMovie } from '#shared/types/movie'
+import type { Suggestion } from '#shared/types/suggestion'
 
 useSeoMeta({ title: 'Overview · BSOTG' })
 
 const toast = useToast()
-const { user } = useAuth()
+const { posterUrl } = useTmdb()
 const { events } = useEvents()
 
 const eventIndex = ref(0)
 const initialized = ref(false)
+const eventInfoOpen = ref(false)
+const suggestOpen = ref(false)
+const trailerOpen = ref(false)
+const trailerMovie = ref<TmdbMovie | null>(null)
 
 const currentEvent = computed(() => events.value[eventIndex.value] ?? null)
 const currentEventId = computed(() => currentEvent.value?.id ?? null)
 
-const {
-  suggestions,
-  alreadySuggested,
-  suggest,
-  vote,
-  unvote,
-  removeSuggestion
-} = useSuggestions(currentEventId)
+const { suggestions, alreadySuggested, suggest, vote, unvote, removeSuggestion } = useSuggestions(currentEventId)
 
-const selectedMovie = ref<TmdbMovie | null>(null)
-
-// Real per-user participation limits (replaces the legacy fake counters).
-const usedVotes = computed(() => (user.value ? countUserVotes(suggestions.value, user.value.id) : 0))
-const usedSuggestions = computed(() => (user.value ? countUserSuggestions(suggestions.value, user.value.id) : 0))
-const votesLeft = computed(() => remaining(VOTE_LIMIT, usedVotes.value))
-const suggestionsLeft = computed(() => remaining(SUGGESTION_LIMIT, usedSuggestions.value))
-const voteLocked = computed(() => votesLeft.value <= 0)
-const canSuggest = computed(() => suggestionsLeft.value > 0)
+const suggestedMovieIds = computed(() => suggestions.value.map(s => s.tmdb_movie.id))
+const maxVotes = computed(() => Math.max(1, ...suggestions.value.map(s => s.votes?.length ?? 0)))
+const totalVotes = computed(() => suggestions.value.reduce((sum, s) => sum + (s.votes?.length ?? 0), 0))
+// Only surface a "leader" once votes exist — before that the order is just by date.
+const leadingTitle = computed(() => (totalVotes.value > 0 ? suggestions.value[0]?.tmdb_movie.title ?? null : null))
+const leadPoster = computed(() => (totalVotes.value > 0 ? posterUrl(suggestions.value[0]?.tmdb_movie.poster_path) : null))
 
 const eventOptions = computed(() =>
   events.value.map((event, index) => ({
@@ -39,7 +34,6 @@ const eventOptions = computed(() =>
   }))
 )
 
-// On first data load, jump to the next upcoming event (fallback: the latest one).
 watch(events, (list) => {
   if (initialized.value || !list.length) return
   const upcoming = list.findIndex(event => isUpcoming(event.event_date))
@@ -54,44 +48,39 @@ function nextEvent(): void {
   if (eventIndex.value < events.value.length - 1) eventIndex.value++
 }
 
+function openTrailer(suggestion: Suggestion): void {
+  trailerMovie.value = suggestion.tmdb_movie
+  trailerOpen.value = true
+}
+
 async function onSuggest(movie: TmdbMovie): Promise<void> {
-  if (!canSuggest.value) {
-    toast.add({ title: 'Suggestion limit reached', description: `You can suggest up to ${SUGGESTION_LIMIT} per event.`, color: 'warning' })
-    return
-  }
+  suggestOpen.value = false
   if (alreadySuggested(movie.id)) {
     toast.add({ title: 'Already suggested', description: `${movie.title} is already on the list.`, color: 'warning' })
-    selectedMovie.value = null
     return
   }
   try {
     await suggest(movie)
-    selectedMovie.value = null
     toast.add({ title: 'Suggestion added', icon: 'i-lucide-check', color: 'success' })
   } catch {
     toast.add({ title: 'Could not add suggestion', color: 'error' })
   }
 }
-
-async function onVote(suggestion: typeof suggestions.value[number]): Promise<void> {
-  if (voteLocked.value) {
-    toast.add({ title: 'Vote limit reached', description: `You can back up to ${VOTE_LIMIT} movies per event. Unvote one to free a slot.`, color: 'warning' })
-    return
-  }
+async function onVote(suggestion: Suggestion): Promise<void> {
   try {
     await vote(suggestion)
   } catch {
     toast.add({ title: 'Vote failed', color: 'error' })
   }
 }
-async function onUnvote(suggestion: typeof suggestions.value[number]): Promise<void> {
+async function onUnvote(suggestion: Suggestion): Promise<void> {
   try {
     await unvote(suggestion)
   } catch {
     toast.add({ title: 'Unvote failed', color: 'error' })
   }
 }
-async function onRemove(suggestion: typeof suggestions.value[number]): Promise<void> {
+async function onRemove(suggestion: Suggestion): Promise<void> {
   try {
     await removeSuggestion(suggestion)
     toast.add({ title: 'Suggestion removed', color: 'neutral' })
@@ -102,9 +91,9 @@ async function onRemove(suggestion: typeof suggestions.value[number]): Promise<v
 </script>
 
 <template>
-  <UContainer class="py-8 max-w-3xl">
+  <UContainer class="py-6 sm:py-8">
     <template v-if="events.length && currentEvent">
-      <!-- Event navigation -->
+      <!-- Event selector -->
       <div class="flex items-center gap-2 mb-6">
         <UButton
           icon="i-lucide-chevron-left"
@@ -131,124 +120,116 @@ async function onRemove(suggestion: typeof suggestions.value[number]): Promise<v
         />
       </div>
 
-      <!-- Event hero -->
-      <UCard class="mb-8">
-        <div class="flex flex-wrap items-center gap-3 mb-2">
-          <UBadge
-            :color="isUpcoming(currentEvent.event_date) ? 'primary' : 'neutral'"
-            :variant="isUpcoming(currentEvent.event_date) ? 'solid' : 'subtle'"
-            :label="isUpcoming(currentEvent.event_date) ? 'Upcoming' : 'Past'"
-            icon="i-lucide-calendar"
-          />
-          <span class="text-muted">{{ formatDate(currentEvent.event_date) }}</span>
-        </div>
-        <h1 class="text-2xl font-bold">
-          {{ currentEvent.title }}
-        </h1>
-        <div
-          v-if="currentEvent.description"
-          class="mt-3 text-muted [&_p]:my-2 [&_a]:text-primary [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
-          v-html="sanitizeHtml(currentEvent.description)"
-        />
-      </UCard>
+      <div class="grid lg:grid-cols-3 gap-6">
+        <!-- LEFT: control panel -->
+        <aside class="lg:col-span-1 space-y-4 lg:sticky lg:top-20 lg:self-start">
+          <!-- Event header card → details modal -->
+          <button type="button" class="w-full text-left group" @click="eventInfoOpen = true">
+            <UCard variant="subtle" class="overflow-hidden group-hover:ring-2 group-hover:ring-primary/30 transition" :ui="{ body: 'relative' }">
+              <div
+                v-if="leadPoster"
+                class="absolute inset-0 opacity-15 bg-cover bg-center"
+                :style="{ backgroundImage: `url(${leadPoster})` }"
+              />
+              <div class="relative">
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                  <UBadge
+                    :color="isUpcoming(currentEvent.event_date) ? 'primary' : 'neutral'"
+                    :variant="isUpcoming(currentEvent.event_date) ? 'solid' : 'subtle'"
+                    :label="isUpcoming(currentEvent.event_date) ? 'Upcoming' : 'Past'"
+                    icon="i-lucide-calendar"
+                    size="sm"
+                  />
+                  <span class="text-sm text-muted">{{ formatDate(currentEvent.event_date) }}</span>
+                </div>
+                <h1 class="text-xl font-bold">
+                  {{ currentEvent.title }}
+                </h1>
+                <p class="text-xs text-dimmed mt-1 inline-flex items-center gap-1">
+                  <UIcon name="i-lucide-info" /> Tap for details
+                </p>
+              </div>
+            </UCard>
+          </button>
 
-      <!-- Suggestions -->
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <h2 class="text-xl font-semibold">
-          Suggestions
-        </h2>
-        <div class="flex items-center gap-2">
-          <UBadge
-            :label="`${votesLeft} ${votesLeft === 1 ? 'vote' : 'votes'} left`"
-            :color="votesLeft ? 'primary' : 'neutral'"
-            variant="subtle"
-            icon="i-lucide-heart"
-          />
-          <UBadge
-            :label="`${suggestionsLeft} ${suggestionsLeft === 1 ? 'suggestion' : 'suggestions'} left`"
-            :color="suggestionsLeft ? 'primary' : 'neutral'"
-            variant="subtle"
-            icon="i-lucide-plus"
-          />
-        </div>
-      </div>
-
-      <div v-if="suggestions.length" class="space-y-3">
-        <SuggestionCard
-          v-for="suggestion in suggestions"
-          :key="suggestion.id"
-          :suggestion="suggestion"
-          :vote-locked="voteLocked"
-          @vote="onVote(suggestion)"
-          @unvote="onUnvote(suggestion)"
-          @remove="onRemove(suggestion)"
-        />
-      </div>
-      <UCard v-else variant="subtle" class="text-center">
-        <UIcon name="i-lucide-film" class="size-8 text-muted mx-auto" />
-        <p class="text-muted mt-2">
-          No suggestions yet. Be the first to nominate a movie!
-        </p>
-      </UCard>
-
-      <!-- Suggest a movie -->
-      <div class="mt-8">
-        <h2 class="text-xl font-semibold mb-4">
-          Suggest a movie
-        </h2>
-
-        <UAlert
-          v-if="!canSuggest"
-          color="warning"
-          variant="subtle"
-          icon="i-lucide-info"
-          title="Suggestion limit reached"
-          :description="`You've used all ${SUGGESTION_LIMIT} of your suggestions for this event.`"
-        />
-
-        <UCard v-else-if="selectedMovie" variant="subtle">
-          <div class="flex gap-4">
-            <img
-              v-if="selectedMovie.poster_path"
-              :src="`https://image.tmdb.org/t/p/w500${selectedMovie.poster_path}`"
-              :alt="selectedMovie.title"
-              class="h-32 w-24 sm:h-40 sm:w-28 rounded-md object-cover bg-elevated shrink-0"
-            >
-            <div class="min-w-0 flex-1">
-              <h3 class="font-semibold text-lg">
-                {{ selectedMovie.title }}
-                <span v-if="selectedMovie.release_date" class="text-muted font-normal">
-                  ({{ selectedMovie.release_date.slice(0, 4) }})
-                </span>
-              </h3>
-              <p v-if="selectedMovie.vote_average" class="text-sm text-muted mt-1 flex items-center gap-1">
-                <UIcon name="i-lucide-star" class="text-amber-400" />
-                {{ selectedMovie.vote_average.toFixed(1) }}
-              </p>
-              <p v-if="selectedMovie.overview" class="text-sm text-muted mt-2 line-clamp-4">
-                {{ selectedMovie.overview }}
-              </p>
-              <div class="flex flex-col sm:flex-row gap-2 mt-4">
-                <UButton
-                  label="Suggest this"
-                  icon="i-lucide-plus"
-                  class="justify-center"
-                  :disabled="alreadySuggested(selectedMovie.id)"
-                  @click="onSuggest(selectedMovie)"
-                />
-                <UButton
-                  label="Cancel"
-                  color="neutral"
-                  variant="ghost"
-                  class="justify-center"
-                  @click="selectedMovie = null"
-                />
+          <!-- Stats -->
+          <UCard variant="subtle">
+            <div class="grid grid-cols-2 gap-3 text-center">
+              <div>
+                <p class="text-2xl font-bold">
+                  {{ suggestions.length }}
+                </p>
+                <p class="text-xs text-muted">
+                  {{ suggestions.length === 1 ? 'movie' : 'movies' }}
+                </p>
+              </div>
+              <div>
+                <p class="text-2xl font-bold">
+                  {{ totalVotes }}
+                </p>
+                <p class="text-xs text-muted">
+                  {{ totalVotes === 1 ? 'vote' : 'votes' }}
+                </p>
               </div>
             </div>
-          </div>
-        </UCard>
+            <template v-if="leadingTitle">
+              <USeparator class="my-3" />
+              <p class="text-xs text-muted">
+                <UIcon name="i-lucide-trophy" class="text-amber-400 align-text-bottom" /> Leading
+              </p>
+              <p class="font-medium truncate">
+                {{ leadingTitle }}
+              </p>
+            </template>
+          </UCard>
 
-        <MovieSearch v-else @select="selectedMovie = $event" />
+          <!-- Suggest (desktop inline) -->
+          <div class="hidden lg:block">
+            <h2 class="text-sm font-semibold text-muted mb-2">
+              Suggest a movie
+            </h2>
+            <SuggestSection :suggested-movie-ids="suggestedMovieIds" @suggest="onSuggest" />
+          </div>
+
+          <!-- Suggest (mobile) -->
+          <UButton
+            class="lg:hidden justify-center"
+            block
+            label="Suggest a movie"
+            icon="i-lucide-plus"
+            @click="suggestOpen = true"
+          />
+        </aside>
+
+        <!-- RIGHT: rankings -->
+        <section class="lg:col-span-2">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold">
+              Rankings
+            </h2>
+            <UBadge :label="`${suggestions.length}`" color="neutral" variant="subtle" />
+          </div>
+
+          <div v-if="suggestions.length" class="space-y-3">
+            <SuggestionCard
+              v-for="(suggestion, index) in suggestions"
+              :key="suggestion.id"
+              :suggestion="suggestion"
+              :rank="index + 1"
+              :max-votes="maxVotes"
+              @vote="onVote(suggestion)"
+              @unvote="onUnvote(suggestion)"
+              @remove="onRemove(suggestion)"
+              @trailer="openTrailer(suggestion)"
+            />
+          </div>
+          <UCard v-else variant="subtle" class="text-center py-10">
+            <UIcon name="i-lucide-film" class="size-8 text-muted mx-auto" />
+            <p class="text-muted mt-2">
+              No suggestions yet. Be the first to nominate a movie!
+            </p>
+          </UCard>
+        </section>
       </div>
     </template>
 
@@ -262,5 +243,15 @@ async function onRemove(suggestion: typeof suggestions.value[number]): Promise<v
         Check back soon — an organizer will add the next screening.
       </p>
     </div>
+
+    <!-- Mobile suggest slideover -->
+    <USlideover v-model:open="suggestOpen" title="Suggest a movie">
+      <template #body>
+        <SuggestSection :suggested-movie-ids="suggestedMovieIds" @suggest="onSuggest" />
+      </template>
+    </USlideover>
+
+    <EventInfoModal v-model:open="eventInfoOpen" :event="currentEvent" />
+    <TrailerModal v-model:open="trailerOpen" :movie="trailerMovie" />
   </UContainer>
 </template>

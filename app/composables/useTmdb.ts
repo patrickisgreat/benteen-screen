@@ -13,5 +13,10 @@ export function useTmdb() {
     return posterPath ? `https://image.tmdb.org/t/p/${size}${posterPath}` : null
   }
 
-  return { searchMovies, posterUrl }
+  /** Best YouTube trailer for a movie (key + title), or null key when none. */
+  async function getTrailer(movieId: number): Promise<{ key: string | null, name: string | null }> {
+    return await $fetch('/api/movies/videos', { query: { id: movieId } })
+  }
+
+  return { searchMovies, posterUrl, getTrailer }
 }
