@@ -1,4 +1,4 @@
-import { serverSupabaseServiceRole, serverSupabaseUser } from '#supabase/server'
+import { serverSupabaseClient, serverSupabaseUser } from '#supabase/server'
 import { z } from 'zod'
 import type { Database } from '~/types/database.types'
 
@@ -9,10 +9,12 @@ const bodySchema = z.object({
 
 /**
  * Invite a friend: an allowlisted, non-blocked member adds an email to the
- * allowlist and we send them an e-vite. Uses the service role (the caller's
- * session isn't reliably available in the serverless fn), so we re-check the
- * inviter is allowed + not blocked here — the same gate RLS would apply
- * (Invariant 1). The Resend key stays server-only (Invariant 2).
+ * allowlist and we send them an e-vite. Runs under the caller's own session (RLS):
+ * the `invites: create` policy already enforces invited_by = self + allowed +
+ * not-blocked, so we don't need the service role — and a misconfigured
+ * service-role key can't break it. We still re-check allowed/blocked here for a
+ * clean 403 instead of a raw RLS error. The Resend key stays server-only
+ * (Invariant 2).
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
@@ -24,7 +26,8 @@ export default defineEventHandler(async (event) => {
   }
   const { email, name } = parsed.data
 
-  const db = serverSupabaseServiceRole<Database>(event)
+  // RLS-scoped client: runs as the signed-in user via their session cookie.
+  const db = await serverSupabaseClient<Database>(event)
 
   // The inviter must be an allowlisted (admin or on the list), non-blocked member.
   const { data: me } = await db.from('profiles').select('is_admin, blocked').eq('id', user.id).single()
