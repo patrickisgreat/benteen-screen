@@ -56,7 +56,10 @@ export function useRsvp(eventId: MaybeRefOrGetter<string | null | undefined>) {
     } else {
       const { error } = await supabase
         .from('rsvps')
-        .upsert({ event_id: id, user_id: myId.value, status }, { onConflict: 'event_id,user_id' })
+        .upsert(
+          { event_id: id, user_id: myId.value, status, updated_at: new Date().toISOString() },
+          { onConflict: 'event_id,user_id' }
+        )
       if (error) throw error
     }
     await refresh()

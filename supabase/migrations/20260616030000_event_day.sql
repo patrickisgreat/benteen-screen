@@ -9,8 +9,13 @@ alter table public.events add column if not exists location_url text;  -- map li
 alter table public.events add column if not exists poster_url   text;  -- event poster image
 
 -- Public storage bucket for event posters; only admins may upload/replace.
-insert into storage.buckets (id, name, public)
-values ('event-posters', 'event-posters', true)
+-- Restrict to raster images (no SVG → no scriptable upload) and cap the size.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'event-posters', 'event-posters', true,
+  5242880, -- 5 MB
+  array['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+)
 on conflict (id) do nothing;
 
 create policy "event-posters: public read" on storage.objects
@@ -56,11 +61,14 @@ create policy "rsvps: update own" on public.rsvps for update to authenticated us
 create policy "rsvps: delete own" on public.rsvps for delete to authenticated using (user_id = auth.uid());
 
 -- bring_items: read all; create as self; claim an open slot or edit your own; delete your own (or admin).
+-- A row may only ever be unclaimed or claimed by the acting user — you can never
+-- assign an item to another person's profile (the WITH CHECK is the boundary).
 create policy "bring: read" on public.bring_items for select to authenticated using (true);
-create policy "bring: create" on public.bring_items for insert to authenticated with check (created_by = auth.uid());
+create policy "bring: create" on public.bring_items for insert to authenticated
+  with check (created_by = auth.uid() and (user_id is null or user_id = auth.uid()));
 create policy "bring: update" on public.bring_items for update to authenticated
   using (created_by = auth.uid() or user_id = auth.uid() or user_id is null)
-  with check (created_by = auth.uid() or user_id = auth.uid() or user_id is null);
+  with check (user_id is null or user_id = auth.uid());
 create policy "bring: delete" on public.bring_items for delete to authenticated
   using (created_by = auth.uid() or user_id = auth.uid() or public.is_admin());
 

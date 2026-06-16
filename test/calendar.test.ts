@@ -50,6 +50,12 @@ describe('icsContent', () => {
     expect(ics).not.toContain('LOCATION:')
     expect(ics).not.toContain('DESCRIPTION:')
   })
+
+  it('includes a stable UID and DTSTAMP (RFC 5545 requires both)', () => {
+    const ics = icsContent({ title: 'Movie Night', start })
+    expect(ics).toMatch(/UID:20260704T230000Z-movie-night@/)
+    expect(ics).toContain('DTSTAMP:20260704T230000Z')
+  })
 })
 
 describe('applyTime', () => {

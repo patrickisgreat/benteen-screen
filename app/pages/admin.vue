@@ -16,12 +16,7 @@ const selectedEventId = ref<string>()
 const { suggestions, setDeleted, voterNames } = useAdminSuggestions(selectedEventId)
 
 // Upcoming events first (soonest first), then past events descending (oldest last).
-const sortedEvents = computed(() => {
-  const ms = (e: MovieEvent) => new Date(e.event_date).getTime()
-  const upcoming = events.value.filter(e => isUpcoming(e.event_date)).sort((a, b) => ms(a) - ms(b))
-  const past = events.value.filter(e => !isUpcoming(e.event_date)).sort((a, b) => ms(b) - ms(a))
-  return [...upcoming, ...past]
-})
+const sortedEvents = computed(() => sortEventsForAdmin(events.value))
 
 const eventOptions = computed(() =>
   sortedEvents.value.map(event => ({

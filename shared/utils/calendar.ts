@@ -59,11 +59,17 @@ export function googleCalendarUrl(e: CalendarEvent): string {
 /** ICS file content (for Apple Calendar / Outlook / .ics download). */
 export function icsContent(e: CalendarEvent): string {
   const esc = (s: string): string => s.replace(/[\\;,]/g, m => `\\${m}`).replace(/\n/g, '\\n')
+  const slug = e.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'event'
+  // RFC 5545 requires UID + DTSTAMP. We don't track a separate creation time, so
+  // the (stable) event start doubles as DTSTAMP — both are deterministic.
+  const stamp = toCalDate(e.start)
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//BSOTG//Movie Night//EN',
     'BEGIN:VEVENT',
+    `UID:${stamp}-${slug}@benteenscreenonthegreen.com`,
+    `DTSTAMP:${stamp}`,
     `DTSTART:${toCalDate(e.start)}`,
     `DTEND:${toCalDate(endOf(e))}`,
     `SUMMARY:${esc(e.title)}`,
