@@ -8,6 +8,8 @@ export interface MovieEvent {
   location: string | null
   location_url: string | null
   poster_url: string | null
+  /** When voting was ended (locked) by an admin; null = voting is open. */
+  voting_locked_at: string | null
   created_at: string
 }
 
