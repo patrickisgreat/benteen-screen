@@ -7,13 +7,49 @@ import type { EventInvite } from '#shared/types/event-invite'
 // e-vites, and shows live RSVP / open / click tracking.
 const props = defineProps<{ eventId: string }>()
 const toast = useToast()
-const { invites, stats, addInvite, removeInvite, seedFromLastEvent, sendInvites } = useEventInvites(() => props.eventId)
+const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites } = useEventInvites(() => props.eventId)
 
 const newEmail = ref('')
 const newName = ref('')
 const sending = ref(false)
 const seeding = ref(false)
+const deleting = ref(false)
 const emailSchema = z.string().email()
+
+// Multi-select for bulk delete. Kept in sync as the list changes (realtime / refresh).
+const selected = ref<Set<string>>(new Set())
+const selectedCount = computed(() => selected.value.size)
+const allSelected = computed(() => invites.value.length > 0 && invites.value.every(i => selected.value.has(i.id)))
+
+watch(invites, (list) => {
+  const live = new Set(list.map(i => i.id))
+  const next = new Set([...selected.value].filter(id => live.has(id)))
+  if (next.size !== selected.value.size) selected.value = next
+})
+
+function toggleOne(id: string): void {
+  const next = new Set(selected.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  selected.value = next
+}
+function toggleAll(): void {
+  selected.value = allSelected.value ? new Set() : new Set(invites.value.map(i => i.id))
+}
+async function onDeleteSelected(): Promise<void> {
+  const ids = [...selected.value]
+  if (!ids.length) return
+  deleting.value = true
+  try {
+    await removeInvites(ids)
+    selected.value = new Set()
+    toast.add({ title: `Removed ${ids.length} guest${ids.length === 1 ? '' : 's'}`, color: 'neutral' })
+  } catch {
+    toast.add({ title: 'Could not remove the selected guests', color: 'error' })
+  } finally {
+    deleting.value = false
+  }
+}
 
 // Auto-roll: the first time we see an empty list for this event, pull last
 // event's invitees ("auto add from last event unless we remove them").
@@ -166,9 +202,38 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
       />
     </div>
 
+    <!-- Bulk select toolbar -->
+    <div v-if="invites.length" class="flex items-center gap-3 px-1">
+      <UCheckbox
+        :model-value="allSelected"
+        aria-label="Select all guests"
+        @update:model-value="toggleAll"
+      />
+      <span class="text-sm text-muted">
+        {{ selectedCount ? `${selectedCount} selected` : 'Select all' }}
+      </span>
+      <UButton
+        v-if="selectedCount"
+        :label="`Delete ${selectedCount}`"
+        icon="i-lucide-trash-2"
+        color="error"
+        variant="soft"
+        size="xs"
+        class="ml-auto"
+        :loading="deleting"
+        @click="onDeleteSelected"
+      />
+    </div>
+
     <!-- Guest list -->
     <ul v-if="invites.length" class="divide-y divide-default rounded-lg ring ring-default overflow-hidden">
       <li v-for="invite in invites" :key="invite.id" class="flex items-center gap-3 p-3">
+        <UCheckbox
+          :model-value="selected.has(invite.id)"
+          :aria-label="`Select ${invite.display_name || invite.email}`"
+          class="shrink-0"
+          @update:model-value="toggleOne(invite.id)"
+        />
         <div class="min-w-0 flex-1">
           <p class="font-medium truncate">
             {{ invite.display_name || invite.email }}

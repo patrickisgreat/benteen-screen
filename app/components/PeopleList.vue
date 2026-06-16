@@ -11,7 +11,11 @@ const emit = defineEmits<{
   unblock: [person: Profile]
   revoke: [invite: Invite]
   select: [person: Profile]
+  setAdmin: [person: Profile, value: boolean]
 }>()
+
+// To hide the admin toggle on your own row (you can't change your own admin).
+const { myId } = useAuth()
 
 type Row
   = | { kind: 'member', key: string, name: string, email: string, profile: Profile }
@@ -99,8 +103,18 @@ function initials(name: string, email: string): string {
           </p>
         </component>
 
-        <!-- Member actions: ban/unban (admins can't be banned from the UI). -->
+        <!-- Member actions: admin toggle + ban/unban (admins can't be banned from the UI). -->
         <template v-if="row.kind === 'member'">
+          <UButton
+            v-if="row.profile.id !== myId"
+            :label="row.profile.is_admin ? 'Remove admin' : 'Make admin'"
+            :icon="row.profile.is_admin ? 'i-lucide-shield-off' : 'i-lucide-shield'"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            class="shrink-0"
+            @click="emit('setAdmin', row.profile, !row.profile.is_admin)"
+          />
           <UButton
             v-if="row.profile.blocked"
             label="Unban"

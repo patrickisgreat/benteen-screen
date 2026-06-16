@@ -60,6 +60,27 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     await refresh()
   }
 
+  /** Remove several invites at once (multi-select delete). No-op for an empty list. */
+  async function removeInvites(inviteIds: readonly string[]): Promise<void> {
+    if (!inviteIds.length) return
+    const { error } = await supabase.from('event_invites').delete().in('id', [...inviteIds])
+    if (error) throw error
+    await refresh()
+  }
+
+  /** Overlay the best-known display name (a signed-in person's profile name) onto
+   *  seed candidates, falling back to whatever name the source row carried. Keeps
+   *  "pull from last event" from importing bare emails when we actually know names. */
+  async function withProfileNames(
+    candidates: Array<{ email: string, display_name: string | null }>
+  ): Promise<Array<{ email: string, display_name: string | null }>> {
+    const emails = candidates.map(c => c.email).filter(Boolean)
+    if (!emails.length) return candidates
+    const { data: profiles } = await supabase.from('profiles').select('email, display_name').in('email', emails)
+    const nameByEmail = new Map((profiles ?? []).filter(p => p.email).map(p => [p.email, p.display_name]))
+    return candidates.map(c => ({ email: c.email, display_name: nameByEmail.get(c.email) ?? c.display_name }))
+  }
+
   /** Build this event's guest list from the most recent OTHER event that has one
    *  (newest-first, skipping empty events). Falls back to the household roster
    *  (everyone on the allowlist) when no prior event has a guest list yet — so the
@@ -95,9 +116,8 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     }
 
     const existing = new Set(invites.value.map(i => i.email))
-    const toAdd = candidates
-      .filter(c => !existing.has(c.email))
-      .map(c => ({ event_id: id, email: c.email, display_name: c.display_name }))
+    const named = await withProfileNames(candidates.filter(c => !existing.has(c.email)))
+    const toAdd = named.map(c => ({ event_id: id, email: c.email, display_name: c.display_name }))
     if (!toAdd.length) return 0
     const { error } = await supabase.from('event_invites').insert(toAdd)
     if (error) throw error
@@ -135,5 +155,5 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     if (channel) supabase.removeChannel(channel)
   })
 
-  return { invites, pending, stats, refresh, addInvite, removeInvite, seedFromLastEvent, sendInvites }
+  return { invites, pending, stats, refresh, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites }
 }

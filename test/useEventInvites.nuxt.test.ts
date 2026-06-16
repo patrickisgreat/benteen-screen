@@ -8,6 +8,7 @@ let list: Array<Record<string, unknown>> = [] // current event's invites (refres
 let eventsList: Array<Record<string, unknown>> = [] // other events (seed)
 let poolList: Array<Record<string, unknown>> = [] // invites across other events (seed pool)
 let rosterList: Array<Record<string, unknown>> = [] // allowlist roster (seed fallback)
+let profilesList: Array<Record<string, unknown>> = [] // profiles (seed name enrichment)
 const ops = { inserted: [] as unknown[], deleted: [] as unknown[] }
 
 // Thenable + chainable stub mirroring the PostgREST builder. event_invites resolves
@@ -38,6 +39,10 @@ function builder(table: string) {
       eq: (_col: string, val: unknown) => {
         ops.deleted.push(val)
         return Promise.resolve({ error: null })
+      },
+      in: (_col: string, vals: unknown[]) => {
+        ops.deleted.push(...vals)
+        return Promise.resolve({ error: null })
       }
     }),
     then: (resolve: (v: unknown) => void) => {
@@ -45,7 +50,9 @@ function builder(table: string) {
         ? eventsList
         : table === 'event_invites'
           ? (usedIn ? poolList : list)
-          : table === 'invites' ? rosterList : []
+          : table === 'invites'
+            ? rosterList
+            : table === 'profiles' ? profilesList : []
       resolve({ data })
     }
   }
@@ -64,6 +71,7 @@ beforeEach(() => {
   eventsList = []
   poolList = []
   rosterList = []
+  profilesList = []
   ops.inserted = []
   ops.deleted = []
 })
@@ -94,6 +102,20 @@ describe('useEventInvites', () => {
     await flushPromises()
     await removeInvite('a')
     expect(ops.deleted).toContain('a')
+  })
+
+  it('removeInvites deletes several ids at once', async () => {
+    const { removeInvites } = useEventInvites(ref('e'))
+    await flushPromises()
+    await removeInvites(['a', 'b', 'c'])
+    expect(ops.deleted).toEqual(expect.arrayContaining(['a', 'b', 'c']))
+  })
+
+  it('removeInvites is a no-op for an empty selection', async () => {
+    const { removeInvites } = useEventInvites(ref('e'))
+    await flushPromises()
+    await removeInvites([])
+    expect(ops.deleted).toHaveLength(0)
   })
 
   it('seedFromLastEvent pulls from the most recent other event that has a list', async () => {
@@ -146,5 +168,29 @@ describe('useEventInvites', () => {
     const emails = ops.inserted.flat().map(i => (i as { email?: string }).email)
     expect(emails).toContain('dad@x')
     expect(emails).not.toContain('mom@x')
+  })
+
+  it('seedFromLastEvent enriches seeded guests with profile display names', async () => {
+    // The source list only has emails (no names); profiles knows them by email.
+    eventsList = []
+    rosterList = [{ email: 'mom@x', display_name: null }, { email: 'dad@x', display_name: null }]
+    profilesList = [{ email: 'mom@x', display_name: 'Mom Bennett' }, { email: 'dad@x', display_name: 'Dad Bennett' }]
+    const { seedFromLastEvent } = useEventInvites(ref('e'))
+    await flushPromises()
+    await seedFromLastEvent()
+    const inserted = ops.inserted.flat() as Array<{ email?: string, display_name?: string | null }>
+    expect(inserted.find(i => i.email === 'mom@x')?.display_name).toBe('Mom Bennett')
+    expect(inserted.find(i => i.email === 'dad@x')?.display_name).toBe('Dad Bennett')
+  })
+
+  it('seedFromLastEvent keeps the source name when no profile name exists', async () => {
+    eventsList = []
+    rosterList = [{ email: 'guest@x', display_name: 'Guest' }]
+    profilesList = [] // no profile for this email
+    const { seedFromLastEvent } = useEventInvites(ref('e'))
+    await flushPromises()
+    await seedFromLastEvent()
+    const inserted = ops.inserted.flat() as Array<{ email?: string, display_name?: string | null }>
+    expect(inserted.find(i => i.email === 'guest@x')?.display_name).toBe('Guest')
   })
 })

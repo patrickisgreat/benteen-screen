@@ -47,6 +47,14 @@ export function useAdminPeople() {
     await refresh()
   }
 
+  /** Grant or revoke admin. Enforced in the RPC (admin-only; can't change your own —
+   *  is_admin stays out-of-band, Invariant 4). */
+  async function setAdmin(id: string, value: boolean): Promise<void> {
+    const { error } = await supabase.rpc('admin_set_admin', { target_id: id, value })
+    if (error) throw error
+    await refresh()
+  }
+
   /** Withdraw a pending invite. RLS allows admins to delete any invite. */
   async function revokeInvite(email: string): Promise<void> {
     const { error } = await supabase.from('invites').delete().eq('email', email)
@@ -54,5 +62,5 @@ export function useAdminPeople() {
     await refresh()
   }
 
-  return { people, pendingInvites, pending, loadError, setBlocked, revokeInvite }
+  return { people, pendingInvites, pending, loadError, setBlocked, setAdmin, revokeInvite }
 }
