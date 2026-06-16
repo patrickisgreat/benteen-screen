@@ -22,11 +22,12 @@ const bodySchema = z.object({
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) throw createError({ statusCode: 401, statusMessage: 'Not authenticated' })
+  const userId = claimsUserId(user)
+  if (!user || !userId) throw createError({ statusCode: 401, statusMessage: 'Not authenticated' })
 
   // RLS-scoped client: runs as the signed-in user via their session cookie.
   const admin = await serverSupabaseClient<Database>(event)
-  const { data: me } = await admin.from('profiles').select('is_admin').eq('id', user.id).single()
+  const { data: me } = await admin.from('profiles').select('is_admin').eq('id', userId).single()
   if (!me?.is_admin) throw createError({ statusCode: 403, statusMessage: 'Admins only' })
 
   const parsed = bodySchema.safeParse(await readBody(event))

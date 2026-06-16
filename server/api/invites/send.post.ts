@@ -18,7 +18,8 @@ const bodySchema = z.object({
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) throw createError({ statusCode: 401, statusMessage: 'Not authenticated' })
+  const userId = claimsUserId(user)
+  if (!user || !userId) throw createError({ statusCode: 401, statusMessage: 'Not authenticated' })
 
   const parsed = bodySchema.safeParse(await readBody(event))
   if (!parsed.success) {
@@ -30,7 +31,7 @@ export default defineEventHandler(async (event) => {
   const db = await serverSupabaseClient<Database>(event)
 
   // The inviter must be an allowlisted (admin or on the list), non-blocked member.
-  const { data: me } = await db.from('profiles').select('is_admin, blocked').eq('id', user.id).single()
+  const { data: me } = await db.from('profiles').select('is_admin, blocked').eq('id', userId).single()
   if (!me || me.blocked) throw createError({ statusCode: 403, statusMessage: 'Not allowed to invite' })
   let allowed = me.is_admin
   const inviterEmail = (user.email ?? '').trim().toLowerCase()
@@ -44,7 +45,7 @@ export default defineEventHandler(async (event) => {
   const { error: insertError } = await db.from('invites').insert({
     email,
     display_name: name ?? null,
-    invited_by: user.id
+    invited_by: userId
   })
   if (insertError && insertError.code !== '23505') {
     throw createError({ statusCode: 400, statusMessage: insertError.message || 'Could not add invite' })

@@ -12,14 +12,15 @@ import type { Database } from '~/types/database.types'
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) throw createError({ statusCode: 401, statusMessage: 'Not authenticated' })
+  const userId = claimsUserId(user)
+  if (!user || !userId) throw createError({ statusCode: 401, statusMessage: 'Not authenticated' })
 
   const eventId = getRouterParam(event, 'id')
   if (!eventId) throw createError({ statusCode: 400, statusMessage: 'Missing event id' })
 
   // RLS-scoped client: runs as the signed-in user via their session cookie.
   const db = await serverSupabaseClient<Database>(event)
-  const { data: me, error: meError } = await db.from('profiles').select('is_admin').eq('id', user.id).single()
+  const { data: me, error: meError } = await db.from('profiles').select('is_admin').eq('id', userId).single()
   if (meError) {
     throw createError({ statusCode: 500, statusMessage: 'Could not load your profile', data: { cause: meError.message, code: meError.code } })
   }
@@ -61,7 +62,7 @@ export default defineEventHandler(async (event) => {
       })
       // Allowlist them so they can sign in too (idempotent).
       await db.from('invites').upsert(
-        { email: invite.email, display_name: invite.display_name, invited_by: user.id },
+        { email: invite.email, display_name: invite.display_name, invited_by: userId },
         { onConflict: 'email', ignoreDuplicates: true }
       )
       await db
