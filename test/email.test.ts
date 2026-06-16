@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import type { InviteOptions } from '../shared/types/invite-options'
 import {
   buildAnnounceEmail,
   buildEventInviteEmail,
   buildInviteEmail,
   escapeHtml,
   formatEmailDate,
+  htmlToText,
   uniqueEmails
-} from '../server/utils/email'
+} from '../shared/utils/email'
 
 describe('buildEventInviteEmail', () => {
   it('includes tokenized Going/Maybe/No RSVP links', () => {
@@ -27,6 +29,56 @@ describe('buildEventInviteEmail', () => {
   it('falls back to "Your host" without an inviter name', () => {
     const m = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, location: null, inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc' })
     expect(m.html).toContain('Your host')
+  })
+
+  const opts = (over: Partial<InviteOptions>): InviteOptions => ({
+    theme: 'marquee', accent: 'green', message: '', showPoster: true, showDetails: true, ...over
+  })
+
+  it('includes the poster when showPoster is on', () => {
+    const m = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, posterUrl: 'https://img/jaws.jpg', inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc', options: opts({}) })
+    expect(m.html).toContain('https://img/jaws.jpg')
+  })
+
+  it('omits the poster when showPoster is off', () => {
+    const m = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, posterUrl: 'https://img/jaws.jpg', inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc', options: opts({ showPoster: false }) })
+    expect(m.html).not.toContain('https://img/jaws.jpg')
+  })
+
+  it('renders the host message, escaped', () => {
+    const m = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc', options: opts({ message: 'Bring chairs <3' }) })
+    expect(m.html).toContain('Bring chairs &lt;3')
+    expect(m.text).toContain('Bring chairs <3')
+  })
+
+  it('hides date/location details when showDetails is off', () => {
+    const m = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: 'Friday', location: 'The Green', inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc', options: opts({ showDetails: false }) })
+    expect(m.html).not.toContain('The Green')
+    expect(m.html).not.toContain('Friday')
+  })
+
+  it('links the location when a map url is given', () => {
+    const m = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, location: 'The Green', locationUrl: 'https://maps/x', inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc', options: opts({}) })
+    expect(m.html).toContain('https://maps/x')
+  })
+
+  it('applies the chosen accent color to the going button', () => {
+    const green = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc', options: opts({ accent: 'green' }) })
+    const red = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc', options: opts({ accent: 'red' }) })
+    expect(green.html).toContain('#16a34a')
+    expect(red.html).toContain('#dc2626')
+  })
+
+  it('strips description HTML to plain text (no injection)', () => {
+    const m = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, description: '<p>Bring snacks</p><script>alert(1)</script>', inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc', options: opts({}) })
+    expect(m.html).toContain('Bring snacks')
+    expect(m.html).not.toContain('<script>')
+  })
+
+  it('adds the lineup CTA when an app url is given', () => {
+    const m = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc', appUrl: 'https://x/overview', options: opts({}) })
+    expect(m.html).toContain('https://x/overview')
+    expect(m.text).toContain('https://x/overview')
   })
 })
 
@@ -66,5 +118,10 @@ describe('email utils', () => {
   it('formatEmailDate renders a readable date and tolerates junk', () => {
     expect(formatEmailDate('2026-07-15T19:00:00Z')).toContain('2026')
     expect(formatEmailDate('not-a-date')).toBe('')
+  })
+
+  it('htmlToText strips tags and decodes entities', () => {
+    expect(htmlToText('<p>Hello</p><p>World &amp; co</p>')).toBe('Hello\nWorld & co')
+    expect(htmlToText('a<br>b')).toBe('a\nb')
   })
 })

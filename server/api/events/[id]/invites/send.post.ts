@@ -26,8 +26,13 @@ export default defineEventHandler(async (event) => {
   }
   if (!me?.is_admin) throw createError({ statusCode: 403, statusMessage: 'Admins only' })
 
-  const { data: ev } = await db.from('events').select('title, event_date, location').eq('id', eventId).single()
+  const { data: ev } = await db
+    .from('events')
+    .select('title, event_date, start_time, location, location_url, poster_url, description, invite_options')
+    .eq('id', eventId)
+    .single()
   if (!ev) throw createError({ statusCode: 404, statusMessage: 'Event not found' })
+  const inviteOptions = normalizeInviteOptions(ev.invite_options)
 
   const { data: invites, error: queueError } = await db
     .from('event_invites')
@@ -52,9 +57,15 @@ export default defineEventHandler(async (event) => {
     const mail = buildEventInviteEmail({
       eventTitle: ev.title,
       eventDate: ev.event_date ? formatEmailDate(ev.event_date) : null,
+      eventTime: ev.start_time,
       location: ev.location,
+      locationUrl: ev.location_url,
+      posterUrl: ev.poster_url,
+      description: ev.description,
       inviterName,
-      rsvpUrl: `${origin}/rsvp?token=${invite.token}`
+      rsvpUrl: `${origin}/rsvp?token=${invite.token}`,
+      appUrl: `${origin}/overview`,
+      options: inviteOptions
     })
     try {
       const { id: resendId } = await sendEmail(config.resendApiKey, config.resendFrom, {

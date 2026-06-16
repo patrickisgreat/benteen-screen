@@ -554,7 +554,7 @@ function onSelectEvent(event: MovieEvent): void {
           placeholder="Select an event"
           class="w-full sm:max-w-sm mb-4"
         />
-        <EventInviteManager v-if="selectedEventId" :key="selectedEventId" :event-id="selectedEventId" />
+        <EventInviteManager v-if="selectedEventId" :key="selectedEventId" :event-id="selectedEventId" :event="selectedEvent" />
         <UCard v-else variant="subtle" class="text-center text-muted">
           Select an event to manage its guest list.
         </UCard>

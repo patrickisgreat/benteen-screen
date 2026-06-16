@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import type { EventInvite } from '#shared/types/event-invite'
+import type { MovieEvent } from '#shared/types/event'
+import { INVITE_ACCENTS, INVITE_THEMES, type InviteAccent, type InviteOptions, type InviteTheme } from '#shared/types/invite-options'
 
-// Admin guest-list manager + Evite tracker for one event. Lets admins add/remove
-// guests, pull last event's list in on demand, send tokenized e-vites, and shows
-// live RSVP / open / click tracking.
-const props = defineProps<{ eventId: string }>()
+// Admin guest-list manager + Evite tracker + e-vite editor for one event. Lets
+// admins customize the invite (theme/accent/message/toggles with a live preview),
+// add/remove guests, pull last event's list in on demand, send tokenized e-vites,
+// and shows live RSVP / open / click tracking.
+const props = defineProps<{ eventId: string, event?: MovieEvent | null }>()
 const toast = useToast()
 const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites } = useEventInvites(() => props.eventId)
+const { save: saveInviteOptions } = useInviteOptions(() => props.eventId)
 
 const newEmail = ref('')
 const newName = ref('')
@@ -15,6 +19,48 @@ const sending = ref(false)
 const seeding = ref(false)
 const deleting = ref(false)
 const emailSchema = z.string().email()
+
+// --- E-vite editor ---------------------------------------------------------
+const THEME_LABELS: Record<InviteTheme, string> = { marquee: 'Marquee', neon: 'Neon', classic: 'Classic' }
+const ACCENT_SWATCH: Record<InviteAccent, string> = { green: 'bg-green-600', red: 'bg-red-600', amber: 'bg-amber-600' }
+const options = ref<InviteOptions>(normalizeInviteOptions(props.event?.invite_options ?? null))
+const savingOptions = ref(false)
+
+// Re-sync the editor if the event changes underneath us (e.g. data loads late).
+watch(() => props.event?.id, () => {
+  options.value = normalizeInviteOptions(props.event?.invite_options ?? null)
+})
+
+// The live preview is the exact same builder the server uses to send.
+const previewHtml = computed(() => {
+  const ev = props.event
+  if (!ev) return ''
+  return buildEventInviteEmail({
+    eventTitle: ev.title,
+    eventDate: ev.event_date ? formatEmailDate(ev.event_date) : null,
+    eventTime: ev.start_time,
+    location: ev.location,
+    locationUrl: ev.location_url,
+    posterUrl: ev.poster_url,
+    description: ev.description,
+    inviterName: null,
+    rsvpUrl: '#',
+    appUrl: '#',
+    options: options.value
+  }).html
+})
+
+async function onSaveOptions(): Promise<void> {
+  savingOptions.value = true
+  try {
+    await saveInviteOptions(options.value)
+    toast.add({ title: 'E-vite design saved', icon: 'i-lucide-check', color: 'success' })
+  } catch {
+    toast.add({ title: 'Could not save the design', color: 'error' })
+  } finally {
+    savingOptions.value = false
+  }
+}
 
 // Multi-select for bulk delete. Kept in sync as the list changes (realtime / refresh).
 const selected = ref<Set<string>>(new Set())
@@ -173,6 +219,89 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
         </p>
       </UCard>
     </div>
+
+    <!-- E-vite editor: customize the design + live preview -->
+    <UCollapsible v-if="event" :unmount-on-hide="false" class="rounded-lg ring ring-default">
+      <UButton
+        label="Customize the e-vite"
+        icon="i-lucide-palette"
+        color="neutral"
+        variant="ghost"
+        trailing-icon="i-lucide-chevron-down"
+        block
+        class="justify-between"
+      />
+      <template #content>
+        <div class="grid md:grid-cols-2 gap-5 p-4 border-t border-default">
+          <!-- Controls -->
+          <div class="space-y-4">
+            <div>
+              <p class="text-sm font-semibold mb-1.5">
+                Theme
+              </p>
+              <div class="flex gap-2">
+                <UButton
+                  v-for="t in INVITE_THEMES"
+                  :key="t"
+                  :label="THEME_LABELS[t]"
+                  size="sm"
+                  :color="options.theme === t ? 'primary' : 'neutral'"
+                  :variant="options.theme === t ? 'solid' : 'outline'"
+                  @click="options.theme = t"
+                />
+              </div>
+            </div>
+
+            <div>
+              <p class="text-sm font-semibold mb-1.5">
+                Accent
+              </p>
+              <div class="flex gap-2">
+                <button
+                  v-for="a in INVITE_ACCENTS"
+                  :key="a"
+                  type="button"
+                  :aria-label="`Accent ${a}`"
+                  :aria-pressed="options.accent === a"
+                  class="size-7 rounded-full ring-2 ring-offset-2 ring-offset-default transition"
+                  :class="[ACCENT_SWATCH[a], options.accent === a ? 'ring-primary' : 'ring-transparent']"
+                  @click="options.accent = a"
+                />
+              </div>
+            </div>
+
+            <div class="flex flex-wrap gap-4">
+              <USwitch v-model="options.showPoster" label="Show poster" />
+              <USwitch v-model="options.showDetails" label="Show date & details" />
+            </div>
+
+            <UFormField label="Personal message" hint="optional">
+              <UTextarea
+                v-model="options.message"
+                :rows="3"
+                placeholder="Bring a chair and a blanket — popcorn's on us!"
+                class="w-full"
+              />
+            </UFormField>
+
+            <UButton label="Save design" icon="i-lucide-save" size="sm" :loading="savingOptions" @click="onSaveOptions" />
+          </div>
+
+          <!-- Live preview -->
+          <div>
+            <p class="text-sm font-semibold mb-1.5">
+              Live preview
+            </p>
+            <iframe
+              :srcdoc="previewHtml"
+              title="E-vite preview"
+              sandbox=""
+              class="w-full h-[460px] rounded-lg ring ring-default bg-white"
+            />
+          </div>
+        </div>
+      </template>
+    </UCollapsible>
 
     <!-- Add + actions -->
     <div class="flex flex-wrap items-end gap-2">
