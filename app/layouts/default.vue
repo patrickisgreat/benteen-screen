@@ -2,6 +2,7 @@
 import type { DropdownMenuItem, NavigationMenuItem } from '@nuxt/ui'
 
 const { account, isAdmin, signOutUser } = useAuth()
+const inviteOpen = ref(false)
 
 const links = computed<NavigationMenuItem[]>(() => {
   const items: NavigationMenuItem[] = [
@@ -17,6 +18,7 @@ const userMenu = computed<DropdownMenuItem[][]>(() => [
   [{ label: account.value?.displayName ?? 'Signed in', type: 'label' as const, avatar: { src: account.value?.avatarUrl ?? undefined } }],
   [
     { label: 'Profile', icon: 'i-lucide-user', to: '/profile' },
+    { label: 'Invite a friend', icon: 'i-lucide-user-plus', onSelect: () => { inviteOpen.value = true } },
     ...(isAdmin.value ? [{ label: 'Admin', icon: 'i-lucide-shield', to: '/admin' }] : [])
   ],
   [{ label: 'Sign out', icon: 'i-lucide-log-out', color: 'error' as const, onSelect: () => handleSignOut() }]
@@ -76,5 +78,7 @@ async function handleSignOut(): Promise<void> {
     <UMain>
       <slot />
     </UMain>
+
+    <InviteFriendModal v-model:open="inviteOpen" />
   </div>
 </template>

@@ -98,6 +98,14 @@ function downloadIcs(): void {
           />
         </div>
 
+        <!-- Share to invite others (access stays allowlist-gated) -->
+        <div v-if="isUpcoming(event.event_date)">
+          <h3 class="text-sm font-semibold text-muted mb-2">
+            Spread the word
+          </h3>
+          <ShareEvent :event="event" />
+        </div>
+
         <!-- Description -->
         <div
           v-if="event.description"
