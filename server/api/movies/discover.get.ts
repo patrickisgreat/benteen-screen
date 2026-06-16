@@ -1,3 +1,4 @@
+import { isMovieGenreId } from '#shared/utils/genres'
 import type { TmdbMovie } from '#shared/types/movie'
 
 interface TmdbDiscoverResponse {
@@ -34,20 +35,25 @@ export default defineEventHandler(async (event): Promise<TmdbMovie[]> => {
 
   const page = Math.floor(Math.random() * MAX_PAGE) + 1
 
+  // Optional category filter — only a known TMDB genre id is forwarded.
+  const genreRaw = Number(getQuery(event).genre)
+  const genre = Number.isInteger(genreRaw) && isMovieGenreId(genreRaw) ? genreRaw : null
+
+  const query: Record<string, string | number | boolean> = {
+    'api_key': tmdbApiKey,
+    'include_adult': false,
+    'language': 'en-US',
+    'sort_by': 'vote_average.desc',
+    'vote_average.gte': VOTE_AVERAGE_MIN,
+    'vote_count.gte': VOTE_COUNT_MIN,
+    'vote_count.lte': VOTE_COUNT_MAX,
+    'page': page
+  }
+  if (genre) query['with_genres'] = String(genre)
+
   let data: TmdbDiscoverResponse
   try {
-    data = await $fetch<TmdbDiscoverResponse>('https://api.themoviedb.org/3/discover/movie', {
-      query: {
-        'api_key': tmdbApiKey,
-        'include_adult': false,
-        'language': 'en-US',
-        'sort_by': 'vote_average.desc',
-        'vote_average.gte': VOTE_AVERAGE_MIN,
-        'vote_count.gte': VOTE_COUNT_MIN,
-        'vote_count.lte': VOTE_COUNT_MAX,
-        'page': page
-      }
-    })
+    data = await $fetch<TmdbDiscoverResponse>('https://api.themoviedb.org/3/discover/movie', { query })
   } catch {
     throw createError({ statusCode: 502, statusMessage: 'Failed to reach the movie database' })
   }
