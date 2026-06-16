@@ -78,13 +78,16 @@ describe('invited.global middleware', () => {
     expect(useState('is-allowed').value).toBeNull()
   })
 
-  it('treats an RPC error as not allowed (fails closed)', async () => {
+  it('fails OPEN on an RPC error (UX gate must not lock everyone out; RLS still enforces)', async () => {
     state.user.value = { id: 'u1' }
     state.rpcData = null
-    state.rpcError = { message: 'boom' }
+    state.rpcError = { message: 'function is_allowed does not exist' }
     await run('/overview')
-    expect(state.signOutCalls).toBe(1)
-    expect(state.navigatedTo).toBe('/request-access')
+    // No sign-out, no redirect — the user proceeds; RLS governs their data.
+    expect(state.signOutCalls).toBe(0)
+    expect(state.navigatedTo).toBeNull()
+    // And the verdict isn't cached, so a later (recovered) navigation re-checks.
+    expect(useState('is-allowed').value).toBeNull()
   })
 
   it('caches the verdict so a second navigation skips the RPC', async () => {
