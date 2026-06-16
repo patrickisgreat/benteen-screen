@@ -87,6 +87,31 @@ export function buildAnnounceEmail(opts: {
   return { subject, html, text }
 }
 
+/** Evite-style per-event invitation with one-click RSVP buttons. The buttons
+ *  link to the public /rsvp page (token in the query), which records the reply
+ *  without requiring sign-in. */
+export function buildEventInviteEmail(opts: {
+  eventTitle: string
+  eventDate: string | null
+  location: string | null
+  inviterName: string | null
+  rsvpUrl: string // base: https://site/rsvp?token=abc
+}): BuiltEmail {
+  const inviter = opts.inviterName ? escapeHtml(opts.inviterName) : 'Your host'
+  const rsvp = (status: string, label: string, color: string): string =>
+    `<a href="${escapeHtml(`${opts.rsvpUrl}&status=${status}`)}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;margin:0 6px 6px 0">${escapeHtml(label)}</a>`
+  const subject = `You're invited: ${opts.eventTitle}`
+  const html = shell(
+    `<h1 style="font-size:20px;margin:0 0 8px">You're invited to ${escapeHtml(opts.eventTitle)} 🎬</h1>`
+    + (opts.eventDate ? `<p style="color:#6b7280;margin:0 0 4px">${escapeHtml(opts.eventDate)}${opts.location ? ` · ${escapeHtml(opts.location)}` : ''}</p>` : '')
+    + `<p>${inviter} hopes you can make it for movie night. Will you be there?</p>`
+    + `<p style="margin:20px 0">${rsvp('going', 'I\'m going', '#16a34a')}${rsvp('maybe', 'Maybe', '#d97706')}${rsvp('no', 'Can\'t make it', '#6b7280')}</p>`
+  )
+  const text = `You're invited: ${opts.eventTitle}${opts.eventDate ? ` — ${opts.eventDate}` : ''}`
+    + `\n\nRSVP:\nGoing: ${opts.rsvpUrl}&status=going\nMaybe: ${opts.rsvpUrl}&status=maybe\nCan't make it: ${opts.rsvpUrl}&status=no`
+  return { subject, html, text }
+}
+
 export interface SendParams {
   to: string | string[]
   bcc?: string[]
@@ -96,10 +121,11 @@ export interface SendParams {
   replyTo?: string
 }
 
-/** Thin Resend wrapper — throws on failure so callers map it to an HTTP error. */
-export async function sendEmail(apiKey: string, from: string, params: SendParams): Promise<void> {
+/** Thin Resend wrapper — throws on failure so callers map it to an HTTP error.
+ *  Returns the Resend message id so callers can correlate webhook events. */
+export async function sendEmail(apiKey: string, from: string, params: SendParams): Promise<{ id: string | null }> {
   const resend = new Resend(apiKey)
-  const { error } = await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from,
     to: params.to,
     bcc: params.bcc,
@@ -109,4 +135,5 @@ export async function sendEmail(apiKey: string, from: string, params: SendParams
     replyTo: params.replyTo
   })
   if (error) throw new Error(error.message || 'Failed to send email')
+  return { id: data?.id ?? null }
 }

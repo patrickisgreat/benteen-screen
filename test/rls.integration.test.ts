@@ -106,6 +106,15 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     expect(error).toBeTruthy()
   })
 
+  it('event_invites are admin-only: a non-admin member reads zero rows', async () => {
+    await admin!.from('event_invites').insert({ event_id: eventId, email: `rls_guest_${stamp}@example.com` })
+    const mine = await memberClient.from('event_invites').select('*').eq('event_id', eventId)
+    expect(mine.data ?? [], 'a non-admin member must not see the guest list').toHaveLength(0)
+    const asAdmin = await admin!.from('event_invites').select('*').eq('event_id', eventId)
+    expect((asAdmin.data ?? []).length, 'service role / admin sees the guest list').toBeGreaterThan(0)
+    await admin!.from('event_invites').delete().eq('event_id', eventId)
+  })
+
   it('the total invite cap blocks an over-limit member invite but exempts admin/seed', async () => {
     const { count } = await admin!.from('invites').select('*', { count: 'exact', head: true })
     // Set the cap to the current size so the next member-issued invite is over-limit.

@@ -23,6 +23,12 @@ export interface Database {
         Update: { id?: boolean, max_invites?: number | null, updated_at?: string }
         Relationships: []
       }
+      event_invites: {
+        Row: { id: string, event_id: string, email: string, display_name: string | null, token: string, rsvp: string | null, rsvp_at: string | null, invited_by: string | null, resend_id: string | null, sent_at: string | null, delivered_at: string | null, opened_at: string | null, clicked_at: string | null, bounced_at: string | null, created_at: string }
+        Insert: { id?: string, event_id: string, email: string, display_name?: string | null, token?: string, rsvp?: string | null, rsvp_at?: string | null, invited_by?: string | null, resend_id?: string | null, sent_at?: string | null, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null, created_at?: string }
+        Update: { id?: string, event_id?: string, email?: string, display_name?: string | null, token?: string, rsvp?: string | null, rsvp_at?: string | null, invited_by?: string | null, resend_id?: string | null, sent_at?: string | null, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null, created_at?: string }
+        Relationships: []
+      }
       events: {
         Row: { id: string, title: string, description: string, event_date: string, start_time: string | null, location: string | null, location_url: string | null, poster_url: string | null, created_by: string | null, created_at: string }
         Insert: { id?: string, title: string, description?: string, event_date: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, created_by?: string | null, created_at?: string }

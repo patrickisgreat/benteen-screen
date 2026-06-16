@@ -41,6 +41,7 @@ const tabs = [
   { label: 'People', icon: 'i-lucide-users', slot: 'people' },
   { label: 'Suggestions', icon: 'i-lucide-clapperboard', slot: 'suggestions' },
   { label: 'Bring list', icon: 'i-lucide-utensils', slot: 'bring' },
+  { label: 'Invites', icon: 'i-lucide-mail-plus', slot: 'invites' },
   { label: 'Comms', icon: 'i-lucide-megaphone', slot: 'comms' }
 ]
 
@@ -294,7 +295,9 @@ async function onRevoke(invite: Invite): Promise<void> {
           <div class="flex flex-wrap items-center justify-between gap-3">
             <p class="text-sm text-muted">
               {{ people.length }} member{{ people.length === 1 ? '' : 's' }}
-              <template v-if="pendingInvites.length">· {{ pendingInvites.length }} pending</template>
+              <template v-if="pendingInvites.length">
+                · {{ pendingInvites.length }} pending
+              </template>
             </p>
             <UButton label="Invite someone" icon="i-lucide-user-plus" size="sm" @click="inviteOpen = true" />
           </div>
@@ -419,6 +422,25 @@ async function onRevoke(invite: Invite): Promise<void> {
       </template>
 
       <!-- COMMS -->
+      <template #invites>
+        <p class="text-sm text-muted mb-4">
+          Curate the guest list for an event and send Evite-style invitations with
+          one-click RSVP. A new event's list auto-fills from the last movie night.
+        </p>
+        <USelectMenu
+          v-model="selectedEventId"
+          :items="eventOptions"
+          value-key="value"
+          :search-input="false"
+          placeholder="Select an event"
+          class="w-full sm:max-w-sm mb-4"
+        />
+        <EventInviteManager v-if="selectedEventId" :key="selectedEventId" :event-id="selectedEventId" />
+        <UCard v-else variant="subtle" class="text-center text-muted">
+          Select an event to manage its guest list.
+        </UCard>
+      </template>
+
       <template #comms>
         <p class="text-sm text-muted mb-4">
           Email an announcement or reminder about an event. Recipients are BCC'd.

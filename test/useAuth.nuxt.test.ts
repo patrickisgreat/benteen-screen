@@ -8,12 +8,17 @@ const calls: Call[] = []
 let nextError: Error | null = null
 let nextSession: unknown = null // what signUp returns as data.session
 
+function record(fn: string, args: unknown[], result: unknown): Promise<unknown> {
+  calls.push({ fn, args })
+  return Promise.resolve(result)
+}
+
 const auth = {
-  signInWithOAuth: (args: unknown) => { calls.push({ fn: 'signInWithOAuth', args: [args] }); return Promise.resolve({ error: nextError }) },
-  signInWithPassword: (args: unknown) => { calls.push({ fn: 'signInWithPassword', args: [args] }); return Promise.resolve({ error: nextError }) },
-  signUp: (args: unknown) => { calls.push({ fn: 'signUp', args: [args] }); return Promise.resolve({ data: { session: nextSession }, error: nextError }) },
-  resetPasswordForEmail: (email: string, opts: unknown) => { calls.push({ fn: 'resetPasswordForEmail', args: [email, opts] }); return Promise.resolve({ error: nextError }) },
-  signOut: () => { calls.push({ fn: 'signOut', args: [] }); return Promise.resolve({ error: null }) }
+  signInWithOAuth: (args: unknown) => record('signInWithOAuth', [args], { error: nextError }),
+  signInWithPassword: (args: unknown) => record('signInWithPassword', [args], { error: nextError }),
+  signUp: (args: unknown) => record('signUp', [args], { data: { session: nextSession }, error: nextError }),
+  resetPasswordForEmail: (email: string, opts: unknown) => record('resetPasswordForEmail', [email, opts], { error: nextError }),
+  signOut: () => record('signOut', [], { error: null })
 }
 
 mockNuxtImport('useSupabaseClient', () => () => ({ auth }))

@@ -6,7 +6,9 @@ const toast = useToast()
 const draft = ref<number | null>(null)
 const saving = ref(false)
 
-watch(maxInvites, value => { draft.value = value }, { immediate: true })
+watch(maxInvites, (value) => {
+  draft.value = value
+}, { immediate: true })
 
 async function save(): Promise<void> {
   saving.value = true
