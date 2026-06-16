@@ -19,13 +19,13 @@ export interface Database {
       }
       suggestions: {
         Row: { id: string, event_id: string, user_id: string, tmdb_movie: TmdbMovie, deleted: boolean, created_at: string }
-        Insert: { id?: string, event_id: string, user_id: string, tmdb_movie: TmdbMovie, deleted?: boolean, created_at?: string }
+        Insert: { id?: string, event_id: string, user_id?: string, tmdb_movie: TmdbMovie, deleted?: boolean, created_at?: string }
         Update: { id?: string, event_id?: string, user_id?: string, tmdb_movie?: TmdbMovie, deleted?: boolean, created_at?: string }
         Relationships: []
       }
       votes: {
         Row: { suggestion_id: string, user_id: string, created_at: string }
-        Insert: { suggestion_id: string, user_id: string, created_at?: string }
+        Insert: { suggestion_id: string, user_id?: string, created_at?: string }
         Update: { suggestion_id?: string, user_id?: string, created_at?: string }
         Relationships: []
       }
