@@ -7,12 +7,13 @@ import { serverSupabaseServiceRole, serverSupabaseUser } from '#supabase/server'
  */
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
-  if (!user) {
+  const userId = claimsUserId(user)
+  if (!userId) {
     throw createError({ statusCode: 401, statusMessage: 'Not authenticated' })
   }
 
   const admin = serverSupabaseServiceRole(event)
-  const { error } = await admin.auth.admin.deleteUser(user.id)
+  const { error } = await admin.auth.admin.deleteUser(userId)
   if (error) {
     throw createError({ statusCode: 500, statusMessage: 'Failed to delete account' })
   }
