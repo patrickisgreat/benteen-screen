@@ -30,9 +30,9 @@ export interface Database {
         Relationships: []
       }
       events: {
-        Row: { id: string, title: string, description: string, event_date: string, start_time: string | null, location: string | null, location_url: string | null, poster_url: string | null, voting_locked_at: string | null, created_by: string | null, created_at: string }
-        Insert: { id?: string, title: string, description?: string, event_date: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, voting_locked_at?: string | null, created_by?: string | null, created_at?: string }
-        Update: { id?: string, title?: string, description?: string, event_date?: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, voting_locked_at?: string | null, created_by?: string | null, created_at?: string }
+        Row: { id: string, title: string, description: string, event_date: string, start_time: string | null, location: string | null, location_url: string | null, poster_url: string | null, voting_locked_at: string | null, invite_options: Record<string, unknown> | null, created_by: string | null, created_at: string }
+        Insert: { id?: string, title: string, description?: string, event_date: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, voting_locked_at?: string | null, invite_options?: Record<string, unknown> | null, created_by?: string | null, created_at?: string }
+        Update: { id?: string, title?: string, description?: string, event_date?: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, voting_locked_at?: string | null, invite_options?: Record<string, unknown> | null, created_by?: string | null, created_at?: string }
         Relationships: []
       }
       rsvps: {

@@ -15,7 +15,22 @@ const invites = ref([
 const sendFn = vi.fn<() => Promise<SendResult>>(async () => ({ sent: 0, failed: 0, error: null }))
 const removeMany = vi.fn(async () => {})
 const seedFn = vi.fn(async () => 0)
+const saveOptionsFn = vi.fn(async () => {})
 const toasts: Toast[] = []
+
+const eventObj = {
+  id: 'e',
+  title: 'The Goonies',
+  description: '<p>Bring snacks</p>',
+  event_date: '2026-07-01T00:00:00Z',
+  start_time: '8pm',
+  location: 'The Green',
+  location_url: null,
+  poster_url: 'https://img/goonies.jpg',
+  voting_locked_at: null,
+  invite_options: null,
+  created_at: ''
+}
 
 mockNuxtImport('useEventInvites', () => () => ({
   invites,
@@ -29,6 +44,7 @@ mockNuxtImport('useEventInvites', () => () => ({
   sendInvites: sendFn
 }))
 mockNuxtImport('useToast', () => () => ({ add: (t: Toast) => toasts.push(t) }))
+mockNuxtImport('useInviteOptions', () => () => ({ save: saveOptionsFn }))
 
 const clickSend = async (w: { findAll: (s: string) => Array<{ text: () => string, trigger: (e: string) => Promise<void> }> }): Promise<void> => {
   const send = w.findAll('button').find(b => b.text().includes('Send'))
@@ -124,5 +140,35 @@ describe('EventInviteManager', () => {
     const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e' } })
     await clickSend(w)
     expect(toasts.at(-1)?.title).toBe('Everyone has already been invited')
+  })
+
+  it('shows the e-vite editor only when an event is provided', async () => {
+    const without = await mountSuspended(EventInviteManager, { props: { eventId: 'e' } })
+    expect(without.findAll('button').some(b => b.text().includes('Customize the e-vite'))).toBe(false)
+    const withEvent = await mountSuspended(EventInviteManager, { props: { eventId: 'e', event: eventObj } })
+    expect(withEvent.findAll('button').some(b => b.text().includes('Customize the e-vite'))).toBe(true)
+  })
+
+  it('renders a live preview built from the event + options', async () => {
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e', event: eventObj } })
+    const iframe = w.find('iframe')
+    expect(iframe.exists()).toBe(true)
+    const srcdoc = iframe.attributes('srcdoc') ?? ''
+    expect(srcdoc).toContain('The Goonies')
+    expect(srcdoc).toContain('https://img/goonies.jpg') // poster on by default
+  })
+
+  it('saves the e-vite design', async () => {
+    saveOptionsFn.mockClear()
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e', event: eventObj } })
+    // expand the editor, then save
+    const trigger = w.findAll('button').find(b => b.text().includes('Customize the e-vite'))
+    await trigger!.trigger('click')
+    await flushPromises()
+    const save = w.findAll('button').find(b => b.text().includes('Save design'))
+    await save!.trigger('click')
+    await flushPromises()
+    expect(saveOptionsFn).toHaveBeenCalledTimes(1)
+    expect(toasts.at(-1)?.title).toContain('saved')
   })
 })
