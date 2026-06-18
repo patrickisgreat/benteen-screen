@@ -1,4 +1,4 @@
-import { serverSupabaseClient, serverSupabaseUser } from '#supabase/server'
+import { serverSupabaseClient } from '#supabase/server'
 import { z } from 'zod'
 import type { Database } from '~/types/database.types'
 
@@ -17,9 +17,7 @@ const bodySchema = z.object({
  * (Invariant 2).
  */
 export default defineEventHandler(async (event) => {
-  const user = await serverSupabaseUser(event)
-  const userId = claimsUserId(user)
-  if (!user || !userId) throw createError({ statusCode: 401, statusMessage: 'Not authenticated' })
+  const { user, userId } = await requireUser(event)
 
   const parsed = bodySchema.safeParse(await readBody(event))
   if (!parsed.success) {
@@ -66,11 +64,10 @@ export default defineEventHandler(async (event) => {
     return { ok: true, emailed: false }
   }
 
-  const meta = user.user_metadata as Record<string, string | undefined> | undefined
-  const inviterName = meta?.full_name ?? meta?.name ?? user.email ?? null
+  const inviterName = inviterNameFromClaims(user)
   const mail = buildInviteEmail({
     inviterName,
-    link: `${config.siteUrl || getRequestURL(event).origin}/login`,
+    link: `${resolveOrigin(event)}/login`,
     eventTitle: nextEvent?.title ?? null,
     eventDate: nextEvent?.event_date ? formatEmailDate(nextEvent.event_date) : null
   })

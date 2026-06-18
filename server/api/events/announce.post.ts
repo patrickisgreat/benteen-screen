@@ -1,4 +1,4 @@
-import { serverSupabaseClient, serverSupabaseUser } from '#supabase/server'
+import { serverSupabaseClient } from '#supabase/server'
 import { z } from 'zod'
 import type { Database } from '~/types/database.types'
 
@@ -21,14 +21,11 @@ const bodySchema = z.object({
  *  - going:   people who RSVP'd "going" to this event
  */
 export default defineEventHandler(async (event) => {
-  const user = await serverSupabaseUser(event)
-  const userId = claimsUserId(user)
-  if (!user || !userId) throw createError({ statusCode: 401, statusMessage: 'Not authenticated' })
+  const { user, userId } = await requireUser(event)
 
   // RLS-scoped client: runs as the signed-in user via their session cookie.
   const admin = await serverSupabaseClient<Database>(event)
-  const { data: me } = await admin.from('profiles').select('is_admin').eq('id', userId).single()
-  if (!me?.is_admin) throw createError({ statusCode: 403, statusMessage: 'Admins only' })
+  await requireAdmin(admin, userId)
 
   const parsed = bodySchema.safeParse(await readBody(event))
   if (!parsed.success) throw createError({ statusCode: 400, statusMessage: 'Invalid announcement' })
@@ -56,20 +53,19 @@ export default defineEventHandler(async (event) => {
 
   if (!emails.length) return { ok: true, count: 0 }
 
-  const config = useRuntimeConfig(event)
-  if (!config.resendApiKey) throw createError({ statusCode: 500, statusMessage: 'Email is not configured' })
+  const { resendApiKey, resendFrom } = requireEmailConfig(event)
 
   const mail = buildAnnounceEmail({
     eventTitle: ev.title,
     eventDate: ev.event_date ? formatEmailDate(ev.event_date) : null,
     message,
     subject,
-    link: `${config.siteUrl || getRequestURL(event).origin}/overview`
+    link: `${resolveOrigin(event)}/overview`
   })
 
   try {
-    await sendEmail(config.resendApiKey, config.resendFrom, {
-      to: config.resendFrom, // a `to` is required; real recipients are BCC'd
+    await sendEmail(resendApiKey, resendFrom, {
+      to: resendFrom, // a `to` is required; real recipients are BCC'd
       bcc: emails,
       subject: mail.subject,
       html: mail.html,

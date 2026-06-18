@@ -1,4 +1,4 @@
-import { serverSupabaseServiceRole, serverSupabaseUser } from '#supabase/server'
+import { serverSupabaseServiceRole } from '#supabase/server'
 
 /**
  * Deletes the signed-in user's account. Supabase doesn't allow client-side user
@@ -6,11 +6,7 @@ import { serverSupabaseServiceRole, serverSupabaseUser } from '#supabase/server'
  * auth user cascades to profile → suggestions → votes (FK on delete cascade).
  */
 export default defineEventHandler(async (event) => {
-  const user = await serverSupabaseUser(event)
-  const userId = claimsUserId(user)
-  if (!userId) {
-    throw createError({ statusCode: 401, statusMessage: 'Not authenticated' })
-  }
+  const { userId } = await requireUser(event)
 
   const admin = serverSupabaseServiceRole(event)
   const { error } = await admin.auth.admin.deleteUser(userId)

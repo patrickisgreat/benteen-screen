@@ -1,4 +1,4 @@
-import { serverSupabaseClient, serverSupabaseUser } from '#supabase/server'
+import { serverSupabaseClient } from '#supabase/server'
 import type { Database } from '~/types/database.types'
 
 /**
@@ -11,20 +11,14 @@ import type { Database } from '~/types/database.types'
  * stamp sent_at + the Resend message id.
  */
 export default defineEventHandler(async (event) => {
-  const user = await serverSupabaseUser(event)
-  const userId = claimsUserId(user)
-  if (!user || !userId) throw createError({ statusCode: 401, statusMessage: 'Not authenticated' })
+  const { user, userId } = await requireUser(event)
 
   const eventId = getRouterParam(event, 'id')
   if (!eventId) throw createError({ statusCode: 400, statusMessage: 'Missing event id' })
 
   // RLS-scoped client: runs as the signed-in user via their session cookie.
   const db = await serverSupabaseClient<Database>(event)
-  const { data: me, error: meError } = await db.from('profiles').select('is_admin').eq('id', userId).single()
-  if (meError) {
-    throw createError({ statusCode: 500, statusMessage: 'Could not load your profile', data: { cause: meError.message, code: meError.code } })
-  }
-  if (!me?.is_admin) throw createError({ statusCode: 403, statusMessage: 'Admins only' })
+  await requireAdmin(db, userId)
 
   const { data: ev } = await db
     .from('events')
@@ -45,11 +39,9 @@ export default defineEventHandler(async (event) => {
   const queue = invites ?? []
   if (!queue.length) return { ok: true, sent: 0, failed: 0, error: null }
 
-  const config = useRuntimeConfig(event)
-  if (!config.resendApiKey) throw createError({ statusCode: 500, statusMessage: 'Email is not configured' })
-  const origin = config.siteUrl || getRequestURL(event).origin
-  const meta = user.user_metadata as Record<string, string | undefined> | undefined
-  const inviterName = meta?.full_name ?? meta?.name ?? user.email ?? null
+  const { resendApiKey, resendFrom } = requireEmailConfig(event)
+  const origin = resolveOrigin(event)
+  const inviterName = inviterNameFromClaims(user)
 
   let sent = 0
   const failures: { email: string, error: string }[] = []
@@ -68,7 +60,7 @@ export default defineEventHandler(async (event) => {
       options: inviteOptions
     })
     try {
-      const { id: resendId } = await sendEmail(config.resendApiKey, config.resendFrom, {
+      const { id: resendId } = await sendEmail(resendApiKey, resendFrom, {
         to: invite.email,
         subject: mail.subject,
         html: mail.html,

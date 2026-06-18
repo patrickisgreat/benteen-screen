@@ -1,8 +1,27 @@
 import { Resend } from 'resend'
+import type { H3Event } from 'h3'
 
 // The email *builders* (subject/html/text) live in shared/utils/email.ts so the
 // admin UI can render a live preview with the exact same output. This server-only
-// module keeps the Resend send wrapper (the API key must never reach the client).
+// module keeps the Resend send wrapper + the config/origin helpers its routes
+// share (the API key must never reach the client).
+
+/** The origin for links in emails: the configured canonical URL, else the request's. */
+export function resolveOrigin(event: H3Event): string {
+  const { siteUrl } = useRuntimeConfig(event)
+  return siteUrl || getRequestURL(event).origin
+}
+
+/**
+ * Resolves the Resend config, throwing a 500 when no API key is set. Routes that
+ * intentionally soft-degrade on a missing key (e.g. invite-a-friend still
+ * allowlists the email) should read the config directly instead.
+ */
+export function requireEmailConfig(event: H3Event): { resendApiKey: string, resendFrom: string } {
+  const { resendApiKey, resendFrom } = useRuntimeConfig(event)
+  if (!resendApiKey) throw createError({ statusCode: 500, statusMessage: 'Email is not configured' })
+  return { resendApiKey, resendFrom }
+}
 
 export interface SendParams {
   to: string | string[]
