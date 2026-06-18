@@ -4,13 +4,11 @@ import type { TmdbMovie } from '#shared/types/movie'
 const props = defineProps<{ suggestedMovieIds: number[] }>()
 const emit = defineEmits<{ suggest: [movie: TmdbMovie] }>()
 
-const { posterUrl } = useTmdb()
 const selected = ref<TmdbMovie | null>(null)
 
 const alreadySuggested = computed(() =>
   selected.value ? props.suggestedMovieIds.includes(selected.value.id) : false
 )
-const poster = computed(() => posterUrl(selected.value?.poster_path))
 
 function confirm(): void {
   if (selected.value && !alreadySuggested.value) {
@@ -24,16 +22,11 @@ function confirm(): void {
   <div>
     <UCard v-if="selected" variant="subtle">
       <div class="flex gap-3">
-        <img
-          v-if="poster"
-          :src="poster"
-          :alt="selected.title"
-          class="h-32 w-22 rounded-md object-cover bg-elevated shrink-0"
-        >
+        <MoviePoster :path="selected.poster_path" :alt="selected.title" variant="lg" :fallback="false" />
         <div class="min-w-0 flex-1">
           <h3 class="font-semibold leading-tight">
             {{ selected.title }}
-            <span v-if="selected.release_date" class="text-muted font-normal">({{ selected.release_date.slice(0, 4) }})</span>
+            <span v-if="movieYear(selected)" class="text-muted font-normal">({{ movieYear(selected) }})</span>
           </h3>
           <p v-if="selected.vote_average" class="text-sm text-muted mt-1 flex items-center gap-1">
             <UIcon name="i-lucide-star" class="text-amber-400" /> {{ selected.vote_average.toFixed(1) }}

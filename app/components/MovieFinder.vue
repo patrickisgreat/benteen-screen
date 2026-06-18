@@ -5,7 +5,7 @@ const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{ suggestedMovieIds: number[] }>()
 const emit = defineEmits<{ suggest: [movie: TmdbMovie], trailer: [movie: TmdbMovie] }>()
 
-const { posterUrl, discoverGems } = useTmdb()
+const { discoverGems } = useTmdb()
 const toast = useToast()
 
 const movies = ref<TmdbMovie[]>([])
@@ -97,16 +97,11 @@ function isSuggested(movie: TmdbMovie): boolean {
         <div v-else-if="movies.length" class="grid sm:grid-cols-2 gap-3">
           <UCard v-for="movie in movies" :key="movie.id" variant="subtle" :ui="{ body: 'p-3 sm:p-3' }">
             <div class="flex gap-3">
-              <img
-                v-if="posterUrl(movie.poster_path, 'w185')"
-                :src="posterUrl(movie.poster_path, 'w185') ?? undefined"
-                :alt="movie.title"
-                class="h-32 w-22 rounded-md object-cover bg-elevated shrink-0"
-              >
+              <MoviePoster :path="movie.poster_path" :alt="movie.title" size="w185" variant="lg" :fallback="false" />
               <div class="min-w-0 flex-1 flex flex-col">
                 <h3 class="font-semibold leading-tight text-sm">
                   {{ movie.title }}
-                  <span v-if="movie.release_date" class="text-muted font-normal">({{ movie.release_date.slice(0, 4) }})</span>
+                  <span v-if="movieYear(movie)" class="text-muted font-normal">({{ movieYear(movie) }})</span>
                 </h3>
                 <p v-if="movie.vote_average" class="text-xs text-muted mt-0.5 flex items-center gap-1">
                   <UIcon name="i-lucide-star" class="text-amber-400" /> {{ movie.vote_average.toFixed(1) }}
