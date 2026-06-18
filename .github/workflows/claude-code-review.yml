@@ -2,7 +2,15 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # Review once per PR — when it opens or leaves draft. Deliberately NOT on
+    # `synchronize`, so pushing more commits to a PR doesn't re-run a full (paid)
+    # review each time. Re-review on demand by commenting `@claude` (see claude.yml).
+    types: [opened, ready_for_review]
+    # Don't spend a review on docs-/config-only PRs (only skips when EVERY changed
+    # file matches; a mixed code+docs PR still runs).
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
 
 concurrency:
   group: claude-review-${{ github.event.pull_request.number }}
@@ -49,4 +57,5 @@ jobs:
             Leave inline comments on specific lines for concrete issues; mark nits as
             non-blocking. If the PR looks solid, say so briefly — don't invent problems.
           claude_args: |
+            --model claude-sonnet-4-6
             --allowedTools "Read,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),mcp__github_inline_comment__create_inline_comment"
