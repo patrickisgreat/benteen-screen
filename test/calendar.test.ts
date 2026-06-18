@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyTime, googleCalendarUrl, icsContent } from '../shared/utils/calendar'
+import { applyTime, googleCalendarUrl, icsContent, icsFilename } from '../shared/utils/calendar'
 
 // A fixed UTC instant keeps the UTC-formatted output deterministic across timezones.
 const start = new Date('2026-07-04T23:00:00Z')
@@ -55,6 +55,19 @@ describe('icsContent', () => {
     const ics = icsContent({ title: 'Movie Night', start })
     expect(ics).toMatch(/UID:20260704T230000Z-movie-night@/)
     expect(ics).toContain('DTSTAMP:20260704T230000Z')
+  })
+})
+
+describe('icsFilename', () => {
+  it('slugifies the title and appends .ics', () => {
+    expect(icsFilename('Movie Night: Heat!')).toBe('Movie-Night-Heat-.ics')
+    expect(icsFilename('already-fine_2026')).toBe('already-fine_2026.ics')
+  })
+
+  it('falls back to "event" when there is no title', () => {
+    expect(icsFilename('')).toBe('event.ics')
+    expect(icsFilename(null)).toBe('event.ics')
+    expect(icsFilename(undefined)).toBe('event.ics')
   })
 })
 

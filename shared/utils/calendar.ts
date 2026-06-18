@@ -56,6 +56,11 @@ export function googleCalendarUrl(e: CalendarEvent): string {
   return `https://calendar.google.com/calendar/render?${params.toString()}`
 }
 
+/** A safe `.ics` download filename derived from an event title. */
+export function icsFilename(title: string | null | undefined): string {
+  return `${(title || 'event').replace(/[^\w-]+/g, '-')}.ics`
+}
+
 /** ICS file content (for Apple Calendar / Outlook / .ics download). */
 export function icsContent(e: CalendarEvent): string {
   const esc = (s: string): string => s.replace(/[\\;,]/g, m => `\\${m}`).replace(/\n/g, '\\n')
