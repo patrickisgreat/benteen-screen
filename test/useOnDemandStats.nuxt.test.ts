@@ -23,7 +23,10 @@ describe('useOnDemandStats', () => {
   })
 
   it('surfaces a loader error and leaves stats null', async () => {
-    const { stats, error } = useOnDemandStats(ref('a'), async () => { throw new Error('boom') }, 'Failed!')
+    const failing = async (): Promise<string> => {
+      throw new Error('boom')
+    }
+    const { stats, error } = useOnDemandStats(ref('a'), failing, 'Failed!')
     await flushPromises()
     expect(error.value).toBe('boom')
     expect(stats.value).toBeNull()
@@ -31,7 +34,9 @@ describe('useOnDemandStats', () => {
 
   it('drops a stale response when the id changed mid-flight', async () => {
     const resolvers: Record<string, (v: string) => void> = {}
-    const loader = (id: string) => new Promise<string>((resolve) => { resolvers[id] = resolve })
+    const loader = (id: string) => new Promise<string>((resolve) => {
+      resolvers[id] = resolve
+    })
 
     const id = ref('a')
     const { stats } = useOnDemandStats(id, loader) // immediate watch fires load('a')
