@@ -31,7 +31,8 @@ export async function tmdbFetch<T>(
     return await $fetch<T>(`${TMDB_BASE_URL}${path}`, {
       query: { api_key: tmdbApiKey, language: 'en-US', ...query }
     }) as T
-  } catch {
+  } catch (error) {
+    console.error('TMDB request failed:', error)
     throw createError({ statusCode: 502, statusMessage: 'Failed to reach the movie database' })
   }
 }
