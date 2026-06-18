@@ -5,11 +5,9 @@ const props = defineProps<{ suggestion: Suggestion, rank: number, maxVotes: numb
 const emit = defineEmits<{ vote: [], unvote: [], remove: [], trailer: [] }>()
 
 const { myId } = useAuth()
-const { posterUrl } = useTmdb()
 
 const movie = computed(() => props.suggestion.tmdb_movie)
-const poster = computed(() => posterUrl(movie.value.poster_path, 'w185'))
-const year = computed(() => movie.value.release_date?.slice(0, 4) ?? '')
+const year = computed(() => movieYear(movie.value))
 const voteCount = computed(() => props.suggestion.votes?.length ?? 0)
 const hasVoted = computed(() =>
   Boolean(myId.value) && (props.suggestion.votes ?? []).some(v => v.user_id === myId.value)
@@ -42,15 +40,7 @@ const highlight = computed(() => props.rank === 1 && voteCount.value > 0)
       </div>
 
       <!-- poster -->
-      <img
-        v-if="poster"
-        :src="poster"
-        :alt="movie.title"
-        class="h-16 w-11 rounded object-cover bg-elevated shrink-0"
-      >
-      <div v-else class="h-16 w-11 rounded bg-elevated shrink-0 flex items-center justify-center">
-        <UIcon name="i-lucide-film" class="text-muted" />
-      </div>
+      <MoviePoster :path="movie.poster_path" :alt="movie.title" size="w185" />
 
       <!-- content -->
       <div class="min-w-0 flex-1">

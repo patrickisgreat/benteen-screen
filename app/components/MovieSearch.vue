@@ -3,7 +3,7 @@ import type { TmdbMovie } from '#shared/types/movie'
 
 const emit = defineEmits<{ select: [movie: TmdbMovie] }>()
 
-const { searchMovies, posterUrl } = useTmdb()
+const { searchMovies } = useTmdb()
 
 const term = ref('')
 const results = ref<TmdbMovie[]>([])
@@ -35,10 +35,6 @@ function choose(movie: TmdbMovie): void {
   term.value = ''
   results.value = []
 }
-
-function year(movie: TmdbMovie): string {
-  return movie.release_date?.slice(0, 4) ?? ''
-}
 </script>
 
 <template>
@@ -61,18 +57,10 @@ function year(movie: TmdbMovie): string {
           class="flex w-full items-center gap-3 p-3 text-left hover:bg-elevated/50 transition-colors"
           @click="choose(movie)"
         >
-          <img
-            v-if="posterUrl(movie.poster_path, 'w185')"
-            :src="posterUrl(movie.poster_path, 'w185')!"
-            :alt="movie.title"
-            class="h-16 w-11 rounded object-cover bg-elevated shrink-0"
-          >
-          <span v-else class="h-16 w-11 rounded bg-elevated shrink-0 flex items-center justify-center">
-            <UIcon name="i-lucide-film" class="text-muted" />
-          </span>
+          <MoviePoster :path="movie.poster_path" :alt="movie.title" size="w185" />
           <span class="min-w-0">
             <span class="font-medium block truncate">
-              {{ movie.title }}<span v-if="year(movie)" class="text-muted font-normal"> ({{ year(movie) }})</span>
+              {{ movie.title }}<span v-if="movieYear(movie)" class="text-muted font-normal"> ({{ movieYear(movie) }})</span>
             </span>
             <span v-if="movie.vote_average" class="text-sm text-muted flex items-center gap-1">
               <UIcon name="i-lucide-star" class="text-amber-400" /> {{ movie.vote_average.toFixed(1) }}
