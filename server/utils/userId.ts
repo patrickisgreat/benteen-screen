@@ -12,3 +12,15 @@ import type { JwtPayload } from '@supabase/supabase-js'
 export function claimsUserId(user: JwtPayload | null): string | null {
   return typeof user?.sub === 'string' && user.sub ? user.sub : null
 }
+
+/** The subset of JWT claims we read to label an inviter in an e-vite. */
+interface InviterClaims {
+  user_metadata?: { full_name?: string | null, name?: string | null } | null
+  email?: string | null
+}
+
+/** A human name for the inviter, derived from the same claims: full name → name → email → null. */
+export function inviterNameFromClaims(user: InviterClaims): string | null {
+  const meta = user.user_metadata
+  return meta?.full_name ?? meta?.name ?? user.email ?? null
+}

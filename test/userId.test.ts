@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JwtPayload } from '@supabase/supabase-js'
-import { claimsUserId } from '../server/utils/userId'
+import { claimsUserId, inviterNameFromClaims } from '../server/utils/userId'
 
 describe('claimsUserId', () => {
   it('reads the id from the JWT `sub` claim (not `id`)', () => {
@@ -22,5 +22,23 @@ describe('claimsUserId', () => {
 
   it('returns null for a blank sub', () => {
     expect(claimsUserId({ sub: '' } as unknown as JwtPayload)).toBeNull()
+  })
+})
+
+describe('inviterNameFromClaims', () => {
+  it('prefers the full name', () => {
+    expect(inviterNameFromClaims({ user_metadata: { full_name: 'Ada Lovelace', name: 'ada' }, email: 'a@b.c' }))
+      .toBe('Ada Lovelace')
+  })
+
+  it('falls back to name, then email', () => {
+    expect(inviterNameFromClaims({ user_metadata: { name: 'ada' }, email: 'a@b.c' })).toBe('ada')
+    expect(inviterNameFromClaims({ user_metadata: {}, email: 'a@b.c' })).toBe('a@b.c')
+    expect(inviterNameFromClaims({ user_metadata: null, email: 'a@b.c' })).toBe('a@b.c')
+  })
+
+  it('returns null when no name or email is present', () => {
+    expect(inviterNameFromClaims({ user_metadata: null, email: null })).toBeNull()
+    expect(inviterNameFromClaims({})).toBeNull()
   })
 })
