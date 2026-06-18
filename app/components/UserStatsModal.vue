@@ -33,17 +33,7 @@ const summary = computed(() => [
 
       <div v-else-if="stats" class="space-y-5">
         <!-- RSVP + voting summary -->
-        <div class="grid grid-cols-4 gap-2 text-center">
-          <div v-for="s in summary" :key="s.label" class="rounded-lg ring ring-default p-2">
-            <UIcon :name="s.icon" class="text-muted" />
-            <p class="text-xl font-bold leading-tight">
-              {{ s.value }}
-            </p>
-            <p class="text-[11px] text-muted leading-tight">
-              {{ s.label }}
-            </p>
-          </div>
-        </div>
+        <StatTiles :tiles="summary" />
 
         <!-- Movies suggested -->
         <section>
