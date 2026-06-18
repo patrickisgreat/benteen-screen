@@ -28,11 +28,6 @@ function shuffle<T>(items: T[]): T[] {
  * trimmed subset so each call surfaces a different handful of gems.
  */
 export default defineEventHandler(async (event): Promise<TmdbMovie[]> => {
-  const { tmdbApiKey } = useRuntimeConfig(event)
-  if (!tmdbApiKey) {
-    throw createError({ statusCode: 500, statusMessage: 'TMDB API key is not configured' })
-  }
-
   const page = Math.floor(Math.random() * MAX_PAGE) + 1
 
   // Optional category filter — only a known TMDB genre id is forwarded.
@@ -40,9 +35,7 @@ export default defineEventHandler(async (event): Promise<TmdbMovie[]> => {
   const genre = Number.isInteger(genreRaw) && isMovieGenreId(genreRaw) ? genreRaw : null
 
   const query: Record<string, string | number | boolean> = {
-    'api_key': tmdbApiKey,
     'include_adult': false,
-    'language': 'en-US',
     'sort_by': 'vote_average.desc',
     'vote_average.gte': VOTE_AVERAGE_MIN,
     'vote_count.gte': VOTE_COUNT_MIN,
@@ -51,22 +44,7 @@ export default defineEventHandler(async (event): Promise<TmdbMovie[]> => {
   }
   if (genre) query['with_genres'] = String(genre)
 
-  let data: TmdbDiscoverResponse
-  try {
-    data = await $fetch<TmdbDiscoverResponse>('https://api.themoviedb.org/3/discover/movie', { query })
-  } catch {
-    throw createError({ statusCode: 502, statusMessage: 'Failed to reach the movie database' })
-  }
+  const data = await tmdbFetch<TmdbDiscoverResponse>(event, '/discover/movie', query)
 
-  return shuffle((data.results ?? []).filter(movie => Boolean(movie?.id && movie?.title)))
-    .slice(0, RETURN_COUNT)
-    .map(movie => ({
-      id: movie.id,
-      title: movie.title,
-      overview: movie.overview ?? '',
-      poster_path: movie.poster_path ?? null,
-      release_date: movie.release_date ?? '',
-      vote_average: movie.vote_average ?? 0,
-      popularity: movie.popularity ?? 0
-    }))
+  return shuffle(toTmdbMovies(data.results)).slice(0, RETURN_COUNT)
 })
