@@ -23,7 +23,10 @@ yarn-error.log*
 .DS_Store
 .fleet
 .idea
-.vscode
+# Ignore personal VS Code files but share the project formatter config.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 *.tgz
 .eslintcache
 
