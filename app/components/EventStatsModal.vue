@@ -39,17 +39,7 @@ const rsvp = computed(() => [
 
       <div v-else-if="stats" class="space-y-5">
         <!-- Headline counts -->
-        <div class="grid grid-cols-4 gap-2 text-center">
-          <div v-for="t in tiles" :key="t.label" class="rounded-lg ring ring-default p-2">
-            <UIcon :name="t.icon" class="text-muted" />
-            <p class="text-xl font-bold leading-tight">
-              {{ t.value }}
-            </p>
-            <p class="text-[11px] text-muted leading-tight">
-              {{ t.label }}
-            </p>
-          </div>
-        </div>
+        <StatTiles :tiles="tiles" />
 
         <!-- RSVP split -->
         <section>

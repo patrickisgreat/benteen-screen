@@ -14,45 +14,6 @@ import type { UserStats } from '#shared/utils/userStats'
  */
 export function useUserStats(userId: MaybeRefOrGetter<string | null>) {
   const supabase = useSupabaseClient<Database>()
-  const stats = ref<UserStats | null>(null)
-  const pending = ref(false)
-  const error = ref<string | null>(null)
-
-  async function load(id: string): Promise<void> {
-    pending.value = true
-    error.value = null
-    try {
-      const [rsvps, submissions, votes, brought] = await Promise.all([
-        supabase.from('rsvps').select('status').eq('user_id', id),
-        supabase
-          .from('suggestions')
-          .select('id, event_id, tmdb_movie, created_at')
-          .eq('user_id', id)
-          .eq('deleted', false),
-        supabase.from('votes').select('suggestion_id', { count: 'exact', head: true }).eq('user_id', id),
-        supabase.from('bring_items').select('label').eq('user_id', id)
-      ])
-      const firstError = rsvps.error ?? submissions.error ?? votes.error ?? brought.error
-      if (firstError) throw firstError
-
-      const winningSuggestionIds = await computeWins(id, submissions.data ?? [])
-      // Drop a stale response if the selected user changed mid-flight.
-      if (toValue(userId) !== id) return
-
-      stats.value = computeUserStats({
-        rsvps: rsvps.data ?? [],
-        submissions: submissions.data ?? [],
-        votesCast: votes.count ?? 0,
-        brought: brought.data ?? [],
-        winningSuggestionIds
-      })
-    } catch (e) {
-      error.value = errorMessage(e, 'Failed to load stats')
-      stats.value = null
-    } finally {
-      pending.value = false
-    }
-  }
 
   /** For the events this person suggested in, find which of their suggestions won
    *  (top-2 voted) once that event's voting is locked. */
@@ -90,13 +51,28 @@ export function useUserStats(userId: MaybeRefOrGetter<string | null>) {
     return winners
   }
 
-  watch(() => toValue(userId), (id) => {
-    if (!id) {
-      stats.value = null
-      return
-    }
-    void load(id)
-  }, { immediate: true })
+  return useOnDemandStats<UserStats>(userId, async (id) => {
+    const [rsvps, submissions, votes, brought] = await Promise.all([
+      supabase.from('rsvps').select('status').eq('user_id', id),
+      supabase
+        .from('suggestions')
+        .select('id, event_id, tmdb_movie, created_at')
+        .eq('user_id', id)
+        .eq('deleted', false),
+      supabase.from('votes').select('suggestion_id', { count: 'exact', head: true }).eq('user_id', id),
+      supabase.from('bring_items').select('label').eq('user_id', id)
+    ])
+    const firstError = rsvps.error ?? submissions.error ?? votes.error ?? brought.error
+    if (firstError) throw firstError
 
-  return { stats, pending, error }
+    const winningSuggestionIds = await computeWins(id, submissions.data ?? [])
+
+    return computeUserStats({
+      rsvps: rsvps.data ?? [],
+      submissions: submissions.data ?? [],
+      votesCast: votes.count ?? 0,
+      brought: brought.data ?? [],
+      winningSuggestionIds
+    })
+  })
 }
