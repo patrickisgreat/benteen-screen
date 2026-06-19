@@ -25,13 +25,7 @@ const googleUrl = computed(() => (calEvent.value ? googleCalendarUrl(calEvent.va
 
 function downloadIcs(): void {
   if (!calEvent.value) return
-  const blob = new Blob([icsContent(calEvent.value)], { type: 'text/calendar;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${(props.event?.title || 'event').replace(/[^\w-]+/g, '-')}.ics`
-  a.click()
-  URL.revokeObjectURL(url)
+  downloadTextFile(icsContent(calEvent.value), icsFilename(props.event?.title), 'text/calendar;charset=utf-8')
 }
 </script>
 
