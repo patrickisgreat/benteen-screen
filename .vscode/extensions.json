@@ -1,0 +1,7 @@
+{
+  // ESLint is this repo's formatter; Prettier is intentionally not used (it
+  // conflicts with the @stylistic rules). Marked as unwanted so VS Code doesn't
+  // suggest it and re-introduce the conflict.
+  "recommendations": ["dbaeumer.vscode-eslint"],
+  "unwantedRecommendations": ["esbenp.prettier-vscode"]
+}

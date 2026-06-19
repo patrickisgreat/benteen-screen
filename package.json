@@ -15,6 +15,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
+    "format": "eslint . --fix",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
     "test:watch": "vitest"

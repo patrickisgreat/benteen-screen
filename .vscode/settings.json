@@ -1,0 +1,13 @@
+{
+  // This project formats with ESLint (@nuxt/eslint's @stylistic rules:
+  // single quotes, no semicolons, no trailing commas), NOT Prettier. Running
+  // both makes them fight and produces lint-failing files. So: Prettier off,
+  // ESLint applies all auto-fixes (including formatting) on save.
+  "prettier.enable": false,
+  "editor.formatOnSave": false,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "eslint.useFlatConfig": true,
+  "eslint.validate": ["javascript", "typescript", "vue"]
+}
