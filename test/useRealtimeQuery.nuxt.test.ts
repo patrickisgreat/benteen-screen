@@ -102,4 +102,30 @@ describe('useRealtimeQuery', () => {
     await flushPromises()
     expect(data.value).toEqual(['fresh'])
   })
+
+  it('clears a previous error after a successful reload', async () => {
+    let shouldFail = true
+    const load = async (): Promise<string[]> => {
+      if (shouldFail) throw new Error('boom')
+      return ['ok']
+    }
+    const { data, error, refresh } = useRealtimeQuery({ ...baseOpts, key: ref('e1'), load })
+    await flushPromises()
+    expect(error.value).toBe('boom')
+
+    shouldFail = false
+    await refresh()
+    expect(error.value).toBeNull()
+    expect(data.value).toEqual(['ok'])
+  })
+
+  it('uses errorFallback when the thrown value is not an Error', async () => {
+    const load = async (): Promise<string[]> => {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- exercising the non-Error fallback path
+      throw { code: 'PGRST500' }
+    }
+    const { error } = useRealtimeQuery({ ...baseOpts, key: ref('e1'), errorFallback: 'custom fallback', load })
+    await flushPromises()
+    expect(error.value).toBe('custom fallback')
+  })
 })

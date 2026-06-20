@@ -56,12 +56,16 @@ export function useRealtimeQuery<T>(opts: RealtimeQueryOptions<T>): {
     pending.value = true
     try {
       const result = await opts.load(key)
-      if (toValue(opts.key) !== key) return // stale: the key changed mid-flight
+      // Stale-guard: drop the response if the key changed since this load began.
+      // (A rapid A→B→A flip could still let the first A through while a newer A
+      // load is in flight, but that triple-flip isn't reachable from the event
+      // switcher, which only moves one step at a time.)
+      if (toValue(opts.key) !== key) return
       data.value = result
       error.value = null
     } catch (e) {
       if (toValue(opts.key) !== key) return // stale error — ignore
-      error.value = errorMessage(e, opts.errorFallback ?? 'Something went wrong')
+      error.value = errorMessage(e, opts.errorFallback)
     } finally {
       if (toValue(opts.key) === key) pending.value = false
     }
