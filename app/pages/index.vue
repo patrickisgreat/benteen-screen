@@ -41,7 +41,7 @@ const features = [
       <UContainer class="py-20">
         <div class="max-w-2xl mx-auto text-center flex flex-col items-center gap-6">
           <img
-            src="/img/logo.png"
+            src="/img/bsotg_logo.svg"
             alt="Benteen Screen On The Green"
             class="w-72 max-w-full"
           >

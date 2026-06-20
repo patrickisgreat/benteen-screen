@@ -42,7 +42,7 @@ async function onSubmit(event: FormSubmitEvent<{ password: string }>): Promise<v
   <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-500/10 via-default to-primary-500/5 px-4 py-10">
     <UCard class="w-full max-w-md">
       <div class="flex flex-col items-center text-center gap-4 py-2">
-        <img src="/img/logo.png" alt="Benteen Screen On The Green" class="h-16 w-auto">
+        <img src="/img/bsotg_logo.svg" alt="Benteen Screen On The Green" class="h-16 w-auto">
         <div>
           <h1 class="text-2xl font-bold">
             Set a new password

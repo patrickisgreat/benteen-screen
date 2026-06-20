@@ -34,7 +34,7 @@ async function handleSignOut(): Promise<void> {
   <div>
     <UHeader to="/overview" :ui="{ center: 'gap-1' }">
       <template #title>
-        <img src="/img/logo.png" alt="Benteen Screen On The Green" class="h-7 w-auto">
+        <img src="/img/bsotg_logo.svg" alt="Benteen Screen On The Green" class="h-7 w-auto">
       </template>
 
       <UNavigationMenu :items="links" />
