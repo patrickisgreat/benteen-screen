@@ -1,127 +1,90 @@
-import type { MaybeRefOrGetter } from "vue";
-import type { RealtimeChannel } from "@supabase/supabase-js";
-import type { Database } from "~/types/database.types";
-import type { BringItem } from "#shared/types/bring";
+import type { MaybeRefOrGetter } from 'vue'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import type { Database } from '~/types/database.types'
+import type { BringItem } from '#shared/types/bring'
 
-const SELECT =
-  "id, event_id, label, note, user_id, created_by, bringer:profiles!bring_items_user_id_fkey(display_name)";
+const SELECT = 'id, event_id, label, note, user_id, created_by, bringer:profiles!bring_items_user_id_fkey(display_name)'
 
 /** Potluck "bring list" for an event: items + add/claim/unclaim/remove (realtime). */
-export function useBringList(
-  eventId: MaybeRefOrGetter<string | null | undefined>,
-) {
-  const supabase = useSupabaseClient<Database>();
-  const myId = useState<string | null>("my-id", () => null);
-  const items = ref<BringItem[]>([]);
+export function useBringList(eventId: MaybeRefOrGetter<string | null | undefined>) {
+  const supabase = useSupabaseClient<Database>()
+  const myId = useState<string | null>('my-id', () => null)
+  const items = ref<BringItem[]>([])
 
   async function refresh(): Promise<void> {
-    const id = toValue(eventId);
+    const id = toValue(eventId)
     if (!id) {
-      items.value = [];
-      return;
+      items.value = []
+      return
     }
-    const { data } = await supabase
-      .from("bring_items")
-      .select(SELECT)
-      .eq("event_id", id)
-      .order("created_at");
+    const { data } = await supabase.from('bring_items').select(SELECT).eq('event_id', id).order('created_at')
     // Drop a stale response: the selected event changed while this was in flight.
-    if (toValue(eventId) !== id) return;
+    if (toValue(eventId) !== id) return
     // Supabase types the embedded `bringer` join as an array, but the FK is to a
     // single profile — assert to our `BringItem` (single bringer-or-null) shape.
-    items.value = (data ?? []) as unknown as BringItem[];
+    items.value = (data ?? []) as unknown as BringItem[]
   }
 
-  let channel: RealtimeChannel | null = null;
-  watch(
-    () => toValue(eventId),
-    (id) => {
-      if (channel) {
-        supabase.removeChannel(channel);
-        channel = null;
-      }
-      refresh();
-      if (!id) return;
-      channel = supabase
-        .channel(`bring-${crypto.randomUUID()}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "bring_items",
-            filter: `event_id=eq.${id}`,
-          },
-          () => refresh(),
-        )
-        .subscribe();
-    },
-    { immediate: true },
-  );
+  let channel: RealtimeChannel | null = null
+  watch(() => toValue(eventId), (id) => {
+    if (channel) {
+      supabase.removeChannel(channel)
+      channel = null
+    }
+    refresh()
+    if (!id) return
+    channel = supabase
+      .channel(`bring-${crypto.randomUUID()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bring_items', filter: `event_id=eq.${id}` }, () => refresh())
+      .subscribe()
+  }, { immediate: true })
   onUnmounted(() => {
-    if (channel) supabase.removeChannel(channel);
-  });
+    if (channel) supabase.removeChannel(channel)
+  })
 
   // created_by is omitted (DB defaults it to auth.uid()).
-  async function addItem(
-    label: string,
-    note?: string,
-    claimSelf = true,
-  ): Promise<void> {
-    const id = toValue(eventId);
-    if (!id || !label.trim()) return;
-    const { error } = await supabase.from("bring_items").insert({
+  async function addItem(label: string, note?: string, claimSelf = true): Promise<void> {
+    const id = toValue(eventId)
+    if (!id || !label.trim()) return
+    const { error } = await supabase.from('bring_items').insert({
       event_id: id,
       label: label.trim(),
       note: note?.trim() || null,
-      user_id: claimSelf ? myId.value : null,
-    });
-    if (error) throw error;
-    await refresh();
+      user_id: claimSelf ? myId.value : null
+    })
+    if (error) throw error
+    await refresh()
   }
 
   async function claim(item: BringItem): Promise<void> {
-    if (!myId.value) return;
-    const { error } = await supabase
-      .from("bring_items")
-      .update({ user_id: myId.value })
-      .eq("id", item.id);
-    if (error) throw error;
-    await refresh();
+    if (!myId.value) return
+    const { error } = await supabase.from('bring_items').update({ user_id: myId.value }).eq('id', item.id)
+    if (error) throw error
+    await refresh()
   }
 
   async function unclaim(item: BringItem): Promise<void> {
-    const { error } = await supabase
-      .from("bring_items")
-      .update({ user_id: null })
-      .eq("id", item.id);
-    if (error) throw error;
-    await refresh();
+    const { error } = await supabase.from('bring_items').update({ user_id: null }).eq('id', item.id)
+    if (error) throw error
+    await refresh()
   }
 
   async function remove(item: BringItem): Promise<void> {
-    const { error } = await supabase
-      .from("bring_items")
-      .delete()
-      .eq("id", item.id);
-    if (error) throw error;
-    await refresh();
+    const { error } = await supabase.from('bring_items').delete().eq('id', item.id)
+    if (error) throw error
+    await refresh()
   }
 
-  async function updateItem(
-    item: BringItem,
-    label: string,
-    note?: string,
-  ): Promise<void> {
-    const trimmed = label.trim();
-    if (!trimmed) return;
+  async function updateItem(item: BringItem, label: string, note?: string): Promise<void> {
+    const trimmed = label.trim()
+    if (!trimmed) return
     const { error } = await supabase
-      .from("bring_items")
+      .from('bring_items')
       .update({ label: trimmed, note: note?.trim() || null })
-      .eq("id", item.id);
-    if (error) throw error;
-    await refresh();
+      .eq('id', item.id)
+    if (error) throw error
+    await refresh()
   }
 
-  return { items, addItem, claim, unclaim, updateItem, remove };
+  return { items, addItem, claim, unclaim, updateItem, remove }
 }
