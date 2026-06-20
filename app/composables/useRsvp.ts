@@ -1,5 +1,4 @@
 import type { MaybeRefOrGetter } from 'vue'
-import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Database } from '~/types/database.types'
 import type { RsvpStatus } from '#shared/types/rsvp'
 
@@ -7,35 +6,18 @@ import type { RsvpStatus } from '#shared/types/rsvp'
 export function useRsvp(eventId: MaybeRefOrGetter<string | null | undefined>) {
   const supabase = useSupabaseClient<Database>()
   const myId = useState<string | null>('my-id', () => null)
-  const rsvps = ref<{ user_id: string, status: string }[]>([])
 
-  async function refresh(): Promise<void> {
-    const id = toValue(eventId)
-    if (!id) {
-      rsvps.value = []
-      return
+  const { data: rsvps, error, refresh } = useRealtimeQuery<{ user_id: string, status: string }[]>({
+    key: eventId,
+    channel: 'rsvps',
+    tables: [{ table: 'rsvps' }],
+    empty: [],
+    errorFallback: 'Failed to load RSVPs',
+    load: async (id) => {
+      const { data, error } = await supabase.from('rsvps').select('user_id, status').eq('event_id', id)
+      if (error) throw error
+      return data ?? []
     }
-    const { data } = await supabase.from('rsvps').select('user_id, status').eq('event_id', id)
-    // Drop a stale response: the selected event changed while this was in flight.
-    if (toValue(eventId) !== id) return
-    rsvps.value = data ?? []
-  }
-
-  let channel: RealtimeChannel | null = null
-  watch(() => toValue(eventId), (id) => {
-    if (channel) {
-      supabase.removeChannel(channel)
-      channel = null
-    }
-    refresh()
-    if (!id) return
-    channel = supabase
-      .channel(`rsvps-${crypto.randomUUID()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rsvps', filter: `event_id=eq.${id}` }, () => refresh())
-      .subscribe()
-  }, { immediate: true })
-  onUnmounted(() => {
-    if (channel) supabase.removeChannel(channel)
   })
 
   const myStatus = computed<RsvpStatus | null>(() => {
@@ -67,5 +49,5 @@ export function useRsvp(eventId: MaybeRefOrGetter<string | null | undefined>) {
     await refresh()
   }
 
-  return { rsvps, myStatus, counts, setStatus }
+  return { rsvps, error, myStatus, counts, setStatus }
 }

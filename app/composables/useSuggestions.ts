@@ -1,5 +1,4 @@
 import type { MaybeRefOrGetter } from 'vue'
-import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Database } from '~/types/database.types'
 import type { Suggestion } from '#shared/types/suggestion'
 import type { TmdbMovie } from '#shared/types/movie'
@@ -12,43 +11,25 @@ import type { TmdbMovie } from '#shared/types/movie'
 export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefined>) {
   const supabase = useSupabaseClient<Database>()
   const myId = useState<string | null>('my-id', () => null)
-  const suggestions = ref<Suggestion[]>([])
 
-  async function refresh(): Promise<void> {
-    const id = toValue(eventId)
-    if (!id) {
-      suggestions.value = []
-      return
+  const { data: suggestions, error, refresh } = useRealtimeQuery<Suggestion[]>({
+    key: eventId,
+    channel: 'suggestions',
+    tables: [{ table: 'suggestions' }, { table: 'votes', global: true }],
+    empty: [],
+    errorFallback: 'Failed to load suggestions',
+    load: async (id) => {
+      const { data, error } = await supabase
+        .from('suggestions')
+        .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id)')
+        .eq('event_id', id)
+        .eq('deleted', false)
+      if (error) throw error
+      return ((data ?? []) as unknown as Suggestion[]).sort((a, b) => {
+        const diff = b.votes.length - a.votes.length
+        return diff !== 0 ? diff : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      })
     }
-    const { data } = await supabase
-      .from('suggestions')
-      .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id)')
-      .eq('event_id', id)
-      .eq('deleted', false)
-    // Drop a stale response: the selected event changed while this was in flight.
-    if (toValue(eventId) !== id) return
-    suggestions.value = ((data ?? []) as unknown as Suggestion[]).sort((a, b) => {
-      const diff = b.votes.length - a.votes.length
-      return diff !== 0 ? diff : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    })
-  }
-
-  let channel: RealtimeChannel | null = null
-  watch(() => toValue(eventId), (id) => {
-    if (channel) {
-      supabase.removeChannel(channel)
-      channel = null
-    }
-    refresh()
-    if (!id) return
-    channel = supabase
-      .channel(`suggestions-${crypto.randomUUID()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'suggestions', filter: `event_id=eq.${id}` }, () => refresh())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => refresh())
-      .subscribe()
-  }, { immediate: true })
-  onUnmounted(() => {
-    if (channel) supabase.removeChannel(channel)
   })
 
   function alreadySuggested(movieId: number): boolean {
@@ -88,5 +69,5 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
     await refresh()
   }
 
-  return { suggestions, alreadySuggested, suggest, vote, unvote, removeSuggestion }
+  return { suggestions, error, alreadySuggested, suggest, vote, unvote, removeSuggestion }
 }
