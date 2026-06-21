@@ -1,5 +1,4 @@
 import type { MaybeRefOrGetter } from 'vue'
-import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Database } from '~/types/database.types'
 import type { BringItem } from '#shared/types/bring'
 
@@ -9,37 +8,20 @@ const SELECT = 'id, event_id, label, note, user_id, created_by, bringer:profiles
 export function useBringList(eventId: MaybeRefOrGetter<string | null | undefined>) {
   const supabase = useSupabaseClient<Database>()
   const myId = useState<string | null>('my-id', () => null)
-  const items = ref<BringItem[]>([])
 
-  async function refresh(): Promise<void> {
-    const id = toValue(eventId)
-    if (!id) {
-      items.value = []
-      return
+  const { data: items, error, refresh } = useRealtimeQuery<BringItem[]>({
+    key: eventId,
+    channel: 'bring',
+    tables: [{ table: 'bring_items' }],
+    empty: [],
+    errorFallback: 'Failed to load the bring list',
+    load: async (id) => {
+      const { data, error } = await supabase.from('bring_items').select(SELECT).eq('event_id', id).order('created_at')
+      if (error) throw error
+      // Supabase types the embedded `bringer` join as an array, but the FK is to a
+      // single profile — assert to our `BringItem` (single bringer-or-null) shape.
+      return (data ?? []) as unknown as BringItem[]
     }
-    const { data } = await supabase.from('bring_items').select(SELECT).eq('event_id', id).order('created_at')
-    // Drop a stale response: the selected event changed while this was in flight.
-    if (toValue(eventId) !== id) return
-    // Supabase types the embedded `bringer` join as an array, but the FK is to a
-    // single profile — assert to our `BringItem` (single bringer-or-null) shape.
-    items.value = (data ?? []) as unknown as BringItem[]
-  }
-
-  let channel: RealtimeChannel | null = null
-  watch(() => toValue(eventId), (id) => {
-    if (channel) {
-      supabase.removeChannel(channel)
-      channel = null
-    }
-    refresh()
-    if (!id) return
-    channel = supabase
-      .channel(`bring-${crypto.randomUUID()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bring_items', filter: `event_id=eq.${id}` }, () => refresh())
-      .subscribe()
-  }, { immediate: true })
-  onUnmounted(() => {
-    if (channel) supabase.removeChannel(channel)
   })
 
   // created_by is omitted (DB defaults it to auth.uid()).
@@ -86,5 +68,5 @@ export function useBringList(eventId: MaybeRefOrGetter<string | null | undefined
     await refresh()
   }
 
-  return { items, addItem, claim, unclaim, updateItem, remove }
+  return { items, error, addItem, claim, unclaim, updateItem, remove }
 }
