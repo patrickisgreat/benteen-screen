@@ -6,6 +6,7 @@ import type { RsvpStatus } from '#shared/types/rsvp'
 useSeoMeta({ title: 'Overview · BSOTG' })
 
 const toast = useToast()
+const { run } = useToastAction()
 const { posterUrl } = useTmdb()
 const { events } = useEvents()
 // Admins can flip between events; everyone else just sees the active one.
@@ -75,41 +76,23 @@ async function onSuggest(movie: TmdbMovie): Promise<void> {
     toast.add({ title: 'Already suggested', description: `${movie.title} is already on the list.`, color: 'warning' })
     return
   }
-  try {
-    await suggest(movie)
+  if (await run(() => suggest(movie), 'Could not add suggestion')) {
     toast.add({ title: 'Suggestion added', icon: 'i-lucide-check', color: 'success' })
-  } catch {
-    toast.add({ title: 'Could not add suggestion', color: 'error' })
   }
 }
 async function onVote(suggestion: Suggestion): Promise<void> {
-  try {
-    await vote(suggestion)
-  } catch {
-    toast.add({ title: 'Vote failed', color: 'error' })
-  }
+  await run(() => vote(suggestion), 'Vote failed')
 }
 async function onUnvote(suggestion: Suggestion): Promise<void> {
-  try {
-    await unvote(suggestion)
-  } catch {
-    toast.add({ title: 'Unvote failed', color: 'error' })
-  }
+  await run(() => unvote(suggestion), 'Unvote failed')
 }
 async function onRemove(suggestion: Suggestion): Promise<void> {
-  try {
-    await removeSuggestion(suggestion)
+  if (await run(() => removeSuggestion(suggestion), 'Could not remove suggestion')) {
     toast.add({ title: 'Suggestion removed', color: 'neutral' })
-  } catch {
-    toast.add({ title: 'Could not remove suggestion', color: 'error' })
   }
 }
 async function onRsvp(status: RsvpStatus): Promise<void> {
-  try {
-    await setStatus(status)
-  } catch {
-    toast.add({ title: 'Could not update RSVP', color: 'error' })
-  }
+  await run(() => setStatus(status), 'Could not update RSVP')
 }
 </script>
 

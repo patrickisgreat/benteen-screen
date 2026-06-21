@@ -8,6 +8,7 @@ definePageMeta({ middleware: 'admin' })
 useSeoMeta({ title: 'Admin · BSOTG' })
 
 const toast = useToast()
+const { run } = useToastAction()
 const { events } = useEvents()
 const { createEvent, updateEvent, deleteEvent, setVotingLocked } = useEventAdmin()
 const { people, pendingInvites, loadError, setBlocked, setAdmin, revokeInvite } = useAdminPeople()
@@ -88,57 +89,39 @@ async function onSave(payload: {
   locationUrl: string | null
   posterUrl: string | null
 }): Promise<void> {
-  try {
-    if (payload.id) {
-      await updateEvent(payload.id, payload)
-      toast.add({ title: 'Event updated', icon: 'i-lucide-check', color: 'success' })
-    } else {
-      await createEvent(payload)
-      toast.add({ title: 'Event created', icon: 'i-lucide-check', color: 'success' })
-    }
-  } catch {
-    toast.add({ title: 'Could not save event', color: 'error' })
-  }
+  const ok = await run(async () => {
+    if (payload.id) await updateEvent(payload.id, payload)
+    else await createEvent(payload)
+  }, 'Could not save event')
+  if (ok) toast.add({ title: payload.id ? 'Event updated' : 'Event created', icon: 'i-lucide-check', color: 'success' })
 }
 
 async function confirmDelete(): Promise<void> {
   const event = eventPendingDelete.value
   if (!event) return
-  try {
-    await deleteEvent(event.id)
+  if (await run(() => deleteEvent(event.id), 'Could not delete event')) {
     toast.add({ title: 'Event deleted', color: 'neutral' })
     if (selectedEventId.value === event.id) selectedEventId.value = undefined
-  } catch {
-    toast.add({ title: 'Could not delete event', color: 'error' })
-  } finally {
-    eventPendingDelete.value = null
   }
+  eventPendingDelete.value = null
 }
 
 async function onAddBring(label: string): Promise<void> {
-  try {
-    await addBringItem(label, undefined, false) // open slot anyone can claim
+  // open slot anyone can claim
+  if (await run(() => addBringItem(label, undefined, false), 'Could not add item')) {
     toast.add({ title: 'Added to bring list', icon: 'i-lucide-check', color: 'success' })
-  } catch {
-    toast.add({ title: 'Could not add item', color: 'error' })
   }
 }
 
 async function onUpdateBring(item: BringItem, label: string): Promise<void> {
-  try {
-    await updateBringItem(item, label)
+  if (await run(() => updateBringItem(item, label), 'Could not update item')) {
     toast.add({ title: 'Item updated', icon: 'i-lucide-check', color: 'success' })
-  } catch {
-    toast.add({ title: 'Could not update item', color: 'error' })
   }
 }
 
 async function onRemoveBring(item: BringItem): Promise<void> {
-  try {
-    await removeBringItem(item)
+  if (await run(() => removeBringItem(item), 'Could not remove item')) {
     toast.add({ title: 'Item removed', color: 'neutral' })
-  } catch {
-    toast.add({ title: 'Could not remove item', color: 'error' })
   }
 }
 
@@ -178,45 +161,30 @@ async function onLockVoting(): Promise<void> {
 async function onReopenVoting(): Promise<void> {
   const ev = selectedEvent.value
   if (!ev) return
-  try {
-    await setVotingLocked(ev.id, false)
+  if (await run(() => setVotingLocked(ev.id, false), 'Could not reopen voting')) {
     toast.add({ title: 'Voting reopened', color: 'neutral' })
-  } catch {
-    toast.add({ title: 'Could not reopen voting', color: 'error' })
   }
 }
 
 async function toggleSuggestion(id: string, deleted: boolean): Promise<void> {
-  try {
-    await setDeleted(id, deleted)
+  if (await run(() => setDeleted(id, deleted), 'Action failed')) {
     toast.add({ title: deleted ? 'Suggestion hidden' : 'Suggestion restored', color: 'neutral' })
-  } catch {
-    toast.add({ title: 'Action failed', color: 'error' })
   }
 }
 
 async function onBlock(person: Profile): Promise<void> {
-  try {
-    await setBlocked(person.id, true)
+  if (await run(() => setBlocked(person.id, true), 'Could not ban user')) {
     toast.add({ title: `${person.display_name ?? 'User'} banned`, color: 'neutral' })
-  } catch {
-    toast.add({ title: 'Could not ban user', color: 'error' })
   }
 }
 async function onUnblock(person: Profile): Promise<void> {
-  try {
-    await setBlocked(person.id, false)
+  if (await run(() => setBlocked(person.id, false), 'Could not unban user')) {
     toast.add({ title: `${person.display_name ?? 'User'} unbanned`, icon: 'i-lucide-check', color: 'success' })
-  } catch {
-    toast.add({ title: 'Could not unban user', color: 'error' })
   }
 }
 async function onRevoke(invite: Invite): Promise<void> {
-  try {
-    await revokeInvite(invite.email)
+  if (await run(() => revokeInvite(invite.email), 'Could not revoke invite')) {
     toast.add({ title: `Invite to ${invite.email} revoked`, color: 'neutral' })
-  } catch {
-    toast.add({ title: 'Could not revoke invite', color: 'error' })
   }
 }
 function onSelectPerson(person: Profile): void {
