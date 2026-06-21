@@ -10,7 +10,7 @@ import type { TmdbMovie } from '#shared/types/movie'
  */
 export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefined>) {
   const supabase = useSupabaseClient<Database>()
-  const myId = useState<string | null>('my-id', () => null)
+  const myId = useMyId()
 
   const { data: suggestions, error, refresh } = useRealtimeQuery<Suggestion[]>({
     key: eventId,

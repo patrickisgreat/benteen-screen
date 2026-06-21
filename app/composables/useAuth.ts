@@ -10,7 +10,7 @@ import type { Profile } from '#shared/types/user'
 export function useAuth() {
   const supabase = useSupabaseClient<Database>()
   const user = useSupabaseUser()
-  const myId = useState<string | null>('my-id', () => null)
+  const myId = useMyId()
   const profile = useState<Profile | null>('profile', () => null)
   // Cached allowlist verdict (set by middleware/invited.global.ts); cleared on
   // sign-out so the next user is re-checked within the same SPA session.
