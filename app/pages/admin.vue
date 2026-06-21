@@ -384,14 +384,7 @@ function onSelectEvent(event: MovieEvent): void {
 
       <!-- SUGGESTIONS -->
       <template #suggestions>
-        <USelectMenu
-          v-model="selectedEventId"
-          :items="eventOptions"
-          value-key="value"
-          :search-input="false"
-          placeholder="Select an event"
-          class="w-full sm:max-w-sm mb-4"
-        />
+        <EventPicker v-model="selectedEventId" :items="eventOptions" />
 
         <!-- End / reopen voting -->
         <div v-if="selectedEvent" class="mb-4 space-y-3">
@@ -485,14 +478,7 @@ function onSelectEvent(event: MovieEvent): void {
         <p class="text-sm text-muted mb-4">
           Add what the group needs for this event — people claim items on the event page.
         </p>
-        <USelectMenu
-          v-model="selectedEventId"
-          :items="eventOptions"
-          value-key="value"
-          :search-input="false"
-          placeholder="Select an event"
-          class="w-full sm:max-w-sm mb-4"
-        />
+        <EventPicker v-model="selectedEventId" :items="eventOptions" />
 
         <div v-if="selectedEventId" class="max-w-xl">
           <BringList
@@ -514,14 +500,7 @@ function onSelectEvent(event: MovieEvent): void {
           Curate the guest list for an event and send Evite-style invitations with
           one-click RSVP. A new event's list auto-fills from the last movie night.
         </p>
-        <USelectMenu
-          v-model="selectedEventId"
-          :items="eventOptions"
-          value-key="value"
-          :search-input="false"
-          placeholder="Select an event"
-          class="w-full sm:max-w-sm mb-4"
-        />
+        <EventPicker v-model="selectedEventId" :items="eventOptions" />
         <EventInviteManager v-if="selectedEventId" :key="selectedEventId" :event-id="selectedEventId" :event="selectedEvent" />
         <UCard v-else variant="subtle" class="text-center text-muted">
           Select an event to manage its guest list.
@@ -532,14 +511,7 @@ function onSelectEvent(event: MovieEvent): void {
         <p class="text-sm text-muted mb-4">
           Email an announcement or reminder about an event. Recipients are BCC'd.
         </p>
-        <USelectMenu
-          v-model="selectedEventId"
-          :items="eventOptions"
-          value-key="value"
-          :search-input="false"
-          placeholder="Select an event"
-          class="w-full sm:max-w-sm mb-4"
-        />
+        <EventPicker v-model="selectedEventId" :items="eventOptions" />
         <EventAnnounceComposer v-if="selectedEventId" :event-id="selectedEventId" class="max-w-xl" />
         <UCard v-else variant="subtle" class="text-center text-muted">
           Select an event to send a blast.
