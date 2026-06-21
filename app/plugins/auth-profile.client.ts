@@ -10,7 +10,7 @@ import type { Profile } from '#shared/types/user'
 export default defineNuxtPlugin(() => {
   const supabase = useSupabaseClient<Database>()
   const user = useSupabaseUser()
-  const myId = useState<string | null>('my-id', () => null)
+  const myId = useMyId()
   const profile = useState<Profile | null>('profile', () => null)
 
   watch(user, async () => {
