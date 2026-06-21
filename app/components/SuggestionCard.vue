@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Suggestion } from '#shared/types/suggestion'
 
-const props = defineProps<{ suggestion: Suggestion, rank: number, maxVotes: number, locked?: boolean }>()
+const props = defineProps<{ suggestion: Suggestion, rank: number, maxVotes: number, locked?: boolean, voteCapReached?: boolean }>()
 const emit = defineEmits<{ vote: [], unvote: [], remove: [], trailer: [] }>()
 
 const { myId } = useAuth()
@@ -12,6 +12,8 @@ const voteCount = computed(() => props.suggestion.votes?.length ?? 0)
 const hasVoted = computed(() =>
   Boolean(myId.value) && (props.suggestion.votes ?? []).some(v => v.user_id === myId.value)
 )
+// At the vote cap you can't add a new vote, but you can still remove one to switch.
+const voteDisabled = computed(() => Boolean(props.voteCapReached) && !hasVoted.value)
 const isOwner = computed(() =>
   Boolean(myId.value) && props.suggestion.user_id === myId.value
 )
@@ -66,6 +68,8 @@ const highlight = computed(() => props.rank === 1 && voteCount.value > 0)
             :label="String(voteCount)"
             size="sm"
             class="shrink-0"
+            :disabled="voteDisabled"
+            :title="voteDisabled ? 'Vote limit reached — remove a vote to switch your pick' : undefined"
             :aria-label="hasVoted ? 'Remove vote' : 'Vote'"
             @click="hasVoted ? emit('unvote') : emit('vote')"
           />

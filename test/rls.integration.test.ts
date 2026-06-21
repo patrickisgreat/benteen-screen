@@ -130,4 +130,31 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('invites').delete().eq('email', `rls_byadmin_${stamp}@example.com`)
     await admin!.from('app_settings').update({ max_invites: null }).eq('id', true)
   })
+
+  it('caps suggestions at 5 per user per event (server-side trigger)', async () => {
+    for (let i = 0; i < 5; i++) {
+      const { error } = await memberClient.from('suggestions').insert({ event_id: eventId, tmdb_movie: { id: i, title: `S${i}` } })
+      expect(error, `suggestion ${i} should be allowed`).toBeNull()
+    }
+    const sixth = await memberClient.from('suggestions').insert({ event_id: eventId, tmdb_movie: { id: 99, title: 'over' } })
+    expect(sixth.error, 'the 6th suggestion should be rejected by the cap').toBeTruthy()
+    await admin!.from('suggestions').delete().eq('event_id', eventId)
+  })
+
+  it('caps votes at 3 per user per event (server-side trigger)', async () => {
+    // Seed 4 suggestions via the service role (exempt from the suggestion cap) to vote on.
+    const { data: seeded } = await admin!
+      .from('suggestions')
+      .insert([0, 1, 2, 3].map(i => ({ event_id: eventId, user_id: memberId, tmdb_movie: { id: 100 + i, title: `V${i}` } })))
+      .select('id')
+    const ids = (seeded ?? []).map(s => s.id)
+    for (let i = 0; i < 3; i++) {
+      const { error } = await memberClient.from('votes').insert({ suggestion_id: ids[i] })
+      expect(error, `vote ${i} should be allowed`).toBeNull()
+    }
+    const fourth = await memberClient.from('votes').insert({ suggestion_id: ids[3] })
+    expect(fourth.error, 'the 4th vote should be rejected by the cap').toBeTruthy()
+    await admin!.from('votes').delete().eq('user_id', memberId)
+    await admin!.from('suggestions').delete().eq('event_id', eventId)
+  })
 })
