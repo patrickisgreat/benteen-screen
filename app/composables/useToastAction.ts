@@ -1,12 +1,6 @@
-/**
- * Wraps the repeated "toast on failure" handler pattern: runs an async action,
- * shows an error toast and returns false if it throws, or returns true on
- * success. The caller decides what success looks like (a message, a custom
- * color/icon, or a side effect like navigation), so success handling stays where
- * it actually varies between call sites.
- *
- *   if (await run(() => save(), 'Could not save')) toast.add({ title: 'Saved' })
- */
+/** Runs an async action, returning true on success or — if it throws — logging
+ *  the error, toasting `errorTitle`, and returning false. The caller decides what
+ *  success looks like (the success toast varies per call site). */
 export function useToastAction() {
   const toast = useToast()
 
@@ -14,7 +8,8 @@ export function useToastAction() {
     try {
       await action()
       return true
-    } catch {
+    } catch (e) {
+      console.error('[useToastAction]', e)
       toast.add({ title: errorTitle, color: 'error' })
       return false
     }
