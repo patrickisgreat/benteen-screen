@@ -10,7 +10,7 @@ const { run } = useToastAction()
 const { posterUrl } = useTmdb()
 const { events } = useEvents()
 // Admins can flip between events; everyone else just sees the active one.
-const { isAdmin } = useAuth()
+const { isAdmin, myId } = useAuth()
 
 const eventIndex = ref(0)
 const initialized = ref(false)
@@ -38,6 +38,12 @@ const cardBackdrop = computed(() => currentEvent.value?.poster_url || leadPoster
 // Voting ended → show the double-feature winners and hide vote/suggest controls.
 const votingLocked = computed(() => Boolean(currentEvent.value?.voting_locked_at))
 const winners = computed(() => topWinners(suggestions.value))
+
+// Per-event participation caps (mirrors the DB triggers — see shared/utils/limits).
+const mySuggestionCount = computed(() => countMySuggestions(suggestions.value, myId.value))
+const myVoteCount = computed(() => countMyVotes(suggestions.value, myId.value))
+const atSuggestionCap = computed(() => mySuggestionCount.value >= SUGGESTION_LIMIT)
+const atVoteCap = computed(() => myVoteCount.value >= VOTE_LIMIT)
 
 const eventOptions = computed(() =>
   events.value.map((event, index) => ({
@@ -76,11 +82,19 @@ async function onSuggest(movie: TmdbMovie): Promise<void> {
     toast.add({ title: 'Already suggested', description: `${movie.title} is already on the list.`, color: 'warning' })
     return
   }
+  if (atSuggestionCap.value) {
+    toast.add({ title: `You've used all ${SUGGESTION_LIMIT} suggestions`, description: 'Remove one from the list to free up a slot.', color: 'warning' })
+    return
+  }
   if (await run(() => suggest(movie), 'Could not add suggestion')) {
     toast.add({ title: 'Suggestion added', icon: 'i-lucide-check', color: 'success' })
   }
 }
 async function onVote(suggestion: Suggestion): Promise<void> {
+  if (atVoteCap.value) {
+    toast.add({ title: `You've used all ${VOTE_LIMIT} votes`, description: 'Remove a vote to switch your pick.', color: 'warning' })
+    return
+  }
   await run(() => vote(suggestion), 'Vote failed')
 }
 async function onUnvote(suggestion: Suggestion): Promise<void> {
@@ -178,32 +192,45 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
 
           <!-- Suggest + finder (hidden once voting is locked) -->
           <template v-if="!votingLocked">
-            <!-- Suggest (desktop inline) -->
-            <div class="hidden lg:block">
-              <h2 class="text-sm font-semibold text-muted mb-2">
-                Suggest a movie
-              </h2>
-              <SuggestSection :suggested-movie-ids="suggestedMovieIds" @suggest="onSuggest" />
-            </div>
+            <p class="text-xs text-muted text-center">
+              {{ mySuggestionCount }} of {{ SUGGESTION_LIMIT }} suggestions used
+            </p>
+            <template v-if="!atSuggestionCap">
+              <!-- Suggest (desktop inline) -->
+              <div class="hidden lg:block">
+                <h2 class="text-sm font-semibold text-muted mb-2">
+                  Suggest a movie
+                </h2>
+                <SuggestSection :suggested-movie-ids="suggestedMovieIds" @suggest="onSuggest" />
+              </div>
 
-            <!-- Suggest (mobile) -->
-            <UButton
-              class="lg:hidden justify-center"
-              block
-              label="Suggest a movie"
-              icon="i-lucide-plus"
-              @click="suggestOpen = true"
-            />
+              <!-- Suggest (mobile) -->
+              <UButton
+                class="lg:hidden justify-center"
+                block
+                label="Suggest a movie"
+                icon="i-lucide-plus"
+                @click="suggestOpen = true"
+              />
 
-            <!-- Movie finder (all sizes) -->
-            <UButton
-              class="justify-center"
-              block
+              <!-- Movie finder (all sizes) -->
+              <UButton
+                class="justify-center"
+                block
+                color="neutral"
+                variant="outline"
+                label="Help me find a movie"
+                icon="i-lucide-clapperboard"
+                @click="finderOpen = true"
+              />
+            </template>
+            <UAlert
+              v-else
+              icon="i-lucide-circle-check"
               color="neutral"
-              variant="outline"
-              label="Help me find a movie"
-              icon="i-lucide-clapperboard"
-              @click="finderOpen = true"
+              variant="subtle"
+              :title="`You've used all ${SUGGESTION_LIMIT} suggestions`"
+              description="Remove one from the list to free up a slot."
             />
           </template>
           <p v-else class="text-sm text-muted text-center inline-flex items-center justify-center gap-1.5">
@@ -219,7 +246,12 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
             <h2 class="text-xl font-semibold">
               {{ votingLocked ? 'Final results' : 'Rankings' }}
             </h2>
-            <UBadge :label="`${suggestions.length}`" color="neutral" variant="subtle" />
+            <UBadge
+              v-if="!votingLocked"
+              :label="`${myVoteCount}/${VOTE_LIMIT} votes used`"
+              :color="atVoteCap ? 'warning' : 'neutral'"
+              variant="subtle"
+            />
           </div>
 
           <div v-if="suggestions.length" class="space-y-3">
@@ -230,6 +262,7 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
               :rank="index + 1"
               :max-votes="maxVotes"
               :locked="votingLocked"
+              :vote-cap-reached="atVoteCap"
               @vote="onVote(suggestion)"
               @unvote="onUnvote(suggestion)"
               @remove="onRemove(suggestion)"

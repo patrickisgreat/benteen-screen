@@ -16,15 +16,17 @@ const event = {
   created_at: ''
 }
 
-// Shared admin flag — flipped per test before mounting (mockNuxtImport allows
+// Shared state — flipped per test before mounting (mockNuxtImport allows
 // referencing module-scope values, same pattern as useAdminPeople.nuxt.test.ts).
 const isAdmin = ref(false)
+const myId = ref<string | null>(null)
+const suggestionList = ref<Array<Record<string, unknown>>>([])
 
-mockNuxtImport('useAuth', () => () => ({ isAdmin }))
+mockNuxtImport('useAuth', () => () => ({ isAdmin, myId }))
 mockNuxtImport('useEvents', () => () => ({ events: ref([event]) }))
 mockNuxtImport('useTmdb', () => () => ({ posterUrl: () => null }))
 mockNuxtImport('useSuggestions', () => () => ({
-  suggestions: ref([]),
+  suggestions: suggestionList,
   alreadySuggested: () => false,
   suggest: async () => {},
   vote: async () => {},
@@ -51,7 +53,13 @@ const stubs = {
 
 beforeEach(() => {
   isAdmin.value = false
+  myId.value = null
+  suggestionList.value = []
 })
+
+function mineSuggestion(i: number): Record<string, unknown> {
+  return { id: `s${i}`, event_id: 'e1', user_id: 'me', tmdb_movie: { id: i, title: `M${i}` }, deleted: false, created_at: '2026-01-01', votes: [] }
+}
 
 describe('overview page', () => {
   it('renders the active event in the poster header', async () => {
@@ -75,5 +83,13 @@ describe('overview page', () => {
     const w = await mountSuspended(OverviewPage, { global: { stubs } })
     expect(w.text().toLowerCase()).not.toContain('pizza dough')
     expect(w.text()).toContain('See the bring list')
+  })
+
+  it('shows the suggestion-cap notice once I have 5 suggestions', async () => {
+    myId.value = 'me'
+    suggestionList.value = [1, 2, 3, 4, 5].map(mineSuggestion)
+    const w = await mountSuspended(OverviewPage, { global: { stubs } })
+    expect(w.text()).toContain('5 of 5 suggestions used')
+    expect(w.text()).toContain('used all 5 suggestions')
   })
 })

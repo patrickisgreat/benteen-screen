@@ -15,8 +15,8 @@ const display = computed(() => normalizePosterDisplay(props.event.poster_display
 <template>
   <button
     type="button"
-    class="group relative block w-full cursor-pointer overflow-hidden rounded-xl text-left ring ring-default bg-black transition hover:ring-primary/40"
-    :class="posterRatioClass(display.ratio)"
+    class="group relative block w-full cursor-pointer overflow-hidden rounded-xl text-left ring ring-default bg-black transition hover:ring-primary/40 min-h-44 sm:min-h-56"
+    :style="posterRatioStyle(display.ratio)"
     :aria-label="`${event.title} — view event details`"
     @click="$emit('open')"
   >

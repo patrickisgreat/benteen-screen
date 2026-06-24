@@ -32,7 +32,7 @@ describe('EventHero', () => {
   it('applies the event poster_display (ratio, focal point, zoom) to the header', async () => {
     const event = { ...baseEvent, poster_display: { ratio: 'tall', posX: 20, posY: 80, zoom: 1.5 } }
     const w = await mountSuspended(EventHero, { props: { event, backdrop: 'https://img/p.jpg' } })
-    expect(w.find('button').classes()).toContain('aspect-[4/3]')
+    expect(w.find('button').attributes('style') ?? '').toContain('aspect-ratio: 4 / 3')
     const style = w.find('img').attributes('style') ?? ''
     expect(style).toContain('object-position: 20% 80%')
     expect(style).toContain('scale(1.5)')

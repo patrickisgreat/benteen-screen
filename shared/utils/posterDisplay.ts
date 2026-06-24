@@ -30,11 +30,11 @@ export const POSTER_RATIO_LABELS: Record<PosterRatio, string> = {
   tall: 'Tall'
 }
 
-const RATIO_CLASS: Record<PosterRatio, string> = {
-  banner: 'aspect-[3/1]',
-  wide: 'aspect-[16/9]',
-  cinema: 'aspect-[21/9]',
-  tall: 'aspect-[4/3]'
+const RATIO_ASPECT: Record<PosterRatio, string> = {
+  banner: '3 / 1',
+  wide: '16 / 9',
+  cinema: '21 / 9',
+  tall: '4 / 3'
 }
 
 function clamp(n: number, min: number, max: number, fallback: number): number {
@@ -53,9 +53,12 @@ export function normalizePosterDisplay(raw: unknown): PosterDisplay {
   }
 }
 
-/** Tailwind aspect-ratio class for the header container. */
-export function posterRatioClass(ratio: PosterRatio): string {
-  return RATIO_CLASS[ratio]
+/** Inline aspect-ratio style for the header container. Not a Tailwind class:
+ *  the arbitrary `aspect-[x/y]` values only ever appeared in this .ts file, which
+ *  Tailwind doesn't scan, so the class was never generated — collapsing the
+ *  header to 0 height. An inline style works regardless of what Tailwind scans. */
+export function posterRatioStyle(ratio: PosterRatio): Record<string, string> {
+  return { aspectRatio: RATIO_ASPECT[ratio] }
 }
 
 /** Inline style for the poster <img> (object-cover): focal point + zoom. */

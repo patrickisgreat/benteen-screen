@@ -72,7 +72,7 @@ function reset(): void {
     <div
       ref="previewRef"
       class="relative w-full overflow-hidden rounded-lg bg-black ring ring-default cursor-move touch-none select-none"
-      :class="posterRatioClass(model.ratio)"
+      :style="posterRatioStyle(model.ratio)"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"

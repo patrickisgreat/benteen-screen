@@ -55,4 +55,15 @@ describe('SuggestionCard', () => {
     const w = await mountSuspended(SuggestionCard, { props: { suggestion, rank: 1, maxVotes: 2 } })
     expect(w.find('[aria-label="Remove suggestion"]').exists()).toBe(true)
   })
+
+  it('disables the vote button at the vote cap when I have not voted', async () => {
+    const notMine = { ...suggestion, votes: [{ user_id: 'bob' }] }
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion: notMine, rank: 1, maxVotes: 2, voteCapReached: true } })
+    expect(w.get('[aria-label="Vote"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('still lets me remove a vote at the cap (to switch my pick)', async () => {
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion, rank: 1, maxVotes: 2, voteCapReached: true } })
+    expect(w.get('[aria-label="Remove vote"]').attributes('disabled')).toBeUndefined()
+  })
 })
