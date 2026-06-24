@@ -25,6 +25,8 @@ const currentEventId = computed(() => currentEvent.value?.id ?? null)
 
 const { suggestions, alreadySuggested, suggest, vote, unvote, removeSuggestion } = useSuggestions(currentEventId)
 const { myStatus, counts, setStatus } = useRsvp(currentEventId)
+// Who else is looking at this movie night right now (Realtime Presence).
+const { online } = usePresence(currentEventId)
 
 const suggestedMovieIds = computed(() => suggestions.value.map(s => s.tmdb_movie.id))
 const maxVotes = computed(() => Math.max(1, ...suggestions.value.map(s => s.voteCount ?? 0)))
@@ -142,6 +144,11 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
           aria-label="Next event"
           @click="nextEvent"
         />
+      </div>
+
+      <!-- Live "who's watching this movie night" presence -->
+      <div class="flex justify-end mb-2 min-h-7">
+        <WhoOnline :online="online" />
       </div>
 
       <!-- Poster-backed header for the active event -->

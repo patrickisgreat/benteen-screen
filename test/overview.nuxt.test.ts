@@ -46,6 +46,7 @@ mockNuxtImport('useAppSettings', () => () => ({
   maxSuggestions: cfgMaxSuggestions,
   maxVotes: cfgMaxVotes
 }))
+mockNuxtImport('usePresence', () => () => ({ online: ref([]) }))
 
 // Heavy children pull in their own composables/network — stub them; this page
 // test only cares about the header + the admin-gated selector.
@@ -55,7 +56,8 @@ const stubs = {
   MovieFinder: true,
   SuggestionCard: true,
   EventInfoModal: true,
-  TrailerModal: true
+  TrailerModal: true,
+  WhoOnline: true
 }
 
 beforeEach(() => {
