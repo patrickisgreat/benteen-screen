@@ -3,6 +3,9 @@
 // / max_votes). RLS enforces admin-only writes; blank = the defaults in limits.ts.
 const { maxSuggestions, maxVotes, setParticipationCaps } = useAppSettings()
 const toast = useToast()
+// UInput type="number" writes a *string* back through v-model at runtime (no
+// `.number` coercion), even though its model types as number|null — so clean()
+// accepts a string too and normalizes whatever the field actually holds.
 const suggestionsDraft = ref<number | null>(null)
 const votesDraft = ref<number | null>(null)
 const saving = ref(false)
@@ -14,7 +17,7 @@ watch(maxVotes, (v) => {
   votesDraft.value = v
 }, { immediate: true })
 
-function clean(value: number | null): number | null {
+function clean(value: number | string | null): number | null {
   const n = Number(value)
   return Number.isFinite(n) && n >= 1 ? Math.floor(n) : null
 }

@@ -21,6 +21,9 @@ const event = {
 const isAdmin = ref(false)
 const myId = ref<string | null>(null)
 const suggestionList = ref<Array<Record<string, unknown>>>([])
+// Admin-configured caps (null = fall back to the limits.ts defaults).
+const cfgMaxSuggestions = ref<number | null>(null)
+const cfgMaxVotes = ref<number | null>(null)
 
 mockNuxtImport('useAuth', () => () => ({ isAdmin, myId }))
 mockNuxtImport('useEvents', () => () => ({ events: ref([event]) }))
@@ -40,8 +43,8 @@ mockNuxtImport('useRsvp', () => () => ({
 }))
 mockNuxtImport('useToast', () => () => ({ add: () => {} }))
 mockNuxtImport('useAppSettings', () => () => ({
-  maxSuggestions: ref<number | null>(null),
-  maxVotes: ref<number | null>(null)
+  maxSuggestions: cfgMaxSuggestions,
+  maxVotes: cfgMaxVotes
 }))
 
 // Heavy children pull in their own composables/network — stub them; this page
@@ -59,6 +62,8 @@ beforeEach(() => {
   isAdmin.value = false
   myId.value = null
   suggestionList.value = []
+  cfgMaxSuggestions.value = null
+  cfgMaxVotes.value = null
 })
 
 function mineSuggestion(i: number): Record<string, unknown> {
@@ -95,5 +100,15 @@ describe('overview page', () => {
     const w = await mountSuspended(OverviewPage, { global: { stubs } })
     expect(w.text()).toContain('5 of 5 suggestions used')
     expect(w.text()).toContain('used all 5 suggestions')
+  })
+
+  it('honors an admin-configured suggestion cap over the default', async () => {
+    cfgMaxSuggestions.value = 2
+    myId.value = 'me'
+    suggestionList.value = [1, 2].map(mineSuggestion)
+    const w = await mountSuspended(OverviewPage, { global: { stubs } })
+    // The cap notice fires at 2 (the configured value), not the default of 5.
+    expect(w.text()).toContain('2 of 2 suggestions used')
+    expect(w.text()).toContain('used all 2 suggestions')
   })
 })
