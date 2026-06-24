@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/patrickisgreat/benteen-screen/compare/v1.2.0...v1.2.1) (2026-06-24)
+
+
+### Bug Fixes
+
+* poster header collapsed to 0 height (invisible) ([#100](https://github.com/patrickisgreat/benteen-screen/issues/100)) ([a20df48](https://github.com/patrickisgreat/benteen-screen/commit/a20df48b9fb4de2bb27607a7914c4fcd73f69187))
+
 ## [1.2.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.1.0...v1.2.0) (2026-06-24)
 
 
