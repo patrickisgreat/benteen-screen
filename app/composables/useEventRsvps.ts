@@ -1,6 +1,6 @@
 import type { MaybeRefOrGetter } from 'vue'
 import type { Database } from '~/types/database.types'
-import type { RsvpStatus } from '#shared/types/rsvp'
+import { toRsvpStatus, type RsvpStatus } from '#shared/types/rsvp'
 
 /** One person's RSVP in the merged roster. */
 export interface RsvpEntry {
@@ -83,8 +83,7 @@ export function useEventRsvps(eventId: MaybeRefOrGetter<string | null | undefine
           name: profile?.display_name ?? email ?? 'Member',
           email,
           avatar: profile?.avatar_url ?? null,
-          // DB check constraint guarantees the status enum; narrow at this boundary.
-          status: row.status as RsvpStatus,
+          status: toRsvpStatus(row.status),
           viaEmail: false
         })
       }
@@ -99,7 +98,7 @@ export function useEventRsvps(eventId: MaybeRefOrGetter<string | null | undefine
             name: invite.display_name ?? invite.email,
             email: invite.email,
             avatar: null,
-            status: invite.rsvp as RsvpStatus,
+            status: toRsvpStatus(invite.rsvp),
             viaEmail: true
           })
         } else {

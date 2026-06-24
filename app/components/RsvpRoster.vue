@@ -30,7 +30,7 @@ const hasAnything = computed(() =>
         >
           <UAvatar :src="p.avatar ?? undefined" :alt="p.name" size="3xs" />
           <span class="text-sm truncate max-w-40">{{ p.name }}</span>
-          <UIcon v-if="p.viaEmail" name="i-lucide-mail" class="size-3 text-dimmed" title="RSVP'd by email" />
+          <UIcon v-if="p.viaEmail" name="i-lucide-mail" class="size-3 text-dimmed" role="img" aria-label="RSVP'd by email" />
         </li>
       </ul>
     </div>

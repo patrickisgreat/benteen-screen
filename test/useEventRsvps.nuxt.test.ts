@@ -1,5 +1,5 @@
 // @vitest-environment nuxt
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 import type { EventRsvpRoster } from '../app/composables/useEventRsvps'
@@ -41,6 +41,14 @@ async function settle(roster: { value: EventRsvpRoster }): Promise<void> {
   })
   await nextTick()
 }
+
+// Reset every fixture between tests so a stray value can't leak across cases — each
+// test declares the full state it depends on.
+beforeEach(() => {
+  rsvpRows = []
+  profileRows = []
+  inviteRows = []
+})
 
 describe('useEventRsvps', () => {
   it('rolls up in-app member RSVPs with names + avatars', async () => {
@@ -85,5 +93,19 @@ describe('useEventRsvps', () => {
     expect(roster.value.going).toHaveLength(1)
     expect(roster.value.maybe).toHaveLength(0)
     expect(roster.value.going[0]!.viaEmail).toBe(false)
+  })
+
+  it('settles on an all-no-reply guest list (total stays 0, everyone in noReply)', async () => {
+    // The settle edge case: invites exist but nobody replied, so `total` never leaves
+    // 0 and the load is only observable via `noReply` populating.
+    inviteRows = [
+      { email: 'a@x.com', display_name: 'A', rsvp: null },
+      { email: 'b@x.com', display_name: null, rsvp: null }
+    ]
+    const { roster } = useEventRsvps(ref('e1'))
+    await settle(roster)
+    expect(roster.value.total).toBe(0)
+    expect(roster.value.going).toHaveLength(0)
+    expect(roster.value.noReply.map(p => p.name)).toEqual(['A', 'b@x.com'])
   })
 })
