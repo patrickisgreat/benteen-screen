@@ -14,6 +14,7 @@ const suggestion = {
   deleted: false,
   created_at: '2026-01-01T00:00:00Z',
   tmdb_movie: { id: 1, title: 'Heat', release_date: '1995-12-15' },
+  voteCount: 2,
   votes: [{ user_id: 'me' }, { user_id: 'bob' }]
 }
 

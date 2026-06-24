@@ -31,7 +31,7 @@ export function computeEventStats(input: {
   const countStatus = (status: string): number => input.rsvps.filter(r => r.status === status).length
   return {
     suggestionCount: live.length,
-    voteCount: live.reduce((n, s) => n + (s.votes?.length ?? 0), 0),
+    voteCount: live.reduce((n, s) => n + (s.voteCount ?? 0), 0),
     submitterCount: submitters.size,
     voterCount: voters.size,
     going: countStatus('going'),
@@ -39,6 +39,6 @@ export function computeEventStats(input: {
     declined: countStatus('no'),
     bringTotal: input.bringItems.length,
     bringClaimed: input.bringItems.filter(b => b.user_id !== null).length,
-    topPicks: topWinners([...live]).map(s => ({ title: s.tmdb_movie.title, votes: s.votes?.length ?? 0 }))
+    topPicks: topWinners([...live]).map(s => ({ title: s.tmdb_movie.title, votes: s.voteCount ?? 0 }))
   }
 }

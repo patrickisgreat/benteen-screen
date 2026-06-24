@@ -23,8 +23,10 @@ const supabase = {
     }
     return chain
   },
+  // Tally resolves immediately; the suggestions select (above) gates the race.
+  rpc: () => Promise.resolve({ data: [], error: null }),
   channel() {
-    const ch = { on: () => ch, subscribe: () => ch }
+    const ch = { on: () => ch, subscribe: () => ch, send: () => Promise.resolve('ok') }
     return ch
   },
   removeChannel() {}

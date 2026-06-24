@@ -65,6 +65,7 @@ export interface Database {
       admin_set_admin: { Args: { target_id: string, value: boolean }, Returns: undefined }
       admin_set_blocked: { Args: { target_id: string, value: boolean }, Returns: undefined }
       is_allowed: { Args: Record<string, never>, Returns: boolean }
+      suggestion_vote_counts: { Args: { p_event_id: string }, Returns: { suggestion_id: string, votes: number }[] }
     }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }

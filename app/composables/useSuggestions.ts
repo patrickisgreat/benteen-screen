@@ -1,12 +1,20 @@
 import type { MaybeRefOrGetter } from 'vue'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Database } from '~/types/database.types'
 import type { Suggestion } from '#shared/types/suggestion'
 import type { TmdbMovie } from '#shared/types/movie'
 
+// Rows as they come back from the suggestions query (votes = only those the viewer
+// may read; the public count is merged in from the tally RPC below).
+type RawSuggestion = Omit<Suggestion, 'voteCount'>
+
 /**
- * Realtime suggestions for an event + the write actions. Votes are normalized
- * rows, so vote integrity is automatic: one row per (suggestion, user) via the
- * PK, and the count is just `votes.length`.
+ * Realtime suggestions for an event + the write actions. Vote *counts* come from
+ * the `suggestion_vote_counts` tally (so non-admins never read who voted — see the
+ * voter-privacy migration), while each suggestion's `votes` array carries only the
+ * viewer's own vote, enough to answer "did I vote". Because the per-vote realtime
+ * stream is no longer visible across users, live counts ride a lightweight broadcast
+ * on a shared per-event topic: whoever votes pings it, everyone re-fetches the tally.
  */
 export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefined>) {
   const supabase = useSupabaseClient<Database>()
@@ -15,22 +23,51 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
   const { data: suggestions, error, refresh } = useRealtimeQuery<Suggestion[]>({
     key: eventId,
     channel: 'suggestions',
-    tables: [{ table: 'suggestions' }, { table: 'votes', global: true }],
+    tables: [{ table: 'suggestions' }],
     empty: [],
     errorFallback: 'Failed to load suggestions',
     load: async (id) => {
-      const { data, error } = await supabase
-        .from('suggestions')
-        .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id)')
-        .eq('event_id', id)
-        .eq('deleted', false)
-      if (error) throw error
-      return ((data ?? []) as unknown as Suggestion[]).sort((a, b) => {
-        const diff = b.votes.length - a.votes.length
-        return diff !== 0 ? diff : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      })
+      const [rows, counts] = await Promise.all([
+        supabase
+          .from('suggestions')
+          .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id)')
+          .eq('event_id', id)
+          .eq('deleted', false),
+        supabase.rpc('suggestion_vote_counts', { p_event_id: id })
+      ])
+      if (rows.error) throw rows.error
+      if (counts.error) throw counts.error
+      const countById = new Map((counts.data ?? []).map(c => [c.suggestion_id, Number(c.votes)]))
+      return ((rows.data ?? []) as unknown as RawSuggestion[])
+        .map(s => ({ ...s, voteCount: countById.get(s.id) ?? 0 }))
+        .sort((a, b) => {
+          const diff = b.voteCount - a.voteCount
+          return diff !== 0 ? diff : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        })
     }
   })
+
+  // Shared per-event topic so every viewer re-fetches the tally when anyone votes.
+  // (Counts are derived server-side; the payload carries nothing sensitive.)
+  let voteChannel: RealtimeChannel | null = null
+  watch(() => toValue(eventId), (id) => {
+    if (voteChannel) {
+      supabase.removeChannel(voteChannel)
+      voteChannel = null
+    }
+    if (!id) return
+    voteChannel = supabase
+      .channel(`votes:${id}`)
+      .on('broadcast', { event: 'changed' }, () => void refresh())
+      .subscribe()
+  }, { immediate: true })
+  onScopeDispose(() => {
+    if (voteChannel) supabase.removeChannel(voteChannel)
+  })
+
+  function notifyVoteChange(): void {
+    void voteChannel?.send({ type: 'broadcast', event: 'changed', payload: {} })
+  }
 
   function alreadySuggested(movieId: number): boolean {
     return suggestions.value.some(s => s.tmdb_movie?.id === movieId)
@@ -53,6 +90,7 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
     const { error } = await supabase.from('votes').insert({ suggestion_id: suggestion.id })
     if (error) throw error
     await refresh()
+    notifyVoteChange()
   }
 
   async function unvote(suggestion: Suggestion): Promise<void> {
@@ -61,6 +99,7 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
     const { error } = await supabase.from('votes').delete().eq('suggestion_id', suggestion.id)
     if (error) throw error
     await refresh()
+    notifyVoteChange()
   }
 
   async function removeSuggestion(suggestion: Suggestion): Promise<void> {

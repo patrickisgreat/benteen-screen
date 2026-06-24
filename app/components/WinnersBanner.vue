@@ -28,7 +28,7 @@ const { posterUrl } = useTmdb()
             {{ winner.tmdb_movie.title }}
           </p>
           <p class="text-xs text-muted">
-            {{ winner.votes?.length ?? 0 }} vote{{ (winner.votes?.length ?? 0) === 1 ? '' : 's' }}
+            {{ winner.voteCount ?? 0 }} vote{{ (winner.voteCount ?? 0) === 1 ? '' : 's' }}
           </p>
         </div>
       </div>

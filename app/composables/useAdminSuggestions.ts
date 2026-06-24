@@ -27,13 +27,16 @@ export function useAdminSuggestions(eventId: MaybeRefOrGetter<string | null | un
         .select(SELECT)
         .eq('event_id', id)
       if (error) throw error
-      return (data ?? []) as unknown as AdminSuggestion[]
+      // Admins read every vote row (RLS), so the count is just votes.length here —
+      // mirror it into voteCount to satisfy the shared Suggestion shape.
+      return ((data ?? []) as unknown as AdminSuggestion[])
+        .map(s => ({ ...s, voteCount: s.votes?.length ?? 0 }))
     }
   })
 
   // Most-voted first for display.
   const suggestions = computed(() =>
-    [...rows.value].sort((a, b) => (b.votes?.length ?? 0) - (a.votes?.length ?? 0))
+    [...rows.value].sort((a, b) => b.voteCount - a.voteCount)
   )
 
   async function setDeleted(id: string, deleted: boolean): Promise<void> {

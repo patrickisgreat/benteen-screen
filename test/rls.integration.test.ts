@@ -157,4 +157,44 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('votes').delete().eq('user_id', memberId)
     await admin!.from('suggestions').delete().eq('event_id', eventId)
   })
+
+  it('voter privacy: a member sees only their own vote rows, but counts via the tally', async () => {
+    // Two voters on the same suggestion, seeded via the service role.
+    const otherEmail = `rls_other_${stamp}@example.com`
+    const otherId = await makeUser(otherEmail)
+    await admin!.from('invites').insert({ email: otherEmail })
+    const { data: seeded } = await admin!
+      .from('suggestions')
+      .insert({ event_id: eventId, user_id: memberId, tmdb_movie: { id: 500, title: 'Privacy' } })
+      .select('id')
+      .single()
+    const suggestionId = seeded!.id
+    await admin!.from('votes').insert([
+      { suggestion_id: suggestionId, user_id: memberId },
+      { suggestion_id: suggestionId, user_id: otherId }
+    ])
+
+    // The member can read ONLY their own vote row — not the other voter's identity.
+    const visible = await memberClient.from('votes').select('user_id').eq('suggestion_id', suggestionId)
+    expect((visible.data ?? []).map(v => v.user_id), 'a member must not see other voters').toEqual([memberId])
+
+    // …yet the SECURITY DEFINER tally still reports the true total (2), no identities.
+    const tally = await memberClient.rpc('suggestion_vote_counts', { p_event_id: eventId })
+    const row = (tally.data ?? []).find(r => r.suggestion_id === suggestionId)
+    expect(Number(row?.votes), 'the tally exposes the count without the voters').toBe(2)
+
+    // A signed-in but non-invited user gets nothing from the tally: the SECURITY
+    // DEFINER function honors is_allowed() like every other gated path, so a guessed
+    // event UUID is not a back door around the invite-only model.
+    const outsiderTally = await outsiderClient.rpc('suggestion_vote_counts', { p_event_id: eventId })
+    expect(outsiderTally.data ?? [], 'a non-allowed user must not get vote counts').toEqual([])
+
+    // An admin still sees every voter (the admin drill-down needs the names).
+    const asAdmin = await admin!.from('votes').select('user_id').eq('suggestion_id', suggestionId)
+    expect((asAdmin.data ?? []).length, 'admin/service role sees all votes').toBe(2)
+
+    await admin!.from('votes').delete().eq('suggestion_id', suggestionId)
+    await admin!.from('suggestions').delete().eq('id', suggestionId)
+    await admin!.from('invites').delete().eq('email', otherEmail)
+  })
 })
