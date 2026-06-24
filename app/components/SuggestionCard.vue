@@ -8,7 +8,8 @@ const { myId } = useAuth()
 
 const movie = computed(() => props.suggestion.tmdb_movie)
 const year = computed(() => movieYear(movie.value))
-const voteCount = computed(() => props.suggestion.votes?.length ?? 0)
+// Public count from the tally (votes.length would only see the viewer's own vote).
+const voteCount = computed(() => props.suggestion.voteCount ?? 0)
 const hasVoted = computed(() =>
   Boolean(myId.value) && (props.suggestion.votes ?? []).some(v => v.user_id === myId.value)
 )

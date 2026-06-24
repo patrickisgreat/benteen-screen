@@ -12,6 +12,7 @@ const winner = (id: string, title: string, votes: number) => ({
   deleted: false,
   created_at: '2026-01-01T00:00:00Z',
   tmdb_movie: { id: 1, title, poster_path: `${id}.jpg` },
+  voteCount: votes,
   votes: Array.from({ length: votes }, (_, i) => ({ user_id: `v${i}` }))
 })
 

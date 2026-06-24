@@ -9,6 +9,7 @@ const sug = (id: string, userId: string, voters: string[], title = id, deleted =
   tmdb_movie: { id: 1, title },
   deleted,
   created_at: '2026-01-01T00:00:00Z',
+  voteCount: voters.length,
   votes: voters.map(user_id => ({ user_id }))
 })
 

@@ -32,8 +32,9 @@ const supabase = {
       select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [] }) }) })
     }
   },
+  rpc: () => Promise.resolve({ data: [], error: null }),
   channel() {
-    const ch = { on: () => ch, subscribe: () => ch }
+    const ch = { on: () => ch, subscribe: () => ch, send: () => Promise.resolve('ok') }
     return ch
   },
   removeChannel() {}

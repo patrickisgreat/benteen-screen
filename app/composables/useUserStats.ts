@@ -39,8 +39,11 @@ export function useUserStats(userId: MaybeRefOrGetter<string | null>) {
       .in('event_id', lockedIds)
     // The votes embed isn't declared in the generated types (no FK relationship
     // row), so PostgREST's inferred shape doesn't match — cast as useSuggestions does.
+    // Admin drill-down reads every vote (RLS), so the winner count is votes.length —
+    // populate voteCount so topWinners (which counts by voteCount) lines up.
     const byEvent = new Map<string, Suggestion[]>()
-    for (const s of (pool ?? []) as unknown as Suggestion[]) {
+    for (const row of (pool ?? []) as unknown as Suggestion[]) {
+      const s = { ...row, voteCount: row.votes?.length ?? 0 }
       const list = byEvent.get(s.event_id) ?? []
       list.push(s)
       byEvent.set(s.event_id, list)

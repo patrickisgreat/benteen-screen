@@ -27,8 +27,8 @@ const { suggestions, alreadySuggested, suggest, vote, unvote, removeSuggestion }
 const { myStatus, counts, setStatus } = useRsvp(currentEventId)
 
 const suggestedMovieIds = computed(() => suggestions.value.map(s => s.tmdb_movie.id))
-const maxVotes = computed(() => Math.max(1, ...suggestions.value.map(s => s.votes?.length ?? 0)))
-const totalVotes = computed(() => suggestions.value.reduce((sum, s) => sum + (s.votes?.length ?? 0), 0))
+const maxVotes = computed(() => Math.max(1, ...suggestions.value.map(s => s.voteCount ?? 0)))
+const totalVotes = computed(() => suggestions.value.reduce((sum, s) => sum + (s.voteCount ?? 0), 0))
 // Only surface a "leader" once votes exist — before that the order is just by date.
 const leadingTitle = computed(() => (totalVotes.value > 0 ? suggestions.value[0]?.tmdb_movie.title ?? null : null))
 const leadPoster = computed(() => (totalVotes.value > 0 ? posterUrl(suggestions.value[0]?.tmdb_movie.poster_path) : null))

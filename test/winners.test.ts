@@ -9,6 +9,7 @@ const make = (id: string, votes: number, created_at: string, deleted = false): S
   tmdb_movie: { id: Number(id.replace(/\D/g, '')) || 0, title: id, release_date: '2000-01-01' },
   deleted,
   created_at,
+  voteCount: votes,
   votes: Array.from({ length: votes }, (_, i) => ({ user_id: `voter-${i}` }))
 })
 

@@ -25,8 +25,10 @@ export function useEventStats(eventId: MaybeRefOrGetter<string | null>) {
 
     return computeEventStats({
       // The votes embed isn't declared in the generated types, so cast as
-      // useSuggestions does (the inferred shape doesn't match).
-      suggestions: (suggestions.data ?? []) as unknown as Suggestion[],
+      // useSuggestions does (the inferred shape doesn't match). Admins read every
+      // vote (RLS), so the count is votes.length — populate voteCount to match the
+      // shared Suggestion shape (the tally RPC is only needed where reads are scoped).
+      suggestions: ((suggestions.data ?? []) as unknown as Suggestion[]).map(s => ({ ...s, voteCount: s.votes?.length ?? 0 })),
       rsvps: rsvps.data ?? [],
       bringItems: bring.data ?? []
     })
