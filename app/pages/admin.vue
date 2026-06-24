@@ -362,6 +362,7 @@ function onSelectEvent(event: MovieEvent): void {
           </div>
 
           <InviteLimitSetting />
+          <ParticipationLimitsSetting />
 
           <UAlert
             v-if="loadError"

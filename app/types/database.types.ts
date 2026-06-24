@@ -18,9 +18,9 @@ export interface Database {
         Relationships: []
       }
       app_settings: {
-        Row: { id: boolean, max_invites: number | null, updated_at: string }
-        Insert: { id?: boolean, max_invites?: number | null, updated_at?: string }
-        Update: { id?: boolean, max_invites?: number | null, updated_at?: string }
+        Row: { id: boolean, max_invites: number | null, max_suggestions: number | null, max_votes: number | null, updated_at: string }
+        Insert: { id?: boolean, max_invites?: number | null, max_suggestions?: number | null, max_votes?: number | null, updated_at?: string }
+        Update: { id?: boolean, max_invites?: number | null, max_suggestions?: number | null, max_votes?: number | null, updated_at?: string }
         Relationships: []
       }
       event_invites: {
