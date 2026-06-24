@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.4.0...v1.5.0) (2026-06-24)
+
+
+### Features
+
+* float a heart up on vote / a sad heart on unvote ([#109](https://github.com/patrickisgreat/benteen-screen/issues/109)) ([2a88ddc](https://github.com/patrickisgreat/benteen-screen/commit/2a88ddc79d3055e2a533cb2f0f046e94acba903c))
+* who's-online presence on the overview page ([#108](https://github.com/patrickisgreat/benteen-screen/issues/108)) ([5871954](https://github.com/patrickisgreat/benteen-screen/commit/5871954065714a6507aff28f2e2c25e5d2c690d7))
+
+
+### Bug Fixes
+
+* hide who voted for what from non-admins (tally + broadcast) ([#107](https://github.com/patrickisgreat/benteen-screen/issues/107)) ([da6a200](https://github.com/patrickisgreat/benteen-screen/commit/da6a200a1e53ca18bdb2edb8be11608b5b924686))
+
 ## [1.4.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.3.0...v1.4.0) (2026-06-24)
 
 
