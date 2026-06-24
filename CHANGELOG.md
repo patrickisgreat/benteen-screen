@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.3.0...v1.4.0) (2026-06-24)
+
+
+### Features
+
+* batch invite sends (Resend rate limit) + observable open-tracking webhook ([#106](https://github.com/patrickisgreat/benteen-screen/issues/106)) ([fc2f905](https://github.com/patrickisgreat/benteen-screen/commit/fc2f90520e2916ad054288462c05c3151c55d295))
+
 ## [1.3.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.2.2...v1.3.0) (2026-06-24)
 
 
