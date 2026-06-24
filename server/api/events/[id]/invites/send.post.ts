@@ -6,9 +6,9 @@ import type { Database } from '~/types/database.types'
  * Runs under the caller's own session (RLS) — every table here has an admin policy
  * (`event_invites: admin all`, `invites: create` as self with the cap trigger
  * exempting admins), so the service role isn't needed and a misconfigured
- * service-role key can't break sending. For each not-yet-sent invitee we email the
- * one-click RSVP links, add them to the allowlist so they can sign in too, and
- * stamp sent_at + the Resend message id.
+ * service-role key can't break sending. This route owns auth + loading the event
+ * and building each guest's one-click RSVP email; it then delegates the
+ * rate-limit-friendly batch send + delivery recording to `sendEventInvites`.
  */
 export default defineEventHandler(async (event) => {
   const { user, userId } = await requireUser(event)
@@ -43,9 +43,10 @@ export default defineEventHandler(async (event) => {
   const origin = resolveOrigin(event)
   const inviterName = inviterNameFromClaims(user)
 
-  let sent = 0
-  const failures: { email: string, error: string }[] = []
-  for (const invite of queue) {
+  // Build every guest's distinct one-click RSVP email up front. Each link differs,
+  // so these are N distinct emails (not one email to N people) — exactly what the
+  // batch sender fans out across Resend's batch endpoint.
+  const recipients = queue.map((invite) => {
     const mail = buildEventInviteEmail({
       eventTitle: ev.title,
       eventDate: ev.event_date ? formatEmailDate(ev.event_date) : null,
@@ -59,33 +60,26 @@ export default defineEventHandler(async (event) => {
       appUrl: `${origin}/overview`,
       options: inviteOptions
     })
-    try {
-      const { id: resendId } = await sendEmail(resendApiKey, resendFrom, {
-        to: invite.email,
-        subject: mail.subject,
-        html: mail.html,
-        text: mail.text,
-        replyTo: user.email ?? undefined
-      })
-      // Allowlist them so they can sign in too (idempotent).
-      await db.from('invites').upsert(
-        { email: invite.email, display_name: invite.display_name, invited_by: userId },
-        { onConflict: 'email', ignoreDuplicates: true }
-      )
-      await db
-        .from('event_invites')
-        .update({ sent_at: new Date().toISOString(), resend_id: resendId })
-        .eq('id', invite.id)
-      sent++
-    } catch (e) {
-      // Leave sent_at null so a later send retries — but record WHY (don't swallow:
-      // a swallowed Resend rejection looked like "everyone already invited").
-      const message = e instanceof Error ? e.message : 'Unknown error'
-      failures.push({ email: invite.email, error: message })
-      console.error('[events/invites/send] failed for', invite.email, '-', message)
+    return {
+      id: invite.id,
+      email: invite.email,
+      token: invite.token,
+      displayName: invite.display_name,
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text
     }
+  })
+
+  return {
+    ok: true,
+    ...(await sendEventInvites(db, {
+      apiKey: resendApiKey,
+      from: resendFrom,
+      replyTo: user.email ?? undefined,
+      eventId,
+      invitedBy: userId,
+      recipients
+    }))
   }
-  // `error` carries the first failure (usually identical across recipients, e.g. an
-  // unverified Resend sender domain) so the UI can show the real reason.
-  return { ok: true, sent, failed: failures.length, error: failures[0]?.error ?? null }
 })

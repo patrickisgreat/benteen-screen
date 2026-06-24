@@ -24,7 +24,7 @@ export function useAppSettings() {
 
   onMounted(refresh)
 
-  async function update(patch: Record<string, number | null>): Promise<void> {
+  async function update(patch: Database['public']['Tables']['app_settings']['Update']): Promise<void> {
     const { error } = await supabase
       .from('app_settings')
       .update({ ...patch, updated_at: new Date().toISOString() })
