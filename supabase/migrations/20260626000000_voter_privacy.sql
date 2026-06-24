@@ -21,6 +21,10 @@ create policy "votes: read own or admin" on public.votes
 
 -- 2. Public per-suggestion vote counts, no voter identities. SECURITY DEFINER so it
 --    can count rows the caller can no longer read directly; only counts are returned.
+--    `auth.uid()` inside a SECURITY DEFINER body still resolves to the *caller* (it
+--    reads request.jwt.claims), so the is_allowed() gate keeps this consistent with
+--    the invite-only model: a signed-in but non-invited user gets an empty result,
+--    not a back door around RLS via a guessed event UUID.
 create or replace function public.suggestion_vote_counts(p_event_id uuid)
   returns table (suggestion_id uuid, votes bigint)
   language sql security definer stable set search_path = public as $$
@@ -28,6 +32,7 @@ create or replace function public.suggestion_vote_counts(p_event_id uuid)
   from public.votes v
   join public.suggestions s on s.id = v.suggestion_id
   where s.event_id = p_event_id and s.deleted = false
+    and public.is_allowed()
   group by v.suggestion_id
 $$;
 revoke all on function public.suggestion_vote_counts(uuid) from public;

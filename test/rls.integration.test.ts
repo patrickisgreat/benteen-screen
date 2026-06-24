@@ -183,6 +183,12 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     const row = (tally.data ?? []).find(r => r.suggestion_id === suggestionId)
     expect(Number(row?.votes), 'the tally exposes the count without the voters').toBe(2)
 
+    // A signed-in but non-invited user gets nothing from the tally: the SECURITY
+    // DEFINER function honors is_allowed() like every other gated path, so a guessed
+    // event UUID is not a back door around the invite-only model.
+    const outsiderTally = await outsiderClient.rpc('suggestion_vote_counts', { p_event_id: eventId })
+    expect(outsiderTally.data ?? [], 'a non-allowed user must not get vote counts').toEqual([])
+
     // An admin still sees every voter (the admin drill-down needs the names).
     const asAdmin = await admin!.from('votes').select('user_id').eq('suggestion_id', suggestionId)
     expect((asAdmin.data ?? []).length, 'admin/service role sees all votes').toBe(2)
