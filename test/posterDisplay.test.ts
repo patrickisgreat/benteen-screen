@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_POSTER_DISPLAY, normalizePosterDisplay, posterFillStyle, posterRatioClass } from '../shared/utils/posterDisplay'
+import { DEFAULT_POSTER_DISPLAY, normalizePosterDisplay, posterFillStyle, posterRatioStyle } from '../shared/utils/posterDisplay'
 
 describe('posterDisplay', () => {
   it('falls back to the default for null or garbage input', () => {
@@ -18,9 +18,9 @@ describe('posterDisplay', () => {
       .toEqual({ ratio: 'cinema', posX: 30, posY: 70, zoom: 1.2 })
   })
 
-  it('maps each ratio to an aspect class', () => {
-    expect(posterRatioClass('banner')).toBe('aspect-[3/1]')
-    expect(posterRatioClass('tall')).toBe('aspect-[4/3]')
+  it('maps each ratio to an inline aspect-ratio style', () => {
+    expect(posterRatioStyle('banner')).toEqual({ aspectRatio: '3 / 1' })
+    expect(posterRatioStyle('tall')).toEqual({ aspectRatio: '4 / 3' })
   })
 
   it('builds the fill style from focal point + zoom', () => {
