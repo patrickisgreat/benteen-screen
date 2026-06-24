@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.0.0...v1.1.0) (2026-06-24)
+
+
+### Features
+
+* per-event poster display controls (ratio, focal point, zoom) ([#96](https://github.com/patrickisgreat/benteen-screen/issues/96)) ([af322d3](https://github.com/patrickisgreat/benteen-screen/commit/af322d391309dec521d1d5a72f2d0bc8913e5b0c))
+
 ## 1.0.0 (2026-06-21)
 
 
