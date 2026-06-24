@@ -6,7 +6,7 @@ const updates: unknown[] = []
 const supabase = {
   from() {
     return {
-      select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { max_invites: 10 } }) }) }),
+      select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { max_invites: 10, max_suggestions: 7, max_votes: 4 } }) }) }),
       update: (payload: unknown) => {
         updates.push(payload)
         return { eq: () => Promise.resolve({ error: null }) }
@@ -33,5 +33,15 @@ describe('useAppSettings', () => {
     await setMaxInvites(null)
     expect(updates[0]).toMatchObject({ max_invites: null })
     expect(maxInvites.value).toBeNull()
+  })
+
+  it('setMaxSuggestions / setMaxVotes update the participation caps', async () => {
+    const s = useAppSettings()
+    await s.setMaxSuggestions(7)
+    await s.setMaxVotes(4)
+    expect(updates).toContainEqual(expect.objectContaining({ max_suggestions: 7 }))
+    expect(updates).toContainEqual(expect.objectContaining({ max_votes: 4 }))
+    expect(s.maxSuggestions.value).toBe(7)
+    expect(s.maxVotes.value).toBe(4)
   })
 })

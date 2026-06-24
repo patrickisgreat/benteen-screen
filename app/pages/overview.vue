@@ -40,10 +40,14 @@ const votingLocked = computed(() => Boolean(currentEvent.value?.voting_locked_at
 const winners = computed(() => topWinners(suggestions.value))
 
 // Per-event participation caps (mirrors the DB triggers — see shared/utils/limits).
+// Effective limit = admin-configured (app_settings) or the default in limits.ts.
+const { maxSuggestions: cfgMaxSuggestions, maxVotes: cfgMaxVotes } = useAppSettings()
+const suggestionLimit = computed(() => cfgMaxSuggestions.value ?? SUGGESTION_LIMIT)
+const voteLimit = computed(() => cfgMaxVotes.value ?? VOTE_LIMIT)
 const mySuggestionCount = computed(() => countMySuggestions(suggestions.value, myId.value))
 const myVoteCount = computed(() => countMyVotes(suggestions.value, myId.value))
-const atSuggestionCap = computed(() => mySuggestionCount.value >= SUGGESTION_LIMIT)
-const atVoteCap = computed(() => myVoteCount.value >= VOTE_LIMIT)
+const atSuggestionCap = computed(() => mySuggestionCount.value >= suggestionLimit.value)
+const atVoteCap = computed(() => myVoteCount.value >= voteLimit.value)
 
 const eventOptions = computed(() =>
   events.value.map((event, index) => ({
@@ -83,7 +87,7 @@ async function onSuggest(movie: TmdbMovie): Promise<void> {
     return
   }
   if (atSuggestionCap.value) {
-    toast.add({ title: `You've used all ${SUGGESTION_LIMIT} suggestions`, description: 'Remove one from the list to free up a slot.', color: 'warning' })
+    toast.add({ title: `You've used all ${suggestionLimit.value} suggestions`, description: 'Remove one from the list to free up a slot.', color: 'warning' })
     return
   }
   if (await run(() => suggest(movie), 'Could not add suggestion')) {
@@ -92,7 +96,7 @@ async function onSuggest(movie: TmdbMovie): Promise<void> {
 }
 async function onVote(suggestion: Suggestion): Promise<void> {
   if (atVoteCap.value) {
-    toast.add({ title: `You've used all ${VOTE_LIMIT} votes`, description: 'Remove a vote to switch your pick.', color: 'warning' })
+    toast.add({ title: `You've used all ${voteLimit.value} votes`, description: 'Remove a vote to switch your pick.', color: 'warning' })
     return
   }
   await run(() => vote(suggestion), 'Vote failed')
@@ -193,7 +197,7 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
           <!-- Suggest + finder (hidden once voting is locked) -->
           <template v-if="!votingLocked">
             <p class="text-xs text-muted text-center">
-              {{ mySuggestionCount }} of {{ SUGGESTION_LIMIT }} suggestions used
+              {{ mySuggestionCount }} of {{ suggestionLimit }} suggestions used
             </p>
             <template v-if="!atSuggestionCap">
               <!-- Suggest (desktop inline) -->
@@ -229,7 +233,7 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
               icon="i-lucide-circle-check"
               color="neutral"
               variant="subtle"
-              :title="`You've used all ${SUGGESTION_LIMIT} suggestions`"
+              :title="`You've used all ${suggestionLimit} suggestions`"
               description="Remove one from the list to free up a slot."
             />
           </template>
@@ -248,7 +252,7 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
             </h2>
             <UBadge
               v-if="!votingLocked"
-              :label="`${myVoteCount}/${VOTE_LIMIT} votes used`"
+              :label="`${myVoteCount}/${voteLimit} votes used`"
               :color="atVoteCap ? 'warning' : 'neutral'"
               variant="subtle"
             />

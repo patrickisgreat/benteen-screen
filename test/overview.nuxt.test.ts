@@ -39,6 +39,10 @@ mockNuxtImport('useRsvp', () => () => ({
   setStatus: async () => {}
 }))
 mockNuxtImport('useToast', () => () => ({ add: () => {} }))
+mockNuxtImport('useAppSettings', () => () => ({
+  maxSuggestions: ref<number | null>(null),
+  maxVotes: ref<number | null>(null)
+}))
 
 // Heavy children pull in their own composables/network — stub them; this page
 // test only cares about the header + the admin-gated selector.
