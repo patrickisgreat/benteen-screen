@@ -78,7 +78,8 @@ function reset(): void {
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
     >
-      <img :src="posterUrl" alt="" class="size-full object-cover pointer-events-none" :style="posterFillStyle(model)">
+      <img :src="posterUrl" alt="" class="absolute inset-0 size-full object-cover scale-110 blur-2xl opacity-50 pointer-events-none">
+      <img :src="posterUrl" alt="" class="absolute inset-0 size-full object-contain pointer-events-none" :style="posterFillStyle(model)">
       <div class="absolute inset-0 ring-1 ring-inset ring-white/15 pointer-events-none" />
       <span class="absolute bottom-1 left-1/2 -translate-x-1/2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white/80 pointer-events-none">
         Drag to reposition

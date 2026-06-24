@@ -15,27 +15,29 @@ const display = computed(() => normalizePosterDisplay(props.event.poster_display
 <template>
   <button
     type="button"
-    class="group relative block w-full cursor-pointer overflow-hidden rounded-xl text-left ring ring-default bg-black transition hover:ring-primary/40 min-h-44 sm:min-h-56"
+    class="group relative flex flex-col justify-end w-full cursor-pointer overflow-hidden rounded-xl text-left ring ring-default bg-black transition hover:ring-primary/40 min-h-44 sm:min-h-56"
     :style="posterRatioStyle(display.ratio)"
     :aria-label="`${event.title} — view event details`"
     @click="$emit('open')"
   >
-    <!-- Poster (object-cover with the event's focal point + zoom; falls back to a
-         neutral surface when none is set). Hover-scale lives on the wrapper so it
-         composes with the per-event zoom on the image. -->
+    <!-- Blurred fill so a contained poster rests on a soft backdrop, not black bars. -->
+    <img v-if="backdrop" :src="backdrop" alt="" class="absolute inset-0 size-full object-cover scale-110 blur-2xl opacity-50">
+    <!-- The poster itself: object-contain (whole image visible) with the event's
+         focal point + zoom. Hover-scale on the wrapper composes with the zoom. -->
     <div
       v-if="backdrop"
       class="absolute inset-0 transition-transform duration-500 group-hover:scale-105"
     >
-      <img :src="backdrop" alt="" class="size-full object-cover" :style="posterFillStyle(display)">
+      <img :src="backdrop" alt="" class="size-full object-contain" :style="posterFillStyle(display)">
     </div>
     <div v-else class="absolute inset-0 bg-elevated" />
 
     <!-- Legibility gradient so the title is readable over any poster -->
     <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/10" />
 
-    <!-- Title block, anchored to the bottom -->
-    <div class="absolute inset-x-0 bottom-0 p-5 sm:p-6">
+    <!-- Title block. In normal flow (justify-end pins it to the bottom) so the
+         header grows to fit the text on narrow screens instead of clipping it. -->
+    <div class="relative p-5 sm:p-6">
       <div class="flex flex-wrap items-center gap-2 mb-2">
         <UBadge
           :color="upcoming ? 'primary' : 'neutral'"

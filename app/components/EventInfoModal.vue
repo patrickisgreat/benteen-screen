@@ -38,7 +38,7 @@ function downloadIcs(): void {
           v-if="event.poster_url"
           :src="event.poster_url"
           :alt="`${event.title} poster`"
-          class="w-full max-h-72 object-cover rounded-lg ring ring-default"
+          class="w-full max-h-96 object-contain rounded-lg ring ring-default bg-black"
         >
 
         <!-- Date / status / logistics -->
