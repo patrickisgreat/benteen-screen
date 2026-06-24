@@ -8,21 +8,27 @@ const props = defineProps<{ event: MovieEvent, backdrop: string | null }>()
 defineEmits<{ open: [] }>()
 
 const upcoming = computed(() => isUpcoming(props.event.event_date))
+// How this event's poster fills the header (ratio / focal point / zoom).
+const display = computed(() => normalizePosterDisplay(props.event.poster_display))
 </script>
 
 <template>
   <button
     type="button"
-    class="group relative block w-full cursor-pointer overflow-hidden rounded-xl text-left ring ring-default min-h-44 sm:min-h-56 transition hover:ring-primary/40"
+    class="group relative block w-full cursor-pointer overflow-hidden rounded-xl text-left ring ring-default bg-black transition hover:ring-primary/40"
+    :class="posterRatioClass(display.ratio)"
     :aria-label="`${event.title} — view event details`"
     @click="$emit('open')"
   >
-    <!-- Poster background (falls back to a neutral surface when none is set) -->
+    <!-- Poster (object-cover with the event's focal point + zoom; falls back to a
+         neutral surface when none is set). Hover-scale lives on the wrapper so it
+         composes with the per-event zoom on the image. -->
     <div
       v-if="backdrop"
-      class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-      :style="{ backgroundImage: `url(${backdrop})` }"
-    />
+      class="absolute inset-0 transition-transform duration-500 group-hover:scale-105"
+    >
+      <img :src="backdrop" alt="" class="size-full object-cover" :style="posterFillStyle(display)">
+    </div>
     <div v-else class="absolute inset-0 bg-elevated" />
 
     <!-- Legibility gradient so the title is readable over any poster -->

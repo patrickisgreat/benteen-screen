@@ -1,4 +1,5 @@
 import type { Database } from '~/types/database.types'
+import type { PosterDisplay } from '#shared/utils/posterDisplay'
 
 export interface EventInput {
   title: string
@@ -8,6 +9,7 @@ export interface EventInput {
   location?: string | null
   locationUrl?: string | null
   posterUrl?: string | null
+  posterDisplay?: PosterDisplay
 }
 
 /** Map the form's `EventInput` onto the event-table column shape. */
@@ -19,7 +21,9 @@ function toRow(input: EventInput) {
     start_time: input.startTime?.trim() || null,
     location: input.location?.trim() || null,
     location_url: input.locationUrl?.trim() || null,
-    poster_url: input.posterUrl?.trim() || null
+    poster_url: input.posterUrl?.trim() || null,
+    // Typed PosterDisplay → jsonb column (a plain object; cast at the boundary).
+    poster_display: (input.posterDisplay ?? null) as Record<string, unknown> | null
   }
 }
 

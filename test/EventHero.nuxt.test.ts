@@ -21,11 +21,21 @@ describe('EventHero', () => {
     expect(w.text()).toContain('Dazed and Confused')
   })
 
-  it('paints the poster as the background when a backdrop is provided', async () => {
+  it('renders the poster as an image when a backdrop is provided', async () => {
     const w = await mountSuspended(EventHero, { props: { event: baseEvent, backdrop: 'https://img/poster.jpg' } })
-    const bg = w.find('div').attributes('style') ?? ''
-    expect(bg).toContain('background-image')
-    expect(bg).toContain('https://img/poster.jpg')
+    const img = w.find('img')
+    expect(img.exists()).toBe(true)
+    expect(img.attributes('src')).toBe('https://img/poster.jpg')
+    expect(img.classes()).toContain('object-cover')
+  })
+
+  it('applies the event poster_display (ratio, focal point, zoom) to the header', async () => {
+    const event = { ...baseEvent, poster_display: { ratio: 'tall', posX: 20, posY: 80, zoom: 1.5 } }
+    const w = await mountSuspended(EventHero, { props: { event, backdrop: 'https://img/p.jpg' } })
+    expect(w.find('button').classes()).toContain('aspect-[4/3]')
+    const style = w.find('img').attributes('style') ?? ''
+    expect(style).toContain('object-position: 20% 80%')
+    expect(style).toContain('scale(1.5)')
   })
 
   it('labels an upcoming event as Upcoming', async () => {

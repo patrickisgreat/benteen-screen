@@ -3,6 +3,7 @@ import type { MovieEvent } from '#shared/types/event'
 import type { BringItem } from '#shared/types/bring'
 import type { Profile } from '#shared/types/user'
 import type { Invite } from '#shared/types/invite'
+import type { PosterDisplay } from '#shared/utils/posterDisplay'
 
 definePageMeta({ middleware: 'admin' })
 useSeoMeta({ title: 'Admin · BSOTG' })
@@ -88,6 +89,7 @@ async function onSave(payload: {
   location: string | null
   locationUrl: string | null
   posterUrl: string | null
+  posterDisplay: PosterDisplay
 }): Promise<void> {
   const ok = await run(async () => {
     if (payload.id) await updateEvent(payload.id, payload)

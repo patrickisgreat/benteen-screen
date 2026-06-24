@@ -12,6 +12,8 @@ export interface MovieEvent {
   voting_locked_at: string | null
   /** Per-event e-vite customization (jsonb). Read via normalizeInviteOptions. */
   invite_options: Record<string, unknown> | null
+  /** Per-event poster header display (jsonb). Read via normalizePosterDisplay. */
+  poster_display: Record<string, unknown> | null
   created_at: string
 }
 
