@@ -12,6 +12,10 @@ const props = defineProps<{ eventId: string, event?: MovieEvent | null }>()
 const toast = useToast()
 const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites } = useEventInvites(() => props.eventId)
 const { save: saveInviteOptions } = useInviteOptions(() => props.eventId)
+// The TRUE RSVP total = e-vite email replies + in-app RSVPs, merged + deduped.
+// `stats.*` above is the email funnel only (invited/opened/clicked); these are the
+// reconciled headcounts the admin actually plans around.
+const { roster } = useEventRsvps(() => props.eventId)
 
 const newEmail = ref('')
 const newName = ref('')
@@ -203,7 +207,7 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
       </UCard>
       <UCard variant="subtle" :ui="{ body: 'p-3' }">
         <p class="text-xl font-bold text-success">
-          {{ stats.going }}
+          {{ roster.going.length }}
         </p>
         <p class="text-xs text-muted">
           going
@@ -211,7 +215,7 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
       </UCard>
       <UCard variant="subtle" :ui="{ body: 'p-3' }">
         <p class="text-xl font-bold text-warning">
-          {{ stats.maybe }}
+          {{ roster.maybe.length }}
         </p>
         <p class="text-xs text-muted">
           maybe
@@ -219,7 +223,7 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
       </UCard>
       <UCard variant="subtle" :ui="{ body: 'p-3' }">
         <p class="text-xl font-bold">
-          {{ stats.no }}
+          {{ roster.no.length }}
         </p>
         <p class="text-xs text-muted">
           can't
@@ -227,13 +231,21 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
       </UCard>
       <UCard variant="subtle" :ui="{ body: 'p-3' }">
         <p class="text-xl font-bold text-muted">
-          {{ stats.noReply }}
+          {{ roster.noReply.length }}
         </p>
         <p class="text-xs text-muted">
           no reply
         </p>
       </UCard>
     </div>
+
+    <!-- The merged roster: who's actually coming, by name (e-vite + in-app) -->
+    <UCard variant="subtle" :ui="{ body: 'sm:p-4 p-3' }">
+      <h3 class="text-sm font-semibold text-muted mb-3 flex items-center gap-1.5">
+        <UIcon name="i-lucide-users" /> Who's RSVP'd · {{ roster.total }} total
+      </h3>
+      <RsvpRoster :roster="roster" show-no-reply />
+    </UCard>
 
     <!-- E-vite editor: customize the design + live preview -->
     <UCollapsible v-if="event" :unmount-on-hide="false" class="rounded-lg ring ring-default">
