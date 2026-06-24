@@ -39,6 +39,22 @@ export default defineEventHandler(async (event) => {
   // `column` is a fixed key from RESEND_EVENT_COLUMN, but a computed key widens to
   // an index signature — cast to the row Update type at this validated boundary.
   const patch = { [column]: new Date().toISOString() } as Database['public']['Tables']['event_invites']['Update']
-  await admin.from('event_invites').update(patch).eq('resend_id', emailId)
+  const { count, error } = await admin
+    .from('event_invites')
+    .update(patch, { count: 'exact' })
+    .eq('resend_id', emailId)
+
+  // Always 200 so Resend doesn't retry forever, but never silently — a swallowed
+  // miss here is exactly why "Resend shows opens, the app shows none" is so hard to
+  // diagnose. Logs land in the function logs and distinguish the two failure modes.
+  if (error) {
+    console.error(`[webhooks/resend] failed to stamp ${column} for email_id ${emailId} -`, error.message)
+  } else if (!count) {
+    // Verified + parsed, but no invite carries this Resend id: the row was sent
+    // before resend_id was stored, or sent from a different route/sender.
+    console.warn(`[webhooks/resend] ${payload.type} matched no invite (email_id ${emailId})`)
+  } else {
+    console.info(`[webhooks/resend] stamped ${column} on ${count} invite(s) (email_id ${emailId})`)
+  }
   return { ok: true }
 })
