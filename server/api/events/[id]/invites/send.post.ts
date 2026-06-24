@@ -1,29 +1,14 @@
 import { serverSupabaseClient } from '#supabase/server'
 import type { Database } from '~/types/database.types'
 
-// Resend caps the API at a few requests/second. Its batch endpoint sends up to 100
-// distinct emails per request, so a blast of N guests costs ceil(N/100) requests
-// instead of N — well under the limit for any realistic list. The small gap between
-// batches keeps even a >500-guest blast (6+ batches) from tripping the cap.
-const BATCH_SIZE = 100
-const INTER_BATCH_MS = 250
-
-const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
-
-function chunk<T>(items: readonly T[], size: number): T[][] {
-  const out: T[][] = []
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
-  return out
-}
-
 /**
  * Sends (or re-sends) the tokenized e-vites for an event's guest list. Admin-only.
  * Runs under the caller's own session (RLS) — every table here has an admin policy
  * (`event_invites: admin all`, `invites: create` as self with the cap trigger
  * exempting admins), so the service role isn't needed and a misconfigured
- * service-role key can't break sending. For each not-yet-sent invitee we email the
- * one-click RSVP links, add them to the allowlist so they can sign in too, and
- * stamp sent_at + the Resend message id.
+ * service-role key can't break sending. This route owns auth + loading the event
+ * and building each guest's one-click RSVP email; it then delegates the
+ * rate-limit-friendly batch send + delivery recording to `sendEventInvites`.
  */
 export default defineEventHandler(async (event) => {
   const { user, userId } = await requireUser(event)
@@ -58,12 +43,11 @@ export default defineEventHandler(async (event) => {
   const origin = resolveOrigin(event)
   const inviterName = inviterNameFromClaims(user)
 
-  // Build every recipient's email up front, then send in batches. Each guest gets a
-  // distinct one-click RSVP link, so the messages differ; the batch endpoint handles
-  // that (it is N distinct emails in one request, not one email to N people).
-  const mails = queue.map(invite => ({
-    invite,
-    mail: buildEventInviteEmail({
+  // Build every guest's distinct one-click RSVP email up front. Each link differs,
+  // so these are N distinct emails (not one email to N people) — exactly what the
+  // batch sender fans out across Resend's batch endpoint.
+  const recipients = queue.map((invite) => {
+    const mail = buildEventInviteEmail({
       eventTitle: ev.title,
       eventDate: ev.event_date ? formatEmailDate(ev.event_date) : null,
       eventTime: ev.start_time,
@@ -76,51 +60,26 @@ export default defineEventHandler(async (event) => {
       appUrl: `${origin}/overview`,
       options: inviteOptions
     })
-  }))
-
-  let sent = 0
-  const failures: { email: string, error: string }[] = []
-  const batches = chunk(mails, BATCH_SIZE)
-  for (let b = 0; b < batches.length; b++) {
-    if (b > 0) await sleep(INTER_BATCH_MS)
-    const group = batches[b]!
-    try {
-      const { ids } = await sendBatch(
-        resendApiKey,
-        resendFrom,
-        group.map(({ invite, mail }) => ({
-          to: invite.email,
-          subject: mail.subject,
-          html: mail.html,
-          text: mail.text,
-          replyTo: user.email ?? undefined
-        }))
-      )
-      // The batch succeeded as a unit, so allowlist all of its recipients in one
-      // round-trip (idempotent) — they can now sign in too.
-      await db.from('invites').upsert(
-        group.map(({ invite }) => ({ email: invite.email, display_name: invite.display_name, invited_by: userId })),
-        { onConflict: 'email', ignoreDuplicates: true }
-      )
-      // Stamp sent_at + each Resend id so re-sends skip them and webhooks correlate.
-      const sentAt = new Date().toISOString()
-      for (let i = 0; i < group.length; i++) {
-        await db
-          .from('event_invites')
-          .update({ sent_at: sentAt, resend_id: ids[i] })
-          .eq('id', group[i]!.invite.id)
-        sent++
-      }
-    } catch (e) {
-      // Leave sent_at null so a later send retries — but record WHY (don't swallow:
-      // a swallowed Resend rejection looked like "everyone already invited"). A batch
-      // fails as a unit (e.g. an unverified sender domain), so flag the whole group.
-      const message = e instanceof Error ? e.message : 'Unknown error'
-      for (const { invite } of group) failures.push({ email: invite.email, error: message })
-      console.error('[events/invites/send] batch failed -', message)
+    return {
+      id: invite.id,
+      email: invite.email,
+      token: invite.token,
+      displayName: invite.display_name,
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text
     }
+  })
+
+  return {
+    ok: true,
+    ...(await sendEventInvites(db, {
+      apiKey: resendApiKey,
+      from: resendFrom,
+      replyTo: user.email ?? undefined,
+      eventId,
+      invitedBy: userId,
+      recipients
+    }))
   }
-  // `error` carries the first failure (usually identical across recipients, e.g. an
-  // unverified Resend sender domain) so the UI can show the real reason.
-  return { ok: true, sent, failed: failures.length, error: failures[0]?.error ?? null }
 })
