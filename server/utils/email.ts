@@ -48,3 +48,31 @@ export async function sendEmail(apiKey: string, from: string, params: SendParams
   if (error) throw new Error(error.message || 'Failed to send email')
   return { id: data?.id ?? null }
 }
+
+/** Send many distinct emails in a single Resend request (up to 100 per call).
+ *  Resend rate-limits the API to a handful of requests per second; batching keeps
+ *  a large invite blast to one request per 100 recipients instead of one per guest.
+ *  Returns the message ids positionally aligned with `items` (null where Resend
+ *  did not return an id), so callers can correlate each send back to its row. */
+export async function sendBatch(
+  apiKey: string,
+  from: string,
+  items: readonly SendParams[]
+): Promise<{ ids: (string | null)[] }> {
+  if (items.length === 0) return { ids: [] }
+  const resend = new Resend(apiKey)
+  const { data, error } = await resend.batch.send(
+    items.map(params => ({
+      from,
+      to: params.to,
+      bcc: params.bcc,
+      subject: params.subject,
+      html: params.html,
+      text: params.text,
+      replyTo: params.replyTo
+    }))
+  )
+  if (error) throw new Error(error.message || 'Failed to send emails')
+  const sent = data?.data ?? []
+  return { ids: items.map((_, i) => sent[i]?.id ?? null) }
+}
