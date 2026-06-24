@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { MovieEvent } from '#shared/types/event'
+import type { PosterDisplay } from '#shared/utils/posterDisplay'
 
 interface SavePayload {
   id?: string
@@ -10,6 +11,7 @@ interface SavePayload {
   location: string | null
   locationUrl: string | null
   posterUrl: string | null
+  posterDisplay: PosterDisplay
 }
 
 const open = defineModel<boolean>('open', { default: false })
@@ -26,6 +28,7 @@ const startTime = ref('')
 const location = ref('')
 const locationUrl = ref('')
 const posterUrl = ref<string | null>(null)
+const posterDisplay = ref<PosterDisplay>({ ...DEFAULT_POSTER_DISPLAY })
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -44,6 +47,7 @@ watch(open, (isOpen) => {
     location.value = props.event.location ?? ''
     locationUrl.value = props.event.location_url ?? ''
     posterUrl.value = props.event.poster_url ?? null
+    posterDisplay.value = normalizePosterDisplay(props.event.poster_display)
   } else {
     title.value = ''
     description.value = ''
@@ -52,6 +56,7 @@ watch(open, (isOpen) => {
     location.value = ''
     locationUrl.value = ''
     posterUrl.value = null
+    posterDisplay.value = { ...DEFAULT_POSTER_DISPLAY }
   }
 })
 
@@ -83,7 +88,8 @@ function submit(): void {
     startTime: startTime.value.trim() || null,
     location: location.value.trim() || null,
     locationUrl: locationUrl.value.trim() || null,
-    posterUrl: posterUrl.value
+    posterUrl: posterUrl.value,
+    posterDisplay: posterDisplay.value
   })
   open.value = false
 }
@@ -142,6 +148,7 @@ function submit(): void {
             </div>
             <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFileChange">
           </div>
+          <PosterAdjuster v-if="posterUrl" v-model="posterDisplay" :poster-url="posterUrl" class="mt-3" />
         </UFormField>
 
         <UFormField label="Description">
