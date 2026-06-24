@@ -38,17 +38,14 @@ export function useAppSettings() {
     maxInvites.value = value
   }
 
-  /** Set the per-event suggestion cap (null = default). RLS enforces admin-only. */
-  async function setMaxSuggestions(value: number | null): Promise<void> {
-    await update({ max_suggestions: value })
-    maxSuggestions.value = value
+  /** Set both per-event caps in ONE write (null = the limits.ts defaults). RLS
+   *  enforces admin-only. Atomic, so a partial failure can't leave one cap
+   *  committed and the other not. */
+  async function setParticipationCaps(suggestions: number | null, votes: number | null): Promise<void> {
+    await update({ max_suggestions: suggestions, max_votes: votes })
+    maxSuggestions.value = suggestions
+    maxVotes.value = votes
   }
 
-  /** Set the per-event vote cap (null = default). RLS enforces admin-only. */
-  async function setMaxVotes(value: number | null): Promise<void> {
-    await update({ max_votes: value })
-    maxVotes.value = value
-  }
-
-  return { maxInvites, maxSuggestions, maxVotes, pending, setMaxInvites, setMaxSuggestions, setMaxVotes }
+  return { maxInvites, maxSuggestions, maxVotes, pending, setMaxInvites, setParticipationCaps }
 }

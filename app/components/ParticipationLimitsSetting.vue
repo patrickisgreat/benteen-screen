@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Admin control for the per-event participation caps (app_settings.max_suggestions
 // / max_votes). RLS enforces admin-only writes; blank = the defaults in limits.ts.
-const { maxSuggestions, maxVotes, setMaxSuggestions, setMaxVotes } = useAppSettings()
+const { maxSuggestions, maxVotes, setParticipationCaps } = useAppSettings()
 const toast = useToast()
 const suggestionsDraft = ref<number | null>(null)
 const votesDraft = ref<number | null>(null)
@@ -24,8 +24,7 @@ async function save(): Promise<void> {
   try {
     const s = clean(suggestionsDraft.value)
     const v = clean(votesDraft.value)
-    await setMaxSuggestions(s)
-    await setMaxVotes(v)
+    await setParticipationCaps(s, v)
     suggestionsDraft.value = s
     votesDraft.value = v
     toast.add({ title: 'Participation limits saved', icon: 'i-lucide-check', color: 'success' })

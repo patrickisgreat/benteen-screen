@@ -35,12 +35,11 @@ describe('useAppSettings', () => {
     expect(maxInvites.value).toBeNull()
   })
 
-  it('setMaxSuggestions / setMaxVotes update the participation caps', async () => {
+  it('setParticipationCaps writes both caps in a single (atomic) update', async () => {
     const s = useAppSettings()
-    await s.setMaxSuggestions(7)
-    await s.setMaxVotes(4)
-    expect(updates).toContainEqual(expect.objectContaining({ max_suggestions: 7 }))
-    expect(updates).toContainEqual(expect.objectContaining({ max_votes: 4 }))
+    await s.setParticipationCaps(7, 4)
+    expect(updates).toHaveLength(1)
+    expect(updates[0]).toMatchObject({ max_suggestions: 7, max_votes: 4 })
     expect(s.maxSuggestions.value).toBe(7)
     expect(s.maxVotes.value).toBe(4)
   })
