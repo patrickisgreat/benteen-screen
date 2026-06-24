@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.2.2...v1.3.0) (2026-06-24)
+
+
+### Features
+
+* make participation caps admin-configurable ([#102](https://github.com/patrickisgreat/benteen-screen/issues/102)) ([41d53fc](https://github.com/patrickisgreat/benteen-screen/commit/41d53fc85421c216b8f57efc273a5272692cc4cb))
+
 ## [1.2.2](https://github.com/patrickisgreat/benteen-screen/compare/v1.2.1...v1.2.2) (2026-06-24)
 
 
