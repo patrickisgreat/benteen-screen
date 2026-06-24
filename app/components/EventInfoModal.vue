@@ -5,6 +5,9 @@ import type { CalendarEvent } from '#shared/utils/calendar'
 const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{ event: MovieEvent | null }>()
 
+// Full-size poster lightbox (click the poster banner to open).
+const posterOpen = ref(false)
+
 const eventId = computed(() => props.event?.id ?? null)
 const { myStatus, counts, setStatus } = useRsvp(eventId)
 const { items, claim, unclaim } = useBringList(eventId)
@@ -33,13 +36,20 @@ function downloadIcs(): void {
   <UModal v-model:open="open" :title="event?.title || 'Event'" :ui="{ content: 'sm:max-w-2xl' }">
     <template #body>
       <div v-if="event" class="space-y-5">
-        <!-- Poster banner -->
-        <img
+        <!-- Poster banner (click for the full-size view) -->
+        <button
           v-if="event.poster_url"
-          :src="event.poster_url"
-          :alt="`${event.title} poster`"
-          class="w-full max-h-96 object-contain rounded-lg ring ring-default bg-black"
+          type="button"
+          class="block w-full cursor-zoom-in"
+          aria-label="View full-size poster"
+          @click="posterOpen = true"
         >
+          <img
+            :src="event.poster_url"
+            :alt="`${event.title} poster`"
+            class="w-full max-h-96 object-contain rounded-lg ring ring-default bg-black"
+          >
+        </button>
 
         <!-- Date / status / logistics -->
         <div class="space-y-2">
@@ -133,6 +143,18 @@ function downloadIcs(): void {
           />
         </div>
       </div>
+    </template>
+  </UModal>
+
+  <!-- Full-size poster lightbox -->
+  <UModal v-model:open="posterOpen" :title="`${event?.title} poster`" :ui="{ content: 'sm:max-w-4xl' }">
+    <template #body>
+      <img
+        v-if="event?.poster_url"
+        :src="event.poster_url"
+        :alt="`${event.title} poster`"
+        class="w-full h-auto rounded-lg"
+      >
     </template>
   </UModal>
 </template>
