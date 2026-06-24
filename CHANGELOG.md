@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.1.0...v1.2.0) (2026-06-24)
+
+
+### Features
+
+* restore per-event participation caps (5 suggestions, 3 votes) + cap UI ([#95](https://github.com/patrickisgreat/benteen-screen/issues/95)) ([e917838](https://github.com/patrickisgreat/benteen-screen/commit/e9178387c612c7e3ac39af3fcc54dfc0c341cb39))
+
 ## [1.1.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.0.0...v1.1.0) (2026-06-24)
 
 
