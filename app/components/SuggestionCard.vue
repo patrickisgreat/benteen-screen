@@ -32,6 +32,19 @@ const rankClass = computed(() => {
   }
 })
 const highlight = computed(() => props.rank === 1 && voteCount.value > 0)
+
+// The floating-heart flourish lives over the vote button; spawn it optimistically
+// on click (it's a flourish, not a state indicator) then emit the actual action.
+const hearts = useTemplateRef<{ spawn: (kind: 'vote' | 'unvote') => void }>('hearts')
+function onHeartClick(): void {
+  if (hasVoted.value) {
+    hearts.value?.spawn('unvote')
+    emit('unvote')
+  } else {
+    hearts.value?.spawn('vote')
+    emit('vote')
+  }
+}
 </script>
 
 <template>
@@ -61,19 +74,20 @@ const highlight = computed(() => props.rank === 1 && voteCount.value > 0)
             size="md"
             class="shrink-0"
           />
-          <UButton
-            v-else
-            :color="hasVoted ? 'error' : 'neutral'"
-            :variant="hasVoted ? 'soft' : 'outline'"
-            icon="i-lucide-heart"
-            :label="String(voteCount)"
-            size="sm"
-            class="shrink-0"
-            :disabled="voteDisabled"
-            :title="voteDisabled ? 'Vote limit reached — remove a vote to switch your pick' : undefined"
-            :aria-label="hasVoted ? 'Remove vote' : 'Vote'"
-            @click="hasVoted ? emit('unvote') : emit('vote')"
-          />
+          <div v-else class="relative shrink-0">
+            <UButton
+              :color="hasVoted ? 'error' : 'neutral'"
+              :variant="hasVoted ? 'soft' : 'outline'"
+              icon="i-lucide-heart"
+              :label="String(voteCount)"
+              size="sm"
+              :disabled="voteDisabled"
+              :title="voteDisabled ? 'Vote limit reached — remove a vote to switch your pick' : undefined"
+              :aria-label="hasVoted ? 'Remove vote' : 'Vote'"
+              @click="onHeartClick"
+            />
+            <FloatingHearts ref="hearts" />
+          </div>
         </div>
 
         <!-- relative vote bar -->
