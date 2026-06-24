@@ -76,4 +76,20 @@ describe('EventHero', () => {
     })
     expect(w.find('.wf-stub').exists()).toBe(false)
   })
+
+  it('shows the event location when set', async () => {
+    const w = await mountSuspended(EventHero, {
+      props: { event: { ...baseEvent, location: 'Benteen Field' }, backdrop: null },
+      global: { stubs: { WeatherForecast: { template: '<div />' } } }
+    })
+    expect(w.text()).toContain('Benteen Field')
+  })
+
+  it('omits the location line when there is no location', async () => {
+    const w = await mountSuspended(EventHero, {
+      props: { event: baseEvent, backdrop: null },
+      global: { stubs: { WeatherForecast: { template: '<div />' } } }
+    })
+    expect(w.text()).not.toContain('Benteen Field')
+  })
 })

@@ -5,7 +5,7 @@ const { user } = useAuth()
 // Already signed in? The splash is the logged-OUT front door — send members
 // straight to the app instead of making them click through it.
 watchEffect(() => {
-  if (user.value) navigateTo('/overview')
+  if (user.value) void navigateTo('/overview')
 })
 const ctaTo = computed(() => (user.value ? '/overview' : '/login'))
 
