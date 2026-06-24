@@ -32,6 +32,25 @@ describe('SuggestionCard', () => {
     expect(w.emitted('vote')).toBeFalsy()
   })
 
+  it('floats a red heart up when I cast a vote', async () => {
+    const notVoted = { ...suggestion, votes: [{ user_id: 'bob' }] }
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion: notVoted, rank: 1, maxVotes: 2 } })
+    await w.get('[aria-label="Vote"]').trigger('click')
+    const heart = w.find('.floating-heart')
+    expect(heart.exists()).toBe(true)
+    expect(heart.classes()).toContain('text-red-500')
+    expect(w.emitted('vote')).toBeTruthy()
+  })
+
+  it('floats a grayscale broken heart up when I remove my vote', async () => {
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion, rank: 1, maxVotes: 2 } })
+    await w.get('[aria-label="Remove vote"]').trigger('click')
+    const heart = w.find('.floating-heart')
+    expect(heart.exists()).toBe(true)
+    expect(heart.classes()).toContain('grayscale')
+    expect(w.emitted('unvote')).toBeTruthy()
+  })
+
   it('emits trailer from the Trailer button', async () => {
     const w = await mountSuspended(SuggestionCard, { props: { suggestion, rank: 1, maxVotes: 2 } })
     const trailerBtn = w.findAll('button').find(b => b.text().includes('Trailer'))
