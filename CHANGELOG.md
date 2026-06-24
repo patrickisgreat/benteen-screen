@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/patrickisgreat/benteen-screen/compare/v1.2.1...v1.2.2) (2026-06-24)
+
+
+### Bug Fixes
+
+* email poster, bigger nav logo, hero address+weather, land authed users on overview ([#98](https://github.com/patrickisgreat/benteen-screen/issues/98)) ([1622c7d](https://github.com/patrickisgreat/benteen-screen/commit/1622c7d58b9e491480720d066f57ad21d549e005))
+
 ## [1.2.1](https://github.com/patrickisgreat/benteen-screen/compare/v1.2.0...v1.2.1) (2026-06-24)
 
 
