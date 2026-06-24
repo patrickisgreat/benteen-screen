@@ -35,9 +35,12 @@ describe('buildEventInviteEmail', () => {
     theme: 'marquee', accent: 'green', message: '', showPoster: true, showDetails: true, ...over
   })
 
-  it('includes the poster when showPoster is on', () => {
+  it('includes the poster when showPoster is on, showing the whole image (not cropped)', () => {
     const m = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, posterUrl: 'https://img/jaws.jpg', inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc', options: opts({}) })
     expect(m.html).toContain('https://img/jaws.jpg')
+    // Whole poster, scaled to width — not object-fit:cover (which cropped top/bottom).
+    expect(m.html).toContain('height:auto')
+    expect(m.html).not.toContain('object-fit')
   })
 
   it('omits the poster when showPoster is off', () => {

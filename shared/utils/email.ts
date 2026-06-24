@@ -183,7 +183,7 @@ export function buildEventInviteEmail(opts: {
     : ''
 
   const posterHtml = showPoster
-    ? `<img src="${escapeHtml(opts.posterUrl ?? '')}" alt="${escapeHtml(opts.eventTitle)} poster" width="600" style="display:block;width:100%;max-height:360px;object-fit:cover">`
+    ? `<img src="${escapeHtml(opts.posterUrl ?? '')}" alt="${escapeHtml(opts.eventTitle)} poster" width="600" style="display:block;width:100%;height:auto">`
     : ''
 
   const lineupHtml = opts.appUrl

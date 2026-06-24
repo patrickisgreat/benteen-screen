@@ -49,12 +49,15 @@ const display = computed(() => normalizePosterDisplay(props.event.poster_display
       <h1 class="text-2xl sm:text-3xl font-bold text-white drop-shadow-md text-balance underline-offset-4 decoration-2 decoration-white/40 group-hover:underline">
         {{ event.title }}
       </h1>
+      <p v-if="event.location" class="mt-1.5 inline-flex items-center gap-1.5 text-sm text-white/80">
+        <UIcon name="i-lucide-map-pin" class="shrink-0" /> {{ event.location }}
+      </p>
       <WeatherForecast
         v-if="upcoming && event.location"
         :location="event.location"
         :date="event.event_date"
         tone="light"
-        class="mt-2"
+        class="mt-1"
       />
       <p class="mt-1.5 inline-flex items-center gap-1 text-xs text-white/70">
         <UIcon name="i-lucide-info" /> Tap for details
