@@ -46,7 +46,7 @@ begin
   if auth.uid() is not null and (
     select count(*) from public.votes v
     join public.suggestions s on s.id = v.suggestion_id
-    where v.user_id = auth.uid() and s.event_id = ev
+    where v.user_id = auth.uid() and s.event_id = ev and s.deleted = false
   ) >= public.vote_limit() then
     raise exception 'Vote limit (%) reached for this event', public.vote_limit()
       using errcode = 'check_violation';
