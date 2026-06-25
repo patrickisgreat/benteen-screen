@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.8.0...v1.9.0) (2026-06-25)
+
+
+### Features
+
+* communications log in the admin Comms tab ([#123](https://github.com/patrickisgreat/benteen-screen/issues/123)) ([2710d85](https://github.com/patrickisgreat/benteen-screen/commit/2710d85fc061e712bfd03f2091a5d85250e74c43))
+
 ## [1.8.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.7.1...v1.8.0) (2026-06-25)
 
 
