@@ -79,7 +79,7 @@ const movies = computed(() => {
 })
 
 const people = computed(() => dashboard.value.byPerson.filter(p => matches(p.name)))
-const gaps = computed(() => dashboard.value.gaps.filter(g => matches(g.name)))
+const people = computed(() => dashboard.value.byPerson.filter(p => matches(p.name)))
 
 function barPct(votes: number): number {
   return Math.round((votes / maxVotes.value) * 100)
