@@ -59,6 +59,12 @@ export interface Database {
         Update: { suggestion_id?: string, user_id?: string, created_at?: string }
         Relationships: []
       }
+      comms_log: {
+        Row: { id: string, event_id: string | null, kind: string, scope: string | null, subject: string | null, recipient_count: number, sent_by: string | null, created_at: string }
+        Insert: { id?: string, event_id?: string | null, kind: string, scope?: string | null, subject?: string | null, recipient_count?: number, sent_by?: string | null, created_at?: string }
+        Update: { id?: string, event_id?: string | null, kind?: string, scope?: string | null, subject?: string | null, recipient_count?: number, sent_by?: string | null, created_at?: string }
+        Relationships: []
+      }
     }
     Views: { [_ in never]: never }
     Functions: {
