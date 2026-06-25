@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.5.0...v1.6.0) (2026-06-25)
+
+
+### Features
+
+* unified RSVP roster (merge e-vite email + in-app replies) ([#110](https://github.com/patrickisgreat/benteen-screen/issues/110)) ([5e4b908](https://github.com/patrickisgreat/benteen-screen/commit/5e4b908559041b8d0fe81dc84d3a2c9fd1fd1d1e))
+
 ## [1.5.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.4.0...v1.5.0) (2026-06-24)
 
 
