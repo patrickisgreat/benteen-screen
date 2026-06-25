@@ -148,9 +148,9 @@ function voterNames(s: AdminSuggestion): string[] {
               <UIcon name="i-lucide-heart" class="text-error align-text-bottom" />
               {{ s.voteCount ?? 0 }} votes
             </p>
-            <div v-if="voterNames(s).length" class="flex flex-wrap gap-1 mt-2">
+            <div v-if="voterNames(s) as names" class="flex flex-wrap gap-1 mt-2">
               <UBadge
-                v-for="(name, i) in voterNames(s)"
+                v-for="(name, i) in names"
                 :key="`${s.id}-${i}`"
                 :label="name"
                 color="neutral"
