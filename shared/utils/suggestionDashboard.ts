@@ -101,7 +101,7 @@ export function computeSuggestionDashboard(input: {
     .slice(0, TOP_VOTERS)
 
   const gaps: EngagementGap[] = (input.expected ?? [])
-    .map(e => ({ userId: e.userId, name: e.name, suggested: people.get(e.userId)?.suggested.length ? true : false, voted: voters.has(e.userId) }))
+    .map(e => ({ userId: e.userId, name: e.name, suggested: !!people.get(e.userId)?.suggested.length, voted: voters.has(e.userId) }))
     .filter(g => !g.suggested || !g.voted)
     .sort((a, b) => a.name.localeCompare(b.name))
 
