@@ -193,7 +193,7 @@ function barPct(votes: number): number {
               {{ s.voteCount ?? 0 }} {{ (s.voteCount ?? 0) === 1 ? 'vote' : 'votes' }}
             </p>
             <!-- Vote-share bar -->
-            <div class="mt-1.5 h-1.5 max-w-xs rounded-full bg-elevated overflow-hidden">
+            <div class="mt-1.5 h-1.5 max-w-xs rounded-full bg-elevated overflow-hidden" aria-hidden="true">
               <div class="h-full rounded-full bg-primary transition-all" :style="{ width: `${barPct(s.voteCount ?? 0)}%` }" />
             </div>
             <div v-if="(s.votes ?? []).length" class="flex flex-wrap gap-1 mt-2">
