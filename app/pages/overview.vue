@@ -24,7 +24,7 @@ const currentEvent = computed(() => events.value[eventIndex.value] ?? null)
 const currentEventId = computed(() => currentEvent.value?.id ?? null)
 
 const { suggestions, alreadySuggested, suggest, vote, unvote, removeSuggestion } = useSuggestions(currentEventId)
-const { myStatus, counts, setStatus } = useRsvp(currentEventId)
+const { myStatus, myPlusOnes, counts, setStatus, setGuests } = useRsvp(currentEventId)
 // Who else is looking at this movie night right now (Realtime Presence).
 const { online } = usePresence(currentEventId)
 
@@ -114,6 +114,9 @@ async function onRemove(suggestion: Suggestion): Promise<void> {
 async function onRsvp(status: RsvpStatus): Promise<void> {
   await run(() => setStatus(status), 'Could not update RSVP')
 }
+async function onGuests(count: number): Promise<void> {
+  await run(() => setGuests(count), 'Could not update guest count')
+}
 </script>
 
 <template>
@@ -162,7 +165,13 @@ async function onRsvp(status: RsvpStatus): Promise<void> {
             <h2 class="text-sm font-semibold text-muted mb-2">
               Are you coming?
             </h2>
-            <RsvpControl :my-status="myStatus" :counts="counts" @set="onRsvp" />
+            <RsvpControl
+              :my-status="myStatus"
+              :my-plus-ones="myPlusOnes"
+              :counts="counts"
+              @set="onRsvp"
+              @guests="onGuests"
+            />
             <p class="text-xs text-muted mt-3 text-center">
               <button type="button" class="text-primary underline inline-flex items-center gap-1" @click="eventInfoOpen = true">
                 <UIcon name="i-lucide-list" /> See the bring list

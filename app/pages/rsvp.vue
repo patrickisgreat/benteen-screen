@@ -12,6 +12,7 @@ const token = computed(() => (route.query.token ?? '').toString())
 
 const phase = ref<'saving' | 'done' | 'error'>('saving')
 const current = ref<RsvpStatus | null>(null)
+const guests = ref(0)
 
 const HEADLINE: Record<RsvpStatus, string> = {
   going: 'You\'re going! 🎉',
@@ -28,14 +29,22 @@ async function rsvp(status: RsvpStatus): Promise<void> {
     phase.value = 'error'
     return
   }
+  // Guests only ride along with going; switching away resets the local count.
+  if (status !== 'going') guests.value = 0
   phase.value = 'saving'
   try {
-    await $fetch('/api/rsvp', { method: 'POST', body: { token: token.value, status } })
+    await $fetch('/api/rsvp', { method: 'POST', body: { token: token.value, status, plusOnes: guests.value } })
     current.value = status
     phase.value = 'done'
   } catch {
     phase.value = 'error'
   }
+}
+
+/** Update the guest count and re-save (only while going). */
+    <GuestStepper :model-value="guests" :disabled="phase === 'saving'" @update:model-value="setGuests" />
+  guests.value = count
+  if (current.value === 'going') await rsvp('going')
 }
 
 onMounted(() => {
@@ -65,6 +74,12 @@ onMounted(() => {
             <UButton label="Going" color="primary" :variant="current === 'going' ? 'solid' : 'outline'" @click="rsvp('going')" />
             <UButton label="Maybe" color="warning" :variant="current === 'maybe' ? 'solid' : 'outline'" @click="rsvp('maybe')" />
             <UButton label="Can't make it" color="neutral" :variant="current === 'no' ? 'solid' : 'outline'" @click="rsvp('no')" />
+          </div>
+
+          <!-- Bringing guests? Only while going. -->
+          <div v-if="current === 'going'" class="flex flex-col items-center gap-2 pt-1">
+            <span class="text-sm text-muted">Bringing guests?</span>
+            <GuestStepper :model-value="guests" @update:model-value="setGuests" />
           </div>
         </template>
 

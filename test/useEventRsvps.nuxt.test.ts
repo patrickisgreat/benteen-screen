@@ -7,8 +7,8 @@ import type { EventRsvpRoster } from '../app/composables/useEventRsvps'
 // Controllable Supabase reads for the three tables the merge touches. Each test
 // sets the fixtures, then we wait for the immediate-watch load to settle.
 interface ProfileRow { id: string, display_name: string | null, email: string | null, avatar_url: string | null }
-interface InviteRow { email: string, display_name: string | null, rsvp: string | null }
-let rsvpRows: { user_id: string, status: string }[] = []
+interface InviteRow { email: string, display_name: string | null, rsvp: string | null, plus_ones?: number }
+let rsvpRows: { user_id: string, status: string, plus_ones?: number }[] = []
 let profileRows: ProfileRow[] = []
 let inviteRows: InviteRow[] = []
 
@@ -64,6 +64,26 @@ describe('useEventRsvps', () => {
     expect(roster.value.going[0]!.avatar).toBe('ada.jpg')
     expect(roster.value.maybe.map(p => p.name)).toEqual(['Bo'])
     expect(roster.value.total).toBe(2)
+  })
+
+  it('adds guests (plus_ones) into the headcount, going only', async () => {
+    rsvpRows = [
+      { user_id: 'u1', status: 'going', plus_ones: 2 },
+      { user_id: 'u2', status: 'going', plus_ones: 0 },
+      { user_id: 'u3', status: 'maybe', plus_ones: 5 } // ignored — not going
+    ]
+    profileRows = [
+      { id: 'u1', display_name: 'Ada', email: 'ada@x.com', avatar_url: null },
+      { id: 'u2', display_name: 'Bo', email: 'bo@x.com', avatar_url: null },
+      { id: 'u3', display_name: 'Cy', email: 'cy@x.com', avatar_url: null }
+    ]
+    inviteRows = []
+    const { roster } = useEventRsvps(ref('e1'))
+    await settle(roster)
+    // 2 going people + 2 guests = 4 expected; maybe's plus_ones is zeroed.
+    expect(roster.value.headcount).toBe(4)
+    expect(roster.value.going.find(p => p.name === 'Ada')!.plusOnes).toBe(2)
+    expect(roster.value.maybe.find(p => p.name === 'Cy')!.plusOnes).toBe(0)
   })
 
   it('folds email-only guests in and flags them viaEmail', async () => {

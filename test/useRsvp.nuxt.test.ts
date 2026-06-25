@@ -6,7 +6,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 interface UpsertCall { payload: Record<string, unknown>, opts: unknown }
 interface DeleteCall { filters: Record<string, unknown> }
 const calls: { upserts: UpsertCall[], deletes: DeleteCall[] } = { upserts: [], deletes: [] }
-let rows: { user_id: string, status: string }[] = []
+let rows: { user_id: string, status: string, plus_ones?: number }[] = []
 
 // Minimal Supabase stub that records upserts/deletes and feeds refresh()/realtime.
 const supabase = {
@@ -57,8 +57,45 @@ describe('useRsvp', () => {
     rows = [{ user_id: 'me', status: 'going' }, { user_id: 'a', status: 'going' }, { user_id: 'b', status: 'maybe' }]
     const { counts, myStatus } = useRsvp(ref('e1'))
     await tick()
-    expect(counts.value).toEqual({ going: 2, maybe: 1, no: 0 })
+    expect(counts.value).toEqual({ going: 2, maybe: 1, no: 0, guests: 0 })
     expect(myStatus.value).toBe('going')
+  })
+
+  it('sums guests (plus_ones) across those going and resolves my own count', async () => {
+    rows = [
+      { user_id: 'me', status: 'going', plus_ones: 2 },
+      { user_id: 'a', status: 'going', plus_ones: 1 },
+      { user_id: 'b', status: 'maybe', plus_ones: 0 }
+    ]
+    const { counts, myPlusOnes } = useRsvp(ref('e1'))
+    await tick()
+    expect(counts.value.guests).toBe(3)
+    expect(myPlusOnes.value).toBe(2)
+  })
+
+  it('setGuests upserts going with the clamped guest count', async () => {
+    rows = [{ user_id: 'me', status: 'going', plus_ones: 0 }]
+    const { setGuests } = useRsvp(ref('e1'))
+    await tick()
+    await setGuests(3)
+    expect(calls.upserts).toHaveLength(1)
+    expect(calls.upserts[0]!.payload).toMatchObject({ status: 'going', plus_ones: 3 })
+  })
+
+  it('setGuests is a no-op when I am not going (guests only count for going)', async () => {
+    rows = [{ user_id: 'me', status: 'maybe', plus_ones: 0 }]
+    const { setGuests } = useRsvp(ref('e1'))
+    await tick()
+    await setGuests(2)
+    expect(calls.upserts).toHaveLength(0)
+  })
+
+  it('switching to maybe zeroes any guest count', async () => {
+    rows = [{ user_id: 'me', status: 'going', plus_ones: 4 }]
+    const { setStatus } = useRsvp(ref('e1'))
+    await tick()
+    await setStatus('maybe')
+    expect(calls.upserts[0]!.payload).toMatchObject({ status: 'maybe', plus_ones: 0 })
   })
 
   it('setStatus upserts the new status with the composite conflict target', async () => {

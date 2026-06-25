@@ -10,6 +10,8 @@ export interface RsvpEntry {
   email: string | null
   avatar: string | null
   status: RsvpStatus
+  /** Additional guests this person is bringing (their "+1"s); 0 unless going. */
+  plusOnes: number
   /** True when the reply came from the e-vite email rather than in-app. */
   viaEmail: boolean
 }
@@ -23,9 +25,11 @@ export interface EventRsvpRoster {
   noReply: { key: string, name: string, email: string }[]
   /** Distinct people who replied (going + maybe + no). */
   total: number
+  /** Total bodies expected = everyone going + the guests they're bringing. */
+  headcount: number
 }
 
-const EMPTY: EventRsvpRoster = { going: [], maybe: [], no: [], noReply: [], total: 0 }
+const EMPTY: EventRsvpRoster = { going: [], maybe: [], no: [], noReply: [], total: 0, headcount: 0 }
 
 /**
  * The single source of truth for "who's coming", merging both RSVP stores at read
@@ -55,7 +59,7 @@ export function useEventRsvps(eventId: MaybeRefOrGetter<string | null | undefine
     load: async (id) => {
       const { data: rsvpRows, error: rsvpError } = await supabase
         .from('rsvps')
-        .select('user_id, status')
+        .select('user_id, status, plus_ones')
         .eq('event_id', id)
       if (rsvpError) throw rsvpError
 
@@ -65,7 +69,7 @@ export function useEventRsvps(eventId: MaybeRefOrGetter<string | null | undefine
           ? supabase.from('profiles').select('id, display_name, email, avatar_url').in('id', userIds)
           : Promise.resolve({ data: [], error: null }),
         // Admin-only by RLS — a non-admin gets [] here (no error), i.e. members only.
-        supabase.from('event_invites').select('email, display_name, rsvp').eq('event_id', id)
+        supabase.from('event_invites').select('email, display_name, rsvp, plus_ones').eq('event_id', id)
       ])
       if (profiles.error) throw profiles.error
       if (invites.error) throw invites.error
@@ -78,12 +82,14 @@ export function useEventRsvps(eventId: MaybeRefOrGetter<string | null | undefine
         const profile = profileById.get(row.user_id)
         const email = profile?.email ?? null
         if (email) memberEmails.add(email.toLowerCase())
+        const status = toRsvpStatus(row.status)
         entries.push({
           key: row.user_id,
           name: profile?.display_name ?? email ?? 'Member',
           email,
           avatar: profile?.avatar_url ?? null,
-          status: toRsvpStatus(row.status),
+          status,
+          plusOnes: status === 'going' ? (row.plus_ones ?? 0) : 0,
           viaEmail: false
         })
       }
@@ -93,12 +99,14 @@ export function useEventRsvps(eventId: MaybeRefOrGetter<string | null | undefine
         // A member is already counted from rsvps (authoritative); skip their e-vite row.
         if (memberEmails.has(invite.email.toLowerCase())) continue
         if (invite.rsvp) {
+          const status = toRsvpStatus(invite.rsvp)
           entries.push({
             key: invite.email.toLowerCase(),
             name: invite.display_name ?? invite.email,
             email: invite.email,
             avatar: null,
-            status: toRsvpStatus(invite.rsvp),
+            status,
+            plusOnes: status === 'going' ? (invite.plus_ones ?? 0) : 0,
             viaEmail: true
           })
         } else {
@@ -106,12 +114,15 @@ export function useEventRsvps(eventId: MaybeRefOrGetter<string | null | undefine
         }
       }
 
+      const going = entries.filter(e => e.status === 'going')
       return {
-        going: entries.filter(e => e.status === 'going'),
+        going,
         maybe: entries.filter(e => e.status === 'maybe'),
         no: entries.filter(e => e.status === 'no'),
         noReply,
-        total: entries.length
+        total: entries.length,
+        // Everyone going, plus the guests they're bringing.
+        headcount: going.reduce((n, e) => n + 1 + e.plusOnes, 0)
       }
     }
   })

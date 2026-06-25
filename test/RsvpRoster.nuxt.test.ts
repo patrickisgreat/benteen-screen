@@ -6,13 +6,14 @@ import type { EventRsvpRoster } from '../app/composables/useEventRsvps'
 
 const roster: EventRsvpRoster = {
   going: [
-    { key: 'u1', name: 'Ada', email: 'ada@x.com', avatar: null, status: 'going', viaEmail: false },
-    { key: 'g@x.com', name: 'Guest', email: 'g@x.com', avatar: null, status: 'going', viaEmail: true }
+    { key: 'u1', name: 'Ada', email: 'ada@x.com', avatar: null, status: 'going', plusOnes: 1, viaEmail: false },
+    { key: 'g@x.com', name: 'Guest', email: 'g@x.com', avatar: null, status: 'going', plusOnes: 2, viaEmail: true }
   ],
-  maybe: [{ key: 'u2', name: 'Bo', email: 'bo@x.com', avatar: null, status: 'maybe', viaEmail: false }],
+  maybe: [{ key: 'u2', name: 'Bo', email: 'bo@x.com', avatar: null, status: 'maybe', plusOnes: 0, viaEmail: false }],
   no: [],
   noReply: [{ key: 's@x.com', name: 'Silent', email: 's@x.com' }],
-  total: 3
+  total: 3,
+  headcount: 5 // 2 going + 3 guests
 }
 
 describe('RsvpRoster', () => {
@@ -23,6 +24,14 @@ describe('RsvpRoster', () => {
     expect(w.text()).toContain('Ada')
     expect(w.text()).toContain('Guest')
     expect(w.text()).toContain('Bo')
+  })
+
+  it('shows the headcount and per-person +N when guests are coming', async () => {
+    const w = await mountSuspended(RsvpRoster, { props: { roster } })
+    expect(w.text()).toContain('5 expected')
+    expect(w.text()).toContain('2 going + 3 guests')
+    expect(w.text()).toContain('+1') // Ada's guest badge
+    expect(w.text()).toContain('+2') // Guest's badge
   })
 
   it('hides the no-reply section unless asked (admin-only)', async () => {
