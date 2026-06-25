@@ -45,6 +45,17 @@ mockNuxtImport('useEventInvites', () => () => ({
 }))
 mockNuxtImport('useToast', () => () => ({ add: (t: Toast) => toasts.push(t) }))
 mockNuxtImport('useInviteOptions', () => () => ({ save: saveOptionsFn }))
+mockNuxtImport('useEventRsvps', () => () => ({
+  roster: ref({
+    going: [{ key: 'u1', name: 'Ada', email: 'ada@x.com', avatar: null, status: 'going', viaEmail: false }],
+    maybe: [],
+    no: [],
+    noReply: [{ key: 'b@x.com', name: 'Bo', email: 'b@x.com' }],
+    total: 1
+  }),
+  error: ref(null),
+  refresh: async () => {}
+}))
 
 const clickSend = async (w: { findAll: (s: string) => Array<{ text: () => string, trigger: (e: string) => Promise<void> }> }): Promise<void> => {
   const send = w.findAll('button').find(b => b.text().includes('Send'))

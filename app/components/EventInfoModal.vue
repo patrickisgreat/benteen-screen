@@ -7,6 +7,9 @@ const props = defineProps<{ event: MovieEvent | null }>()
 
 const eventId = computed(() => props.event?.id ?? null)
 const { myStatus, counts, setStatus } = useRsvp(eventId)
+// The merged "who's coming" roster (in-app + e-vite email replies). Members see
+// fellow members; admins also see email-only guests (event_invites is admin-only).
+const { roster } = useEventRsvps(eventId)
 const { items, claim, unclaim } = useBringList(eventId)
 
 const calEvent = computed<CalendarEvent | null>(() => {
@@ -117,6 +120,14 @@ function downloadIcs(): void {
             Are you coming?
           </h3>
           <RsvpControl :my-status="myStatus" :counts="counts" @set="setStatus" />
+        </div>
+
+        <!-- Who's coming (merged in-app + e-vite RSVPs) -->
+        <div>
+          <h3 class="text-sm font-semibold text-muted mb-2">
+            Who's coming
+          </h3>
+          <RsvpRoster :roster="roster" />
         </div>
 
         <USeparator />
