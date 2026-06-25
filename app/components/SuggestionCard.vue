@@ -33,15 +33,19 @@ const rankClass = computed(() => {
 })
 const highlight = computed(() => props.rank === 1 && voteCount.value > 0)
 
-// The floating-heart flourish lives over the vote button; spawn it optimistically
-// on click (it's a flourish, not a state indicator) then emit the actual action.
-const hearts = useTemplateRef<{ spawn: (kind: 'vote' | 'unvote') => void }>('hearts')
-function onHeartClick(): void {
+// The floating-heart flourish is a teleported overlay; spawn it at the tapped
+// button's center (works for mouse + keyboard) optimistically on click — it's a
+// flourish, not a state indicator — then emit the actual action.
+const hearts = useTemplateRef<{ spawn: (kind: 'vote' | 'unvote', x: number, y: number) => void }>('hearts')
+function onHeartClick(e: MouseEvent): void {
+  const rect = (e.currentTarget as HTMLElement | null)?.getBoundingClientRect()
+  const x = rect ? rect.left + rect.width / 2 : e.clientX
+  const y = rect ? rect.top + rect.height / 2 : e.clientY
   if (hasVoted.value) {
-    hearts.value?.spawn('unvote')
+    hearts.value?.spawn('unvote', x, y)
     emit('unvote')
   } else {
-    hearts.value?.spawn('vote')
+    hearts.value?.spawn('vote', x, y)
     emit('vote')
   }
 }

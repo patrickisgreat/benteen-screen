@@ -4,12 +4,13 @@ import { MAX_PLUS_ONES } from '#shared/types/rsvp'
 // A compact "− N +" stepper for the number of additional guests an attendee is
 // bringing (their "+1"s). Clamps to [0, max]; emits on every change.
 const model = defineModel<number>({ default: 0 })
-const props = withDefaults(defineProps<{ max?: number }>(), { max: MAX_PLUS_ONES })
+const props = withDefaults(defineProps<{ max?: number, disabled?: boolean }>(), { max: MAX_PLUS_ONES, disabled: false })
 
-const atMin = computed(() => model.value <= 0)
-const atMax = computed(() => model.value >= props.max)
+const atMin = computed(() => props.disabled || model.value <= 0)
+const atMax = computed(() => props.disabled || model.value >= props.max)
 
 function step(delta: number): void {
+  if (props.disabled) return
   model.value = Math.min(props.max, Math.max(0, model.value + delta))
 }
 </script>

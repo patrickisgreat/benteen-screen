@@ -34,4 +34,12 @@ describe('GuestStepper', () => {
     const atMax = await mountSuspended(GuestStepper, { props: { modelValue: 3, max: 3 } })
     expect(atMax.find(plus).attributes('disabled')).toBeDefined()
   })
+
+  it('disabled freezes both buttons and ignores clicks', async () => {
+    const w = await mountSuspended(GuestStepper, { props: { modelValue: 1, disabled: true } })
+    expect(w.find(minus).attributes('disabled')).toBeDefined()
+    expect(w.find(plus).attributes('disabled')).toBeDefined()
+    await w.find(plus).trigger('click')
+    expect(w.emitted('update:modelValue')).toBeFalsy()
+  })
 })
