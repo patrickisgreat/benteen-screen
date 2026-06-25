@@ -12,6 +12,12 @@ export function formatDate(value: DateInput, options: Intl.DateTimeFormatOptions
   return date ? date.toLocaleDateString(undefined, options) : ''
 }
 
+/** Date + time (uses toLocaleString, which supports timeStyle — formatDate does not). */
+export function formatDateTime(value: DateInput, options: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' }): string {
+  const date = toDate(value)
+  return date ? date.toLocaleString(undefined, options) : ''
+}
+
 export function isSameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear()

@@ -76,5 +76,17 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 502, statusMessage: error instanceof Error ? error.message : 'Send failed' })
   }
 
+  // Record the send in the comms log (best-effort — the email already went out, so a
+  // logging failure must not fail the request; surface it in logs instead).
+  const { error: logError } = await admin.from('comms_log').insert({
+    event_id: eventId,
+    kind: 'announcement',
+    scope,
+    subject: mail.subject,
+    recipient_count: emails.length,
+    sent_by: userId
+  })
+  if (logError) console.error('[events/announce] comms_log insert failed -', logError.message)
+
   return { ok: true, count: emails.length }
 })

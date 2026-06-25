@@ -33,6 +33,8 @@ const { suggestions, setDeleted } = useAdminSuggestions(selectedEventId)
 // Bring list + headcount for the selected event (admins curate; people claim on the event page).
 const { items: bringItems, addItem: addBringItem, updateItem: updateBringItem, remove: removeBringItem } = useBringList(selectedEventId)
 const { counts: rsvpCounts } = useRsvp(selectedEventId)
+// Log of communications sent for the selected event (announcements + e-vite blasts).
+const { entries: commsLog } = useCommsLog(selectedEventId)
 
 // Upcoming events first (soonest first), then past events descending (oldest last).
 const sortedEvents = computed(() => sortEventsForAdmin(events.value))
@@ -479,7 +481,10 @@ function onSelectEvent(event: MovieEvent): void {
           Email an announcement or reminder about an event. Recipients are BCC'd.
         </p>
         <EventPicker v-model="selectedEventId" :items="eventOptions" />
-        <EventAnnounceComposer v-if="selectedEventId" :event-id="selectedEventId" class="max-w-xl" />
+        <template v-if="selectedEventId">
+          <EventAnnounceComposer :event-id="selectedEventId" class="max-w-xl" />
+          <CommsLog :entries="commsLog" class="max-w-xl mt-6" />
+        </template>
         <UCard v-else variant="subtle" class="text-center text-muted">
           Select an event to send a blast.
         </UCard>

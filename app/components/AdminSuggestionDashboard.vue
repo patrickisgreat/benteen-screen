@@ -11,12 +11,14 @@ const props = defineProps<{
 const emit = defineEmits<{ toggle: [id: string, deleted: boolean] }>()
 
 type View = 'movies' | 'people' | 'gaps'
-type Sort = 'votes' | 'newest' | 'title'
+type Sort = 'votes' | 'newest' | 'title' | 'submitter'
 type Filter = 'all' | 'visible' | 'hidden'
 
 const view = ref<View>('movies')
 const sort = ref<Sort>('votes')
 const filter = ref<Filter>('all')
+const submitter = ref<string>('all')
+const query = ref('')
 
 const views = [
   { value: 'movies' as const, label: 'Movies', icon: 'i-lucide-clapperboard' },
@@ -26,7 +28,8 @@ const views = [
 const sorts = [
   { value: 'votes' as const, label: 'Most votes' },
   { value: 'newest' as const, label: 'Newest' },
-  { value: 'title' as const, label: 'Title' }
+  { value: 'title' as const, label: 'Title' },
+  { value: 'submitter' as const, label: 'Submitter' }
 ]
 const filters = [
   { value: 'all' as const, label: 'All' },
@@ -38,21 +41,48 @@ const dashboard = computed(() =>
   computeSuggestionDashboard({ suggestions: props.suggestions, winnerIds: props.winnerIds, expected: props.expected })
 )
 
+function authorName(s: AdminSuggestion): string {
+  return s.author?.display_name || s.author?.email || 'unknown'
+}
+
+// Distinct submitters for the filter dropdown (live suggestions only).
+const submitterOptions = computed(() => {
+  const byId = new Map<string, string>()
+  for (const s of props.suggestions) if (!s.deleted) byId.set(s.user_id, authorName(s))
+  return [
+    { value: 'all', label: 'All submitters' },
+    ...[...byId].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label))
+  ]
+})
+
+// The widest vote bar scales to the most-voted movie (min 1 so it never divides by 0).
+const maxVotes = computed(() => Math.max(1, ...props.suggestions.map(s => s.voteCount ?? 0)))
+
+function matches(text: string): boolean {
+  const q = query.value.trim().toLowerCase()
+  return !q || text.toLowerCase().includes(q)
+}
+
 const movies = computed(() => {
   const filtered = props.suggestions.filter((s) => {
-    if (filter.value === 'visible') return !s.deleted
-    if (filter.value === 'hidden') return s.deleted
-    return true
+    if (filter.value === 'visible' && s.deleted) return false
+    if (filter.value === 'hidden' && !s.deleted) return false
+    if (submitter.value !== 'all' && s.user_id !== submitter.value) return false
+    return matches(s.tmdb_movie.title)
   })
   return [...filtered].sort((a, b) => {
     if (sort.value === 'title') return a.tmdb_movie.title.localeCompare(b.tmdb_movie.title)
     if (sort.value === 'newest') return (b.created_at ?? '').localeCompare(a.created_at ?? '')
+    if (sort.value === 'submitter') return authorName(a).localeCompare(authorName(b))
     return (b.voteCount ?? 0) - (a.voteCount ?? 0)
   })
 })
 
-function voterNames(s: AdminSuggestion): string[] {
-  return (s.votes ?? []).map(v => v.voter?.display_name ?? 'Unknown')
+const people = computed(() => dashboard.value.byPerson.filter(p => matches(p.name)))
+const gaps = computed(() => dashboard.value.gaps.filter(g => matches(g.name)))
+
+function barPct(votes: number): number {
+  return Math.round((votes / maxVotes.value) * 100)
 }
 </script>
 
@@ -94,7 +124,10 @@ function voterNames(s: AdminSuggestion): string[] {
       </UCard>
     </div>
 
-    <div v-if="dashboard.summary.mostVoted || dashboard.summary.topVoters.length" class="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+    <div
+      v-if="(dashboard.summary.mostVoted && dashboard.summary.mostVoted.votes > 0) || dashboard.summary.topVoters.length"
+      class="flex flex-wrap gap-x-6 gap-y-1 text-sm"
+    >
       <p v-if="dashboard.summary.mostVoted && dashboard.summary.mostVoted.votes > 0">
         <span class="text-muted">Leading:</span>
         <span class="font-medium">{{ dashboard.summary.mostVoted.title }}</span>
@@ -106,8 +139,9 @@ function voterNames(s: AdminSuggestion): string[] {
       </p>
     </div>
 
-    <!-- View switch -->
+    <!-- View switch + search -->
     <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="flex gap-1">
         <UButton
           v-for="v in views"
           :key="v.value"
@@ -120,10 +154,20 @@ function voterNames(s: AdminSuggestion): string[] {
           @click="view = v.value"
         />
       </div>
-      <div v-if="view === 'movies'" class="flex flex-wrap gap-1">
-        <USelectMenu v-model="sort" :items="sorts" value-key="value" :search-input="false" size="sm" class="w-36" />
-        <USelectMenu v-model="filter" :items="filters" value-key="value" :search-input="false" size="sm" class="w-28" />
-      </div>
+      <UInput
+        v-model="query"
+        icon="i-lucide-search"
+        :placeholder="view === 'movies' ? 'Search movies…' : 'Search people…'"
+        size="sm"
+        class="w-full sm:w-56"
+      />
+    </div>
+
+    <!-- Movies controls -->
+    <div v-if="view === 'movies'" class="flex flex-wrap gap-1">
+      <USelectMenu v-model="sort" :items="sorts" value-key="value" :search-input="false" size="sm" class="w-40" />
+      <USelectMenu v-model="filter" :items="filters" value-key="value" :search-input="false" size="sm" class="w-28" />
+      <USelectMenu v-model="submitter" :items="submitterOptions" value-key="value" :search-input="false" size="sm" class="w-44" />
     </div>
 
     <!-- MOVIES -->
@@ -135,24 +179,28 @@ function voterNames(s: AdminSuggestion): string[] {
         :class="s.deleted ? 'opacity-60' : ''"
       >
         <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
+          <div class="min-w-0 flex-1">
             <h3 class="font-semibold">
               {{ s.tmdb_movie.title }}
               <UBadge v-if="s.deleted" label="Hidden" color="neutral" variant="subtle" size="xs" />
               <UBadge v-if="winnerIds?.includes(s.id)" label="Winner" color="primary" variant="subtle" size="xs" />
             </h3>
             <p class="text-sm text-muted truncate">
-              by {{ s.author?.display_name || s.author?.email || 'unknown' }}
+              by {{ authorName(s) }}
             </p>
-            <p class="text-sm mt-1">
-              <UIcon name="i-lucide-heart" class="text-error align-text-bottom" />
-              {{ s.voteCount ?? 0 }} votes
+            <p class="text-sm mt-1 inline-flex items-center gap-1">
+              <UIcon name="i-lucide-heart" class="text-error" />
+              {{ s.voteCount ?? 0 }} {{ (s.voteCount ?? 0) === 1 ? 'vote' : 'votes' }}
             </p>
-            <div v-if="voterNames(s) as names" class="flex flex-wrap gap-1 mt-2">
+            <!-- Vote-share bar -->
+            <div class="mt-1.5 h-1.5 max-w-xs rounded-full bg-elevated overflow-hidden">
+              <div class="h-full rounded-full bg-primary transition-all" :style="{ width: `${barPct(s.voteCount ?? 0)}%` }" />
+            </div>
+            <div v-if="(s.votes ?? []).length" class="flex flex-wrap gap-1 mt-2">
               <UBadge
-                v-for="(name, i) in names"
+                v-for="(v, i) in (s.votes ?? [])"
                 :key="`${s.id}-${i}`"
-                :label="name"
+                :label="v.voter?.display_name ?? 'Unknown'"
                 color="neutral"
                 variant="outline"
                 size="xs"
@@ -182,20 +230,26 @@ function voterNames(s: AdminSuggestion): string[] {
         </div>
       </UCard>
       <UCard v-if="!movies.length" variant="subtle" class="text-center text-muted">
-        No suggestions for this filter.
+        No suggestions match.
       </UCard>
     </div>
 
     <!-- PEOPLE -->
     <div v-else-if="view === 'people'" class="space-y-3">
-      <UCard v-for="p in dashboard.byPerson" :key="p.userId" variant="subtle">
-        <p class="font-semibold mb-2">
-          {{ p.name }}
-        </p>
+      <UCard v-for="p in people" :key="p.userId" variant="subtle">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <p class="font-semibold truncate">
+            {{ p.name }}
+          </p>
+          <div class="flex gap-1 shrink-0">
+            <UBadge :label="`${p.suggested.length} suggested`" icon="i-lucide-clapperboard" color="neutral" variant="subtle" size="xs" />
+            <UBadge :label="`${p.votedFor.length} voted`" icon="i-lucide-heart" color="neutral" variant="subtle" size="xs" />
+          </div>
+        </div>
         <div class="grid sm:grid-cols-2 gap-3">
           <div>
-            <p class="text-xs font-semibold text-muted mb-1.5 flex items-center gap-1">
-              <UIcon name="i-lucide-clapperboard" /> Suggested · {{ p.suggested.length }}
+            <p class="text-xs font-semibold text-muted mb-1.5">
+              Suggested
             </p>
             <ul v-if="p.suggested.length" class="space-y-1">
               <li v-for="m in p.suggested" :key="m.id" class="text-sm flex items-center gap-1.5">
@@ -209,8 +263,8 @@ function voterNames(s: AdminSuggestion): string[] {
             </p>
           </div>
           <div>
-            <p class="text-xs font-semibold text-muted mb-1.5 flex items-center gap-1">
-              <UIcon name="i-lucide-heart" /> Voted for · {{ p.votedFor.length }}
+            <p class="text-xs font-semibold text-muted mb-1.5">
+              Voted for
             </p>
             <ul v-if="p.votedFor.length" class="space-y-1">
               <li v-for="m in p.votedFor" :key="m.id" class="text-sm truncate">
@@ -223,8 +277,8 @@ function voterNames(s: AdminSuggestion): string[] {
           </div>
         </div>
       </UCard>
-      <UCard v-if="!dashboard.byPerson.length" variant="subtle" class="text-center text-muted">
-        No participation yet.
+      <UCard v-if="!people.length" variant="subtle" class="text-center text-muted">
+        No one matches.
       </UCard>
     </div>
 
@@ -233,7 +287,7 @@ function voterNames(s: AdminSuggestion): string[] {
       <p class="text-sm text-muted">
         Coming (RSVP'd going/maybe) but haven't fully joined in — nudge them.
       </p>
-      <UCard v-for="g in dashboard.gaps" :key="g.userId" variant="subtle" :ui="{ body: 'p-3' }">
+      <UCard v-for="g in gaps" :key="g.userId" variant="subtle" :ui="{ body: 'p-3' }">
         <div class="flex items-center justify-between gap-2">
           <span class="font-medium truncate">{{ g.name }}</span>
           <div class="flex gap-1 shrink-0">
@@ -242,8 +296,8 @@ function voterNames(s: AdminSuggestion): string[] {
           </div>
         </div>
       </UCard>
-      <UCard v-if="!dashboard.gaps.length" variant="subtle" class="text-center text-muted">
-        Everyone who RSVP'd has suggested and voted. 🎉
+      <UCard v-if="!gaps.length" variant="subtle" class="text-center text-muted">
+        {{ dashboard.gaps.length ? 'No one matches.' : 'Everyone who RSVP\'d has suggested and voted. 🎉' }}
       </UCard>
     </div>
   </div>

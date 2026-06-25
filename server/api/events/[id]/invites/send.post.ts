@@ -71,15 +71,27 @@ export default defineEventHandler(async (event) => {
     }
   })
 
-  return {
-    ok: true,
-    ...(await sendEventInvites(db, {
-      apiKey: resendApiKey,
-      from: resendFrom,
-      replyTo: user.email ?? undefined,
-      eventId,
-      invitedBy: userId,
-      recipients
-    }))
+  const result = await sendEventInvites(db, {
+    apiKey: resendApiKey,
+    from: resendFrom,
+    replyTo: user.email ?? undefined,
+    eventId,
+    invitedBy: userId,
+    recipients
+  })
+
+  // Record the blast in the comms log when at least one e-vite went out (best-effort —
+  // a logging failure must not fail the send).
+  if (result.sent > 0) {
+    const { error: logError } = await db.from('comms_log').insert({
+      event_id: eventId,
+      kind: 'invite',
+      subject: `E-vite — ${ev.title}`,
+      recipient_count: result.sent,
+      sent_by: userId
+    })
+    if (logError) console.error('[events/invites/send] comms_log insert failed -', logError.message)
   }
+
+  return { ok: true, ...result }
 })
