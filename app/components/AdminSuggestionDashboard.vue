@@ -42,7 +42,7 @@ const dashboard = computed(() =>
 )
 
 function authorName(s: AdminSuggestion): string {
-  return s.author?.display_name || s.author?.email || 'unknown'
+  return s.author?.display_name ?? s.author?.email ?? 'unknown'
 }
 
 // Distinct submitters for the filter dropdown (live suggestions only).
