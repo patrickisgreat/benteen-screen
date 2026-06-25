@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.7.1...v1.8.0) (2026-06-25)
+
+
+### Features
+
+* admin suggestions dashboard (movies / people / gaps + summary) ([#122](https://github.com/patrickisgreat/benteen-screen/issues/122)) ([0192611](https://github.com/patrickisgreat/benteen-screen/commit/0192611b42f2c42e4653782b465e5adae3a86a43))
+
 ## [1.7.1](https://github.com/patrickisgreat/benteen-screen/compare/v1.7.0...v1.7.1) (2026-06-25)
 
 
