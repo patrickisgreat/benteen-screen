@@ -24,9 +24,9 @@ export interface Database {
         Relationships: []
       }
       event_invites: {
-        Row: { id: string, event_id: string, email: string, display_name: string | null, token: string, rsvp: string | null, rsvp_at: string | null, invited_by: string | null, resend_id: string | null, sent_at: string | null, delivered_at: string | null, opened_at: string | null, clicked_at: string | null, bounced_at: string | null, created_at: string }
-        Insert: { id?: string, event_id: string, email: string, display_name?: string | null, token?: string, rsvp?: string | null, rsvp_at?: string | null, invited_by?: string | null, resend_id?: string | null, sent_at?: string | null, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null, created_at?: string }
-        Update: { id?: string, event_id?: string, email?: string, display_name?: string | null, token?: string, rsvp?: string | null, rsvp_at?: string | null, invited_by?: string | null, resend_id?: string | null, sent_at?: string | null, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null, created_at?: string }
+        Row: { id: string, event_id: string, email: string, display_name: string | null, token: string, rsvp: string | null, rsvp_at: string | null, plus_ones: number, invited_by: string | null, resend_id: string | null, sent_at: string | null, delivered_at: string | null, opened_at: string | null, clicked_at: string | null, bounced_at: string | null, created_at: string }
+        Insert: { id?: string, event_id: string, email: string, display_name?: string | null, token?: string, rsvp?: string | null, rsvp_at?: string | null, plus_ones?: number, invited_by?: string | null, resend_id?: string | null, sent_at?: string | null, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null, created_at?: string }
+        Update: { id?: string, event_id?: string, email?: string, display_name?: string | null, token?: string, rsvp?: string | null, rsvp_at?: string | null, plus_ones?: number, invited_by?: string | null, resend_id?: string | null, sent_at?: string | null, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null, created_at?: string }
         Relationships: []
       }
       events: {
@@ -36,9 +36,9 @@ export interface Database {
         Relationships: []
       }
       rsvps: {
-        Row: { event_id: string, user_id: string, status: string, updated_at: string }
-        Insert: { event_id: string, user_id?: string, status: string, updated_at?: string }
-        Update: { event_id?: string, user_id?: string, status?: string, updated_at?: string }
+        Row: { event_id: string, user_id: string, status: string, plus_ones: number, updated_at: string }
+        Insert: { event_id: string, user_id?: string, status: string, plus_ones?: number, updated_at?: string }
+        Update: { event_id?: string, user_id?: string, status?: string, plus_ones?: number, updated_at?: string }
         Relationships: []
       }
       bring_items: {

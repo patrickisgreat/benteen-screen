@@ -47,11 +47,12 @@ mockNuxtImport('useToast', () => () => ({ add: (t: Toast) => toasts.push(t) }))
 mockNuxtImport('useInviteOptions', () => () => ({ save: saveOptionsFn }))
 mockNuxtImport('useEventRsvps', () => () => ({
   roster: ref({
-    going: [{ key: 'u1', name: 'Ada', email: 'ada@x.com', avatar: null, status: 'going', viaEmail: false }],
+    going: [{ key: 'u1', name: 'Ada', email: 'ada@x.com', avatar: null, status: 'going', plusOnes: 0, viaEmail: false }],
     maybe: [],
     no: [],
     noReply: [{ key: 'b@x.com', name: 'Bo', email: 'b@x.com' }],
-    total: 1
+    total: 1,
+    headcount: 1
   }),
   error: ref(null),
   refresh: async () => {}

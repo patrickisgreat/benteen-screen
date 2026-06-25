@@ -1,10 +1,14 @@
 import { serverSupabaseServiceRole } from '#supabase/server'
 import { z } from 'zod'
+import { MAX_PLUS_ONES } from '#shared/types/rsvp'
 import type { Database } from '~/types/database.types'
 
 const bodySchema = z.object({
   token: z.string().min(8).max(128),
-  status: z.enum(['going', 'maybe', 'no'])
+  status: z.enum(['going', 'maybe', 'no']),
+  // Additional guests the invitee is bringing. Only meaningful when going; clamped
+  // to the shared cap (mirrors the CHECK constraint) so a crafted body can't inflate.
+  plusOnes: z.number().int().min(0).max(MAX_PLUS_ONES).optional().default(0)
 })
 
 /**
@@ -17,6 +21,8 @@ export default defineEventHandler(async (event) => {
   const parsed = bodySchema.safeParse(await readBody(event))
   if (!parsed.success) throw createError({ statusCode: 400, statusMessage: 'Invalid RSVP' })
   const { token, status } = parsed.data
+  // Guests only count when going.
+  const plusOnes = status === 'going' ? parsed.data.plusOnes : 0
 
   const admin = serverSupabaseServiceRole<Database>(event)
   const { data: invite } = await admin
@@ -29,7 +35,7 @@ export default defineEventHandler(async (event) => {
   const now = new Date().toISOString()
   await admin
     .from('event_invites')
-    .update({ rsvp: status, rsvp_at: now, clicked_at: now })
+    .update({ rsvp: status, rsvp_at: now, clicked_at: now, plus_ones: plusOnes })
     .eq('id', invite.id)
 
   // Mirror into the app RSVP if this invitee is also a member (case-insensitive).
@@ -37,8 +43,8 @@ export default defineEventHandler(async (event) => {
   if (profile) {
     await admin
       .from('rsvps')
-      .upsert({ event_id: invite.event_id, user_id: profile.id, status, updated_at: now }, { onConflict: 'event_id,user_id' })
+      .upsert({ event_id: invite.event_id, user_id: profile.id, status, plus_ones: plusOnes, updated_at: now }, { onConflict: 'event_id,user_id' })
   }
 
-  return { ok: true, status }
+  return { ok: true, status, plusOnes }
 })

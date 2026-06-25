@@ -6,7 +6,7 @@ const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{ event: MovieEvent | null }>()
 
 const eventId = computed(() => props.event?.id ?? null)
-const { myStatus, counts, setStatus } = useRsvp(eventId)
+const { myStatus, myPlusOnes, counts, setStatus, setGuests } = useRsvp(eventId)
 // The merged "who's coming" roster (in-app + e-vite email replies). Members see
 // fellow members; admins also see email-only guests (event_invites is admin-only).
 const { roster } = useEventRsvps(eventId)
@@ -119,7 +119,13 @@ function downloadIcs(): void {
           <h3 class="text-sm font-semibold text-muted mb-2">
             Are you coming?
           </h3>
-          <RsvpControl :my-status="myStatus" :counts="counts" @set="setStatus" />
+          <RsvpControl
+            :my-status="myStatus"
+            :my-plus-ones="myPlusOnes"
+            :counts="counts"
+            @set="setStatus"
+            @guests="setGuests"
+          />
         </div>
 
         <!-- Who's coming (merged in-app + e-vite RSVPs) -->
