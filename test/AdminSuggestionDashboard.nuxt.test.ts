@@ -37,6 +37,19 @@ describe('AdminSuggestionDashboard', () => {
     expect(w.text()).toContain('Leading:') // most-voted summary
   })
 
+  it('filters the movie list by the search box', async () => {
+    const w = await mountSuspended(AdminSuggestionDashboard, { props: { suggestions, expected } })
+    await w.get('input[placeholder*="Search"]').setValue('heat')
+    expect(w.text()).toContain('Heat')
+    expect(w.text()).not.toContain('Casino')
+  })
+
+  it('shows a vote-share bar per movie', async () => {
+    const w = await mountSuspended(AdminSuggestionDashboard, { props: { suggestions, expected } })
+    // Heat has 2 of max 2 votes → a full-width bar.
+    expect(w.html()).toContain('width: 100%')
+  })
+
   it('pivots to a per-person view of suggested + voted', async () => {
     const w = await mountSuspended(AdminSuggestionDashboard, { props: { suggestions, expected } })
     await clickView(w, 'People')
