@@ -108,7 +108,6 @@ function voterNames(s: AdminSuggestion): string[] {
 
     <!-- View switch -->
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <div class="flex gap-1">
         <UButton
           v-for="v in views"
           :key="v.value"
@@ -117,6 +116,7 @@ function voterNames(s: AdminSuggestion): string[] {
           size="sm"
           :color="view === v.value ? 'primary' : 'neutral'"
           :variant="view === v.value ? 'solid' : 'outline'"
+          :aria-pressed="view === v.value"
           @click="view = v.value"
         />
       </div>
