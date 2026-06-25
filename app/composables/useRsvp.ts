@@ -21,7 +21,7 @@ export function useRsvp(eventId: MaybeRefOrGetter<string | null | undefined>) {
   })
 
   const mine = computed(() => rsvps.value.find(r => r.user_id === myId.value) ?? null)
-  const myStatus = computed<RsvpStatus | null>(() => (mine.value?.status as RsvpStatus | undefined) ?? null)
+  const myStatus = computed<RsvpStatus | null>(() => (mine.value ? toRsvpStatus(mine.value.status) : null))
   const myPlusOnes = computed(() => mine.value?.plus_ones ?? 0)
 
   const counts = computed(() => {
