@@ -13,6 +13,9 @@ const token = computed(() => (route.query.token ?? '').toString())
 const phase = ref<'saving' | 'done' | 'error'>('saving')
 const current = ref<RsvpStatus | null>(null)
 const guests = ref(0)
+// Updating the guest count re-saves in the background (no full-screen spinner) —
+// this flag just disables the stepper for the in-flight request.
+const savingGuests = ref(false)
 
 const HEADLINE: Record<RsvpStatus, string> = {
   going: 'You\'re going! 🎉',
@@ -41,10 +44,20 @@ async function rsvp(status: RsvpStatus): Promise<void> {
   }
 }
 
-/** Update the guest count and re-save (only while going). */
-    <GuestStepper :model-value="guests" :disabled="phase === 'saving'" @update:model-value="setGuests" />
+/** Update the guest count and re-save in the background (only while going). Keeps
+ *  the "done" view up (no spinner flicker on every tap) and disables the stepper for
+ *  the in-flight request. */
+async function setGuests(count: number): Promise<void> {
   guests.value = count
-  if (current.value === 'going') await rsvp('going')
+  if (current.value !== 'going' || !token.value) return
+  savingGuests.value = true
+  try {
+    await $fetch('/api/rsvp', { method: 'POST', body: { token: token.value, status: 'going', plusOnes: count } })
+  } catch {
+    phase.value = 'error'
+  } finally {
+    savingGuests.value = false
+  }
 }
 
 onMounted(() => {
@@ -79,7 +92,7 @@ onMounted(() => {
           <!-- Bringing guests? Only while going. -->
           <div v-if="current === 'going'" class="flex flex-col items-center gap-2 pt-1">
             <span class="text-sm text-muted">Bringing guests?</span>
-            <GuestStepper :model-value="guests" @update:model-value="setGuests" />
+            <GuestStepper :model-value="guests" :disabled="savingGuests" @update:model-value="setGuests" />
           </div>
         </template>
 
