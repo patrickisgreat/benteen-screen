@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/patrickisgreat/benteen-screen/compare/v1.7.0...v1.7.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* float hearts above everything + animate vote reordering; repair broken rsvp.vue ([#120](https://github.com/patrickisgreat/benteen-screen/issues/120)) ([6f83be1](https://github.com/patrickisgreat/benteen-screen/commit/6f83be1044e351a156f0a7877879c5418eeedab9))
+
 ## [1.7.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.6.0...v1.7.0) (2026-06-25)
 
 
