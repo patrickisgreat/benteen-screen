@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.6.0...v1.7.0) (2026-06-25)
+
+
+### Features
+
+* +1 / guest count on RSVPs (e-vite + in-app) ([#118](https://github.com/patrickisgreat/benteen-screen/issues/118)) ([cdb1639](https://github.com/patrickisgreat/benteen-screen/commit/cdb1639eb513dc3c8c8464a89beffa03314df528))
+
 ## [1.6.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.5.0...v1.6.0) (2026-06-25)
 
 
