@@ -28,7 +28,7 @@ const statsEvent = ref<MovieEvent | null>(null)
 const eventStatsOpen = ref(false)
 
 const selectedEventId = ref<string>()
-const { suggestions, setDeleted, voterNames } = useAdminSuggestions(selectedEventId)
+const { suggestions, setDeleted } = useAdminSuggestions(selectedEventId)
 
 // Bring list + headcount for the selected event (admins curate; people claim on the event page).
 const { items: bringItems, addItem: addBringItem, updateItem: updateBringItem, remove: removeBringItem } = useBringList(selectedEventId)
@@ -129,6 +129,16 @@ async function onRemoveBring(item: BringItem): Promise<void> {
 
 const votingLocked = computed(() => Boolean(selectedEvent.value?.voting_locked_at))
 const winners = computed(() => topWinners(suggestions.value))
+const winnerIds = computed(() => winners.value.map(w => w.id))
+
+// Who RSVP'd (going/maybe) — feeds the dashboard's "engagement gaps" view. Members
+// only (email-only guests can't suggest/vote in-app); keyed by user id.
+const { roster: rsvpRoster } = useEventRsvps(selectedEventId)
+const expectedParticipants = computed(() =>
+  [...rsvpRoster.value.going, ...rsvpRoster.value.maybe]
+    .filter(e => !e.viaEmail)
+    .map(e => ({ userId: e.key, name: e.name }))
+)
 
 async function onLockVoting(): Promise<void> {
   const ev = selectedEvent.value
@@ -417,60 +427,14 @@ function onSelectEvent(event: MovieEvent): void {
           <WinnersBanner v-if="votingLocked && winners.length" :winners="winners" />
         </div>
 
-        <div v-if="suggestions.length" class="space-y-3">
-          <UCard
-            v-for="suggestion in suggestions"
-            :key="suggestion.id"
-            variant="subtle"
-            :class="suggestion.deleted ? 'opacity-60' : ''"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <h3 class="font-semibold">
-                  {{ suggestion.tmdb_movie.title }}
-                  <UBadge v-if="suggestion.deleted" label="Hidden" color="neutral" variant="subtle" size="xs" />
-                </h3>
-                <p class="text-sm text-muted truncate">
-                  by {{ suggestion.author?.email || 'unknown' }}
-                </p>
-                <p class="text-sm mt-1">
-                  <UIcon name="i-lucide-heart" class="text-error align-text-bottom" />
-                  {{ suggestion.votes?.length ?? 0 }} votes
-                </p>
-                <div v-if="voterNames(suggestion).length" class="flex flex-wrap gap-1 mt-2">
-                  <UBadge
-                    v-for="(name, i) in voterNames(suggestion)"
-                    :key="`${suggestion.id}-${i}`"
-                    :label="name"
-                    color="neutral"
-                    variant="outline"
-                    size="xs"
-                  />
-                </div>
-              </div>
-              <UButton
-                v-if="suggestion.deleted"
-                label="Restore"
-                icon="i-lucide-rotate-ccw"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                class="shrink-0"
-                @click="toggleSuggestion(suggestion.id, false)"
-              />
-              <UButton
-                v-else
-                label="Hide"
-                icon="i-lucide-eye-off"
-                color="error"
-                variant="outline"
-                size="sm"
-                class="shrink-0"
-                @click="toggleSuggestion(suggestion.id, true)"
-              />
-            </div>
-          </UCard>
-        </div>
+        <AdminSuggestionDashboard
+          v-if="suggestions.length"
+          :suggestions="suggestions"
+          :expected="expectedParticipants"
+          :winner-ids="winnerIds"
+          :voting-locked="votingLocked"
+          @toggle="toggleSuggestion"
+        />
         <UCard v-else variant="subtle" class="text-center text-muted">
           No suggestions for this event.
         </UCard>
