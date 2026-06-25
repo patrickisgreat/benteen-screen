@@ -274,7 +274,8 @@ async function onGuests(count: number): Promise<void> {
             />
           </div>
 
-          <div v-if="suggestions.length" class="space-y-3">
+          <!-- TransitionGroup animates the FLIP reorder when votes change the ranking. -->
+          <TransitionGroup v-if="suggestions.length" tag="div" name="rank" class="relative space-y-3">
             <SuggestionCard
               v-for="(suggestion, index) in suggestions"
               :key="suggestion.id"
@@ -288,7 +289,7 @@ async function onGuests(count: number): Promise<void> {
               @remove="onRemove(suggestion)"
               @trailer="openTrailer(suggestion)"
             />
-          </div>
+          </TransitionGroup>
           <UCard v-else variant="subtle" class="text-center py-10">
             <UIcon name="i-lucide-film" class="size-8 text-muted mx-auto" />
             <p class="text-muted mt-2">
@@ -328,3 +329,31 @@ async function onGuests(count: number): Promise<void> {
     <TrailerModal v-model:open="trailerOpen" :movie="trailerMovie" />
   </UContainer>
 </template>
+
+<style scoped>
+/* Smoothly slide cards to their new rank when votes reorder the list (FLIP), and
+   fade suggestions in/out as they're added/removed. */
+.rank-move,
+.rank-enter-active,
+.rank-leave-active {
+  transition: transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.35s ease;
+}
+.rank-enter-from,
+.rank-leave-to {
+  opacity: 0;
+  transform: scale(0.97);
+}
+/* Take a leaving card out of flow so the others FLIP up into its place. */
+.rank-leave-active {
+  position: absolute;
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rank-move,
+  .rank-enter-active,
+  .rank-leave-active {
+    transition: none;
+  }
+}
+</style>

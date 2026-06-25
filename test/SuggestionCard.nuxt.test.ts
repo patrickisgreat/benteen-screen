@@ -1,8 +1,13 @@
 // @vitest-environment nuxt
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { ref } from 'vue'
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import SuggestionCard from '../app/components/SuggestionCard.vue'
+
+// Hearts teleport to <body> and persist across mounts — clear them between tests.
+afterEach(() => {
+  document.body.querySelectorAll('.floating-heart').forEach(el => el.remove())
+})
 
 mockNuxtImport('useAuth', () => () => ({ myId: ref('me') }))
 mockNuxtImport('useTmdb', () => () => ({ posterUrl: () => null }))
@@ -33,23 +38,26 @@ describe('SuggestionCard', () => {
     expect(w.emitted('vote')).toBeFalsy()
   })
 
+  // The heart overlay teleports to <body>, so assert against the document.
+  const bodyHeart = (): HTMLElement | null => document.body.querySelector('.floating-heart')
+
   it('floats a red heart up when I cast a vote', async () => {
     const notVoted = { ...suggestion, votes: [{ user_id: 'bob' }] }
     const w = await mountSuspended(SuggestionCard, { props: { suggestion: notVoted, rank: 1, maxVotes: 2 } })
     await w.get('[aria-label="Vote"]').trigger('click')
-    const heart = w.find('.floating-heart')
-    expect(heart.exists()).toBe(true)
-    expect(heart.classes()).toContain('text-red-500')
+    const heart = bodyHeart()
+    expect(heart?.className).toContain('text-red-500')
     expect(w.emitted('vote')).toBeTruthy()
+    heart?.remove()
   })
 
   it('floats a grayscale broken heart up when I remove my vote', async () => {
     const w = await mountSuspended(SuggestionCard, { props: { suggestion, rank: 1, maxVotes: 2 } })
     await w.get('[aria-label="Remove vote"]').trigger('click')
-    const heart = w.find('.floating-heart')
-    expect(heart.exists()).toBe(true)
-    expect(heart.classes()).toContain('grayscale')
+    const heart = bodyHeart()
+    expect(heart?.className).toContain('grayscale')
     expect(w.emitted('unvote')).toBeTruthy()
+    heart?.remove()
   })
 
   it('emits trailer from the Trailer button', async () => {
