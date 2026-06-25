@@ -42,7 +42,7 @@ async function rsvp(status: RsvpStatus): Promise<void> {
 }
 
 /** Update the guest count and re-save (only while going). */
-async function setGuests(count: number): Promise<void> {
+    <GuestStepper :model-value="guests" :disabled="phase === 'saving'" @update:model-value="setGuests" />
   guests.value = count
   if (current.value === 'going') await rsvp('going')
 }
