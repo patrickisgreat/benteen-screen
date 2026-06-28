@@ -28,7 +28,7 @@ const statsEvent = ref<MovieEvent | null>(null)
 const eventStatsOpen = ref(false)
 
 const selectedEventId = ref<string>()
-const { suggestions, setDeleted } = useAdminSuggestions(selectedEventId)
+const { suggestions, refresh: refreshSuggestions, setDeleted } = useAdminSuggestions(selectedEventId)
 
 // Bring list + headcount for the selected event (admins curate; people claim on the event page).
 const { items: bringItems, addItem: addBringItem, updateItem: updateBringItem, remove: removeBringItem } = useBringList(selectedEventId)
@@ -427,6 +427,13 @@ function onSelectEvent(event: MovieEvent): void {
             />
           </div>
           <WinnersBanner v-if="votingLocked && winners.length" :winners="winners" />
+
+          <!-- Prune the ballot as the night nears (open voting only) -->
+          <BallotPruneControls
+            v-if="!votingLocked && selectedEventId && suggestions.length"
+            :event-id="selectedEventId"
+            @pruned="refreshSuggestions"
+          />
         </div>
 
         <AdminSuggestionDashboard
