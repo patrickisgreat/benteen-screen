@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.1](https://github.com/patrickisgreat/benteen-screen/compare/v1.13.0...v1.13.1) (2026-06-28)
+
+
+### Bug Fixes
+
+* repair malformed SuggestionCard template breaking the build ([#136](https://github.com/patrickisgreat/benteen-screen/issues/136)) ([8473bda](https://github.com/patrickisgreat/benteen-screen/commit/8473bdae27402b91d394f5f541bcde00b57cdb3d))
+
 ## [1.13.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.12.0...v1.13.0) (2026-06-28)
 
 
