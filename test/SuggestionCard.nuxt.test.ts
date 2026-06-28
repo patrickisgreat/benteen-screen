@@ -94,4 +94,17 @@ describe('SuggestionCard', () => {
     const w = await mountSuspended(SuggestionCard, { props: { suggestion, rank: 1, maxVotes: 2, voteCapReached: true } })
     expect(w.get('[aria-label="Remove vote"]').attributes('disabled')).toBeUndefined()
   })
+
+  it('disables a new vote when I am not RSVP’d going (canVote=false)', async () => {
+    const notMine = { ...suggestion, votes: [{ user_id: 'bob' }] }
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion: notMine, rank: 1, maxVotes: 2, canVote: false } })
+    const btn = w.get('[aria-label="Vote"]')
+    expect(btn.attributes('disabled')).toBeDefined()
+    expect(btn.attributes('title')).toContain('RSVP')
+  })
+
+  it('still lets me remove an existing vote when not going (canVote=false)', async () => {
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion, rank: 1, maxVotes: 2, canVote: false } })
+    expect(w.get('[aria-label="Remove vote"]').attributes('disabled')).toBeUndefined()
+  })
 })

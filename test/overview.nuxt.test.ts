@@ -20,6 +20,7 @@ const event = {
 // referencing module-scope values, same pattern as useAdminPeople.nuxt.test.ts).
 const isAdmin = ref(false)
 const myId = ref<string | null>(null)
+const myStatus = ref<string | null>(null)
 const suggestionList = ref<Array<Record<string, unknown>>>([])
 // Admin-configured caps (null = fall back to the limits.ts defaults).
 const cfgMaxSuggestions = ref<number | null>(null)
@@ -37,9 +38,11 @@ mockNuxtImport('useSuggestions', () => () => ({
   removeSuggestion: async () => {}
 }))
 mockNuxtImport('useRsvp', () => () => ({
-  myStatus: ref(null),
-  counts: ref({ going: 0, maybe: 0, no: 0 }),
-  setStatus: async () => {}
+  myStatus,
+  myPlusOnes: ref(0),
+  counts: ref({ going: 0, maybe: 0, no: 0, guests: 0 }),
+  setStatus: async () => {},
+  setGuests: async () => {}
 }))
 mockNuxtImport('useToast', () => () => ({ add: () => {} }))
 mockNuxtImport('useAppSettings', () => () => ({
@@ -63,6 +66,7 @@ const stubs = {
 beforeEach(() => {
   isAdmin.value = false
   myId.value = null
+  myStatus.value = 'going'
   suggestionList.value = []
   cfgMaxSuggestions.value = null
   cfgMaxVotes.value = null
@@ -112,5 +116,22 @@ describe('overview page', () => {
     // The cap notice fires at 2 (the configured value), not the default of 5.
     expect(w.text()).toContain('2 of 2 suggestions used')
     expect(w.text()).toContain('used all 2 suggestions')
+  })
+
+  it('prompts to RSVP and hides the suggest controls when not going', async () => {
+    myStatus.value = null
+    const w = await mountSuspended(OverviewPage, { global: { stubs } })
+    expect(w.text()).toContain('RSVP to join in')
+    // The suggestion-count line and suggest controls only appear once going.
+    expect(w.text()).not.toContain('suggestions used')
+    expect(w.text()).not.toContain('Suggest a movie')
+  })
+
+  it('shows the suggest controls once I am going', async () => {
+    myId.value = 'me'
+    myStatus.value = 'going'
+    const w = await mountSuspended(OverviewPage, { global: { stubs } })
+    expect(w.text()).toContain('0 of 5 suggestions used')
+    expect(w.text()).not.toContain('RSVP to join in')
   })
 })

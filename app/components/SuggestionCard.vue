@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import type { Suggestion } from '#shared/types/suggestion'
 
-const props = defineProps<{ suggestion: Suggestion, rank: number, maxVotes: number, locked?: boolean, voteCapReached?: boolean }>()
+// canVote defaults to true via withDefaults: a *typed* boolean prop that's absent
+// is cast to `false` by Vue, which would wrongly disable voting wherever the prop
+// isn't passed — the default makes "voting allowed" the explicit fallback.
+const props = withDefaults(
+  defineProps<{ suggestion: Suggestion, rank: number, maxVotes: number, locked?: boolean, voteCapReached?: boolean, canVote?: boolean }>(),
+  { canVote: true }
+)
 const emit = defineEmits<{ vote: [], unvote: [], remove: [], trailer: [] }>()
 
 const { myId } = useAuth()
@@ -13,8 +19,15 @@ const voteCount = computed(() => props.suggestion.voteCount ?? 0)
 const hasVoted = computed(() =>
   Boolean(myId.value) && (props.suggestion.votes ?? []).some(v => v.user_id === myId.value)
 )
-// At the vote cap you can't add a new vote, but you can still remove one to switch.
-const voteDisabled = computed(() => Boolean(props.voteCapReached) && !hasVoted.value)
+// Can't add a *new* vote at the cap or when you're not RSVP'd "going" — but you
+// can always remove a vote you've already cast (to switch your pick / back out).
+const voteDisabled = computed(() => !hasVoted.value && (Boolean(props.voteCapReached) || !props.canVote))
+const voteDisabledTitle = computed(() => {
+  if (!voteDisabled.value) return undefined
+  return !props.canVote
+    ? 'RSVP "Going" to vote on movies'
+    : 'Vote limit reached — remove a vote to switch your pick'
+})
 const isOwner = computed(() =>
   Boolean(myId.value) && props.suggestion.user_id === myId.value
 )
@@ -86,7 +99,7 @@ function onHeartClick(e: MouseEvent): void {
               :label="String(voteCount)"
               size="sm"
               :disabled="voteDisabled"
-              :title="voteDisabled ? 'Vote limit reached — remove a vote to switch your pick' : undefined"
+              :title="voteDisabledTitle"
               :aria-label="hasVoted ? 'Remove vote' : 'Vote'"
               @click="onHeartClick"
             />

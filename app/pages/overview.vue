@@ -41,6 +41,10 @@ const cardBackdrop = computed(() => currentEvent.value?.poster_url || leadPoster
 const votingLocked = computed(() => Boolean(currentEvent.value?.voting_locked_at))
 const winners = computed(() => topWinners(suggestions.value))
 
+// You must RSVP "going" to suggest or vote. RLS is the real gate (mirrors
+// public.is_going() in the migration); this just drives the UI.
+const isGoing = computed(() => myStatus.value === 'going')
+
 // Per-event participation caps (mirrors the DB triggers — see shared/utils/limits).
 // Effective limit = admin-configured (app_settings) or the default in limits.ts.
 const { maxSuggestions: cfgMaxSuggestions, maxVotes: cfgMaxVotes } = useAppSettings()
@@ -84,6 +88,10 @@ function openTrailer(suggestion: Suggestion): void {
 
 async function onSuggest(movie: TmdbMovie): Promise<void> {
   suggestOpen.value = false
+  if (!isGoing.value) {
+    toast.add({ title: 'RSVP first', description: 'Mark yourself “Going” to suggest a movie.', color: 'warning' })
+    return
+  }
   if (alreadySuggested(movie.id)) {
     toast.add({ title: 'Already suggested', description: `${movie.title} is already on the list.`, color: 'warning' })
     return
@@ -97,6 +105,10 @@ async function onSuggest(movie: TmdbMovie): Promise<void> {
   }
 }
 async function onVote(suggestion: Suggestion): Promise<void> {
+  if (!isGoing.value) {
+    toast.add({ title: 'RSVP first', description: 'Mark yourself “Going” to vote.', color: 'warning' })
+    return
+  }
   if (atVoteCap.value) {
     toast.add({ title: `You've used all ${voteLimit.value} votes`, description: 'Remove a vote to switch your pick.', color: 'warning' })
     return
@@ -212,45 +224,56 @@ async function onGuests(count: number): Promise<void> {
 
           <!-- Suggest + finder (hidden once voting is locked) -->
           <template v-if="!votingLocked">
-            <p class="text-xs text-muted text-center">
-              {{ mySuggestionCount }} of {{ suggestionLimit }} suggestions used
-            </p>
-            <template v-if="!atSuggestionCap">
-              <!-- Suggest (desktop inline) -->
-              <div class="hidden lg:block">
-                <h2 class="text-sm font-semibold text-muted mb-2">
-                  Suggest a movie
-                </h2>
-                <SuggestSection :suggested-movie-ids="suggestedMovieIds" @suggest="onSuggest" />
-              </div>
+            <!-- Gate: you must RSVP "going" before you can suggest or vote. -->
+            <template v-if="isGoing">
+              <p class="text-xs text-muted text-center">
+                {{ mySuggestionCount }} of {{ suggestionLimit }} suggestions used
+              </p>
+              <template v-if="!atSuggestionCap">
+                <!-- Suggest (desktop inline) -->
+                <div class="hidden lg:block">
+                  <h2 class="text-sm font-semibold text-muted mb-2">
+                    Suggest a movie
+                  </h2>
+                  <SuggestSection :suggested-movie-ids="suggestedMovieIds" @suggest="onSuggest" />
+                </div>
 
-              <!-- Suggest (mobile) -->
-              <UButton
-                class="lg:hidden justify-center"
-                block
-                label="Suggest a movie"
-                icon="i-lucide-plus"
-                @click="suggestOpen = true"
-              />
+                <!-- Suggest (mobile) -->
+                <UButton
+                  class="lg:hidden justify-center"
+                  block
+                  label="Suggest a movie"
+                  icon="i-lucide-plus"
+                  @click="suggestOpen = true"
+                />
 
-              <!-- Movie finder (all sizes) -->
-              <UButton
-                class="justify-center"
-                block
+                <!-- Movie finder (all sizes) -->
+                <UButton
+                  class="justify-center"
+                  block
+                  color="neutral"
+                  variant="outline"
+                  label="Help me find a movie"
+                  icon="i-lucide-clapperboard"
+                  @click="finderOpen = true"
+                />
+              </template>
+              <UAlert
+                v-else
+                icon="i-lucide-circle-check"
                 color="neutral"
-                variant="outline"
-                label="Help me find a movie"
-                icon="i-lucide-clapperboard"
-                @click="finderOpen = true"
+                variant="subtle"
+                :title="`You've used all ${suggestionLimit} suggestions`"
+                description="Remove one from the list to free up a slot."
               />
             </template>
             <UAlert
               v-else
-              icon="i-lucide-circle-check"
-              color="neutral"
+              icon="i-lucide-calendar-check"
+              color="primary"
               variant="subtle"
-              :title="`You've used all ${suggestionLimit} suggestions`"
-              description="Remove one from the list to free up a slot."
+              title="RSVP to join in"
+              description="Mark yourself “Going” to suggest movies and vote on the lineup."
             />
           </template>
           <p v-else class="text-sm text-muted text-center inline-flex items-center justify-center gap-1.5">
@@ -283,6 +306,7 @@ async function onGuests(count: number): Promise<void> {
               :rank="index + 1"
               :max-votes="maxVotes"
               :locked="votingLocked"
+              :can-vote="isGoing"
               :vote-cap-reached="atVoteCap"
               @vote="onVote(suggestion)"
               @unvote="onUnvote(suggestion)"
