@@ -29,6 +29,8 @@ const eventStatsOpen = ref(false)
 
 const selectedEventId = ref<string>()
 const { suggestions, refresh: refreshSuggestions, setDeleted } = useAdminSuggestions(selectedEventId)
+// Audit trail of titles pruned from the ballot (culls are permanent + otherwise hidden).
+const { culled: culledSuggestions } = useCulledSuggestions(selectedEventId)
 
 // Bring list + headcount for the selected event (admins curate; people claim on the event page).
 const { items: bringItems, addItem: addBringItem, updateItem: updateBringItem, remove: removeBringItem } = useBringList(selectedEventId)
@@ -447,6 +449,8 @@ function onSelectEvent(event: MovieEvent): void {
         <UCard v-else variant="subtle" class="text-center text-muted">
           No suggestions for this event.
         </UCard>
+
+        <CulledList v-if="culledSuggestions.length" :items="culledSuggestions" class="mt-4" />
       </template>
 
       <!-- BRING LIST -->
