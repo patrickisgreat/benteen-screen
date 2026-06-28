@@ -178,7 +178,7 @@ function onHeartClick(e: MouseEvent): void {
         <template v-else>
           <blockquote v-if="suggestion.blurb" class="mt-2 text-xs italic text-muted border-l-2 border-primary/40 pl-2">
             “{{ suggestion.blurb }}”
-            <button v-if="isOwner && !locked" type="button" class="not-italic text-primary ml-1" @click="startBlurb">
+            <UButton v-if="isOwner && !locked" label="edit" color="primary" variant="link" size="xs" class="not-italic ml-1 p-0" @click="startBlurb" />
               edit
             </button>
           </blockquote>
