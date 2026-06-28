@@ -19,7 +19,9 @@ export interface Suggestion {
   deleted: boolean
   created_at: string
   voteCount: number
-  votes: { user_id: string }[]
+  // `hidden_at` is present on admin/stats reads (to drop soft-deleted votes from
+  // counts); the overview read strips it, so it's optional.
+  votes: { user_id: string, hidden_at?: string | null }[]
 }
 
 /**
@@ -29,5 +31,5 @@ export interface Suggestion {
  */
 export interface AdminSuggestion extends Suggestion {
   author: { display_name: string | null, email: string | null } | null
-  votes: { user_id: string, voter: { display_name: string | null } | null }[]
+  votes: { user_id: string, hidden_at?: string | null, voter: { display_name: string | null } | null }[]
 }
