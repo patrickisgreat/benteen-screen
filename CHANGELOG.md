@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.12.0...v1.13.0) (2026-06-28)
+
+
+### Features
+
+* personal take + TMDB synopsis on suggestion cards ([#134](https://github.com/patrickisgreat/benteen-screen/issues/134)) ([19b2024](https://github.com/patrickisgreat/benteen-screen/commit/19b20240fca2ce32407969ab036bd72c66dd50d5))
+
 ## [1.12.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.11.0...v1.12.0) (2026-06-28)
 
 
