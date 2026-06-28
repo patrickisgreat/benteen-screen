@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.10.0...v1.11.0) (2026-06-28)
+
+
+### Features
+
+* un-RSVP hides your suggestions and votes; re-RSVP restores them ([#130](https://github.com/patrickisgreat/benteen-screen/issues/130)) ([a0f777d](https://github.com/patrickisgreat/benteen-screen/commit/a0f777d697c499f5ec1bfa677bb907d24b361978))
+
 ## [1.10.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.9.0...v1.10.0) (2026-06-28)
 
 
