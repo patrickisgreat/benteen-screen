@@ -149,7 +149,6 @@ function onHeartClick(e: MouseEvent): void {
         </div>
 
         <!-- What it's about (TMDB synopsis) — for anyone who'd rather not watch the trailer. -->
-        <p
         <button
           v-if="movie.overview"
           type="button"
@@ -179,8 +178,6 @@ function onHeartClick(e: MouseEvent): void {
           <blockquote v-if="suggestion.blurb" class="mt-2 text-xs italic text-muted border-l-2 border-primary/40 pl-2">
             “{{ suggestion.blurb }}”
             <UButton v-if="isOwner && !locked" label="edit" color="primary" variant="link" size="xs" class="not-italic ml-1 p-0" @click="startBlurb" />
-              edit
-            </button>
           </blockquote>
           <UButton
             v-else-if="isOwner && !locked"
