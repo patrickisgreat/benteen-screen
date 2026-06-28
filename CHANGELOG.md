@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.13.1...v1.14.0) (2026-06-28)
+
+
+### Features
+
+* headline the personal pitch with the suggester's name ([#138](https://github.com/patrickisgreat/benteen-screen/issues/138)) ([6b00445](https://github.com/patrickisgreat/benteen-screen/commit/6b00445267e6902298f67beba2751cbba6f4ac2c))
+
 ## [1.13.1](https://github.com/patrickisgreat/benteen-screen/compare/v1.13.0...v1.13.1) (2026-06-28)
 
 
