@@ -48,9 +48,9 @@ export interface Database {
         Relationships: []
       }
       suggestions: {
-        Row: { id: string, event_id: string, user_id: string, tmdb_movie: TmdbMovie, deleted: boolean, rsvp_hidden_at: string | null, culled_at: string | null, created_at: string }
-        Insert: { id?: string, event_id: string, user_id?: string, tmdb_movie: TmdbMovie, deleted?: boolean, rsvp_hidden_at?: string | null, culled_at?: string | null, created_at?: string }
-        Update: { id?: string, event_id?: string, user_id?: string, tmdb_movie?: TmdbMovie, deleted?: boolean, rsvp_hidden_at?: string | null, culled_at?: string | null, created_at?: string }
+        Row: { id: string, event_id: string, user_id: string, tmdb_movie: TmdbMovie, deleted: boolean, rsvp_hidden_at: string | null, culled_at: string | null, blurb: string | null, created_at: string }
+        Insert: { id?: string, event_id: string, user_id?: string, tmdb_movie: TmdbMovie, deleted?: boolean, rsvp_hidden_at?: string | null, culled_at?: string | null, blurb?: string | null, created_at?: string }
+        Update: { id?: string, event_id?: string, user_id?: string, tmdb_movie?: TmdbMovie, deleted?: boolean, rsvp_hidden_at?: string | null, culled_at?: string | null, blurb?: string | null, created_at?: string }
         Relationships: []
       }
       votes: {
@@ -80,6 +80,7 @@ export interface Database {
       cull_zero_votes: { Args: { p_event_id: string }, Returns: number }
       cull_to_top: { Args: { p_event_id: string, p_keep: number }, Returns: number }
       is_allowed: { Args: Record<string, never>, Returns: boolean }
+      set_suggestion_blurb: { Args: { p_suggestion_id: string, p_blurb: string }, Returns: undefined }
       suggestion_vote_counts: { Args: { p_event_id: string }, Returns: { suggestion_id: string, votes: number }[] }
     }
     Enums: { [_ in never]: never }

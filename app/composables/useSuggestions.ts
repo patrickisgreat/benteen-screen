@@ -32,7 +32,7 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
       const [rows, counts] = await Promise.all([
         supabase
           .from('suggestions')
-          .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id, hidden_at)')
+          .select('id, event_id, user_id, tmdb_movie, deleted, blurb, created_at, votes(user_id, hidden_at)')
           .eq('event_id', id)
           .eq('deleted', false)
           // Hidden because the author left "going" — off the ballot until they return.
@@ -120,5 +120,13 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
     await refresh()
   }
 
-  return { suggestions, error, refresh, alreadySuggested, suggest, vote, unvote, removeSuggestion }
+  // Set/clear the author's personal blurb (RLS has no author-update path, so this
+  // goes through the author-only RPC). An empty string clears it.
+  async function setBlurb(suggestion: Suggestion, blurb: string): Promise<void> {
+    const { error } = await supabase.rpc('set_suggestion_blurb', { p_suggestion_id: suggestion.id, p_blurb: blurb })
+    if (error) throw error
+    await refresh()
+  }
+
+  return { suggestions, error, refresh, alreadySuggested, suggest, vote, unvote, removeSuggestion, setBlurb }
 }

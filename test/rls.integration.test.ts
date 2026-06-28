@@ -453,4 +453,40 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('votes').delete().eq('user_id', memberId).eq('suggestion_id', s!.id)
     await admin!.from('suggestions').delete().eq('id', s!.id)
   })
+
+  it('set_suggestion_blurb: author can set/clear, others cannot, length-capped', async () => {
+    const { data: mine } = await admin!
+      .from('suggestions').insert({ event_id: eventId, user_id: memberId, tmdb_movie: { id: 980, title: 'Blurbed' } })
+      .select('id').single()
+    const sid = mine!.id
+
+    // Author sets it — trimmed and stored.
+    const set = await memberClient.rpc('set_suggestion_blurb', { p_suggestion_id: sid, p_blurb: '  My desert-island pick.  ' })
+    expect(set.error, 'the author can set their blurb').toBeNull()
+    const after = await admin!.from('suggestions').select('blurb').eq('id', sid).single()
+    expect(after.data!.blurb, 'blurb is trimmed + stored').toBe('My desert-island pick.')
+
+    // An allowlisted non-author can't edit someone else's blurb.
+    const { data: theirs } = await admin!
+      .from('suggestions').insert({ event_id: eventId, user_id: adminUserId, tmdb_movie: { id: 981, title: 'NotMine' } })
+      .select('id').single()
+    const notMine = await memberClient.rpc('set_suggestion_blurb', { p_suggestion_id: theirs!.id, p_blurb: 'hijack' })
+    expect(notMine.error, 'a non-author is rejected even when allowlisted').toBeTruthy()
+
+    // A non-allowlisted user can't either.
+    const outsider = await outsiderClient.rpc('set_suggestion_blurb', { p_suggestion_id: sid, p_blurb: 'nope' })
+    expect(outsider.error, 'a non-allowlisted user is rejected').toBeTruthy()
+
+    // Over the 500-char cap is rejected.
+    const tooLong = await memberClient.rpc('set_suggestion_blurb', { p_suggestion_id: sid, p_blurb: 'x'.repeat(501) })
+    expect(tooLong.error, 'over 500 chars is rejected').toBeTruthy()
+
+    // Whitespace clears it to null.
+    const cleared = await memberClient.rpc('set_suggestion_blurb', { p_suggestion_id: sid, p_blurb: '   ' })
+    expect(cleared.error).toBeNull()
+    const empty = await admin!.from('suggestions').select('blurb').eq('id', sid).single()
+    expect(empty.data!.blurb, 'empty/whitespace clears to null').toBeNull()
+
+    await admin!.from('suggestions').delete().in('id', [sid, theirs!.id])
+  })
 })

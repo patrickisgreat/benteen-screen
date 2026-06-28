@@ -107,4 +107,31 @@ describe('SuggestionCard', () => {
     const w = await mountSuspended(SuggestionCard, { props: { suggestion, rank: 1, maxVotes: 2, canVote: false } })
     expect(w.get('[aria-label="Remove vote"]').attributes('disabled')).toBeUndefined()
   })
+
+  it('shows the TMDB synopsis when present', async () => {
+    const withOverview = { ...suggestion, tmdb_movie: { ...suggestion.tmdb_movie, overview: 'A crew pulls one last heist.' } }
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion: withOverview, rank: 1, maxVotes: 2 } })
+    expect(w.text()).toContain('A crew pulls one last heist.')
+  })
+
+  it('lets the owner add a take and emits the text on save', async () => {
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion, rank: 1, maxVotes: 2 } })
+    await w.findAll('button').find(b => b.text().includes('Add your take'))?.trigger('click')
+    await w.get('textarea').setValue('Peak Michael Mann.')
+    await w.findAll('button').find(b => b.text().trim() === 'Save')?.trigger('click')
+    expect(w.emitted('blurb')?.[0]).toEqual(['Peak Michael Mann.'])
+  })
+
+  it('shows an existing take and no "add" button for the owner', async () => {
+    const withBlurb = { ...suggestion, blurb: 'A desert-island pick for me.' }
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion: withBlurb, rank: 1, maxVotes: 2 } })
+    expect(w.text()).toContain('A desert-island pick for me.')
+    expect(w.findAll('button').find(b => b.text().includes('Add your take'))).toBeUndefined()
+  })
+
+  it('does not let a non-owner add a take', async () => {
+    const notMine = { ...suggestion, user_id: 'someone-else' }
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion: notMine, rank: 1, maxVotes: 2 } })
+    expect(w.findAll('button').find(b => b.text().includes('Add your take'))).toBeUndefined()
+  })
 })

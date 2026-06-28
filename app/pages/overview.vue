@@ -23,7 +23,7 @@ const trailerMovie = ref<TmdbMovie | null>(null)
 const currentEvent = computed(() => events.value[eventIndex.value] ?? null)
 const currentEventId = computed(() => currentEvent.value?.id ?? null)
 
-const { suggestions, refresh: refreshSuggestions, alreadySuggested, suggest, vote, unvote, removeSuggestion } = useSuggestions(currentEventId)
+const { suggestions, refresh: refreshSuggestions, alreadySuggested, suggest, vote, unvote, removeSuggestion, setBlurb } = useSuggestions(currentEventId)
 const { myStatus, myPlusOnes, counts, setStatus, setGuests } = useRsvp(currentEventId)
 // Who else is looking at this movie night right now (Realtime Presence).
 const { online } = usePresence(currentEventId)
@@ -137,6 +137,11 @@ async function onUnvote(suggestion: Suggestion): Promise<void> {
 async function onRemove(suggestion: Suggestion): Promise<void> {
   if (await run(() => removeSuggestion(suggestion), 'Could not remove suggestion')) {
     toast.add({ title: 'Suggestion removed', color: 'neutral' })
+  }
+}
+async function onBlurb(suggestion: Suggestion, text: string): Promise<void> {
+  if (await run(() => setBlurb(suggestion, text), 'Could not save your take')) {
+    toast.add({ title: text ? 'Your take was saved' : 'Your take was removed', icon: 'i-lucide-check', color: 'success' })
   }
 }
 async function applyRsvp(status: RsvpStatus): Promise<void> {
@@ -348,6 +353,7 @@ async function onGuests(count: number): Promise<void> {
               @unvote="onUnvote(suggestion)"
               @remove="onRemove(suggestion)"
               @trailer="openTrailer(suggestion)"
+              @blurb="onBlurb(suggestion, $event)"
             />
           </TransitionGroup>
           <UCard v-else variant="subtle" class="text-center py-10">

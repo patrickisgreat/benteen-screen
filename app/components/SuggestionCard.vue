@@ -8,11 +8,27 @@ const props = withDefaults(
   defineProps<{ suggestion: Suggestion, rank: number, maxVotes: number, locked?: boolean, voteCapReached?: boolean, canVote?: boolean }>(),
   { canVote: true }
 )
-const emit = defineEmits<{ vote: [], unvote: [], remove: [], trailer: [] }>()
+const emit = defineEmits<{ vote: [], unvote: [], remove: [], trailer: [], blurb: [text: string] }>()
 
 const { myId } = useAuth()
 
 const movie = computed(() => props.suggestion.tmdb_movie)
+
+// "What it's about" (TMDB synopsis) — clamped, click to expand.
+const overviewOpen = ref(false)
+
+// The suggester's personal take — owner can add/edit; saving emits the new text
+// (empty clears it). Parent persists via the author-only RPC.
+const editingBlurb = ref(false)
+const blurbDraft = ref('')
+function startBlurb(): void {
+  blurbDraft.value = props.suggestion.blurb ?? ''
+  editingBlurb.value = true
+}
+function saveBlurb(): void {
+  emit('blurb', blurbDraft.value.trim())
+  editingBlurb.value = false
+}
 const year = computed(() => movieYear(movie.value))
 // Public count from the tally (votes.length would only see the viewer's own vote).
 const voteCount = computed(() => props.suggestion.voteCount ?? 0)
@@ -66,7 +82,7 @@ function onHeartClick(e: MouseEvent): void {
 
 <template>
   <UCard variant="subtle" :class="highlight ? 'ring-2 ring-primary/40' : ''" :ui="{ body: 'sm:p-4 p-3' }">
-    <div class="flex items-center gap-3">
+    <div class="flex items-start gap-3">
       <!-- rank -->
       <div class="shrink-0 flex items-center justify-center size-7 rounded-full font-bold text-sm" :class="rankClass">
         {{ rank }}
@@ -131,6 +147,52 @@ function onHeartClick(e: MouseEvent): void {
             @click="emit('remove')"
           />
         </div>
+
+        <!-- What it's about (TMDB synopsis) — for anyone who'd rather not watch the trailer. -->
+        <p
+        <button
+          v-if="movie.overview"
+          type="button"
+          class="text-xs text-muted mt-2 text-left w-full cursor-pointer"
+          :class="overviewOpen ? '' : 'line-clamp-2'"
+          @click="overviewOpen = !overviewOpen"
+        >
+          {{ movie.overview }}
+        </button>
+
+        <!-- The suggester's personal take. -->
+        <div v-if="editingBlurb" class="mt-2 space-y-1">
+          <UTextarea
+            v-model="blurbDraft"
+            :rows="2"
+            :maxlength="500"
+            autoresize
+            placeholder="Why should we screen this? (optional)"
+            class="w-full"
+          />
+          <div class="flex items-center gap-1">
+            <UButton label="Save" icon="i-lucide-check" size="xs" @click="saveBlurb" />
+            <UButton label="Cancel" color="neutral" variant="ghost" size="xs" @click="editingBlurb = false" />
+          </div>
+        </div>
+        <template v-else>
+          <blockquote v-if="suggestion.blurb" class="mt-2 text-xs italic text-muted border-l-2 border-primary/40 pl-2">
+            “{{ suggestion.blurb }}”
+            <UButton v-if="isOwner && !locked" label="edit" color="primary" variant="link" size="xs" class="not-italic ml-1 p-0" @click="startBlurb" />
+              edit
+            </button>
+          </blockquote>
+          <UButton
+            v-else-if="isOwner && !locked"
+            label="Add your take"
+            icon="i-lucide-message-square-plus"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            class="mt-1"
+            @click="startBlurb"
+          />
+        </template>
       </div>
     </div>
   </UCard>
