@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.11.0...v1.12.0) (2026-06-28)
+
+
+### Features
+
+* ballot pruning — cut zero-vote titles + keep-top-N runoff ([#132](https://github.com/patrickisgreat/benteen-screen/issues/132)) ([a9b47cc](https://github.com/patrickisgreat/benteen-screen/commit/a9b47ccc9fe61c58930ab93ee9ace59558951a5c))
+
 ## [1.11.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.10.0...v1.11.0) (2026-06-28)
 
 
