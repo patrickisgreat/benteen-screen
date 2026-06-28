@@ -48,9 +48,9 @@ export interface Database {
         Relationships: []
       }
       suggestions: {
-        Row: { id: string, event_id: string, user_id: string, tmdb_movie: TmdbMovie, deleted: boolean, rsvp_hidden_at: string | null, created_at: string }
-        Insert: { id?: string, event_id: string, user_id?: string, tmdb_movie: TmdbMovie, deleted?: boolean, rsvp_hidden_at?: string | null, created_at?: string }
-        Update: { id?: string, event_id?: string, user_id?: string, tmdb_movie?: TmdbMovie, deleted?: boolean, rsvp_hidden_at?: string | null, created_at?: string }
+        Row: { id: string, event_id: string, user_id: string, tmdb_movie: TmdbMovie, deleted: boolean, rsvp_hidden_at: string | null, culled_at: string | null, created_at: string }
+        Insert: { id?: string, event_id: string, user_id?: string, tmdb_movie: TmdbMovie, deleted?: boolean, rsvp_hidden_at?: string | null, culled_at?: string | null, created_at?: string }
+        Update: { id?: string, event_id?: string, user_id?: string, tmdb_movie?: TmdbMovie, deleted?: boolean, rsvp_hidden_at?: string | null, culled_at?: string | null, created_at?: string }
         Relationships: []
       }
       votes: {
