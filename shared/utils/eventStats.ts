@@ -26,7 +26,8 @@ export function computeEventStats(input: {
   const submitters = new Set(live.map(s => s.user_id))
   const voters = new Set<string>()
   for (const s of live) {
-    for (const v of s.votes ?? []) voters.add(v.user_id)
+    // Soft-deleted votes (voter left "going") don't count toward distinct voters.
+    for (const v of s.votes ?? []) if (v.hidden_at == null) voters.add(v.user_id)
   }
   const countStatus = (status: string): number => input.rsvps.filter(r => r.status === status).length
   return {

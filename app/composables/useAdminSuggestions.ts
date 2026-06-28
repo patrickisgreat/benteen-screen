@@ -5,12 +5,14 @@ import type { AdminSuggestion } from '#shared/types/suggestion'
 const SELECT = `
   id, event_id, user_id, tmdb_movie, deleted, created_at,
   author:profiles!suggestions_user_id_fkey(display_name, email),
-  votes(user_id, voter:profiles!votes_user_id_fkey(display_name))
+  votes(user_id, hidden_at, voter:profiles!votes_user_id_fkey(display_name))
 `
 
 /**
- * Admin view of an event's suggestions — includes soft-deleted rows, and joins
- * the author + each voter's display name. Realtime keeps it live.
+ * Admin view of an event's suggestions — includes admin-deleted rows (for the
+ * moderation toggle) but excludes rsvp-hidden ones (off the ballot, auto-restore
+ * when the author returns), so admin sees the same contention set members do.
+ * Joins the author + each voter's display name. Realtime keeps it live.
  */
 export function useAdminSuggestions(eventId: MaybeRefOrGetter<string | null | undefined>) {
   const supabase = useSupabaseClient<Database>()
@@ -26,11 +28,13 @@ export function useAdminSuggestions(eventId: MaybeRefOrGetter<string | null | un
         .from('suggestions')
         .select(SELECT)
         .eq('event_id', id)
+        // Off the ballot while the author isn't "going" (admin-deleted rows still load).
+        .is('rsvp_hidden_at', null)
       if (error) throw error
-      // Admins read every vote row (RLS), so the count is just votes.length here —
-      // mirror it into voteCount to satisfy the shared Suggestion shape.
+      // Admins read every vote row (RLS); count only the live (non-soft-deleted)
+      // ones so the admin count matches the public tally.
       return ((data ?? []) as unknown as AdminSuggestion[])
-        .map(s => ({ ...s, voteCount: s.votes?.length ?? 0 }))
+        .map(s => ({ ...s, voteCount: liveVoteCount(s.votes) }))
     }
   })
 
@@ -46,7 +50,10 @@ export function useAdminSuggestions(eventId: MaybeRefOrGetter<string | null | un
   }
 
   function voterNames(suggestion: AdminSuggestion): string[] {
-    return (suggestion.votes ?? []).map(vote => vote.voter?.display_name ?? 'Unknown')
+    // Only live voters — someone who left "going" no longer counts.
+    return (suggestion.votes ?? [])
+      .filter(vote => vote.hidden_at == null)
+      .map(vote => vote.voter?.display_name ?? 'Unknown')
   }
 
   return { suggestions, error, setDeleted, voterNames }

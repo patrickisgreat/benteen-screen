@@ -30,6 +30,7 @@ function builder(table: string) {
       usedIn = true
       return c
     },
+    is: () => c,
     not: () => c,
     then: (resolve: (v: unknown) => void) => {
       if (table === 'rsvps') return resolve({ data: data.rsvps, error: null })
