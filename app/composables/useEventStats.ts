@@ -17,8 +17,9 @@ export function useEventStats(eventId: MaybeRefOrGetter<string | null>) {
         .from('suggestions')
         .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id, hidden_at)')
         .eq('event_id', id)
-        // rsvp-hidden suggestions are off the ballot (admin-deleted still load).
-        .is('rsvp_hidden_at', null),
+        // rsvp-hidden and culled suggestions are off the ballot (admin-deleted still load).
+        .is('rsvp_hidden_at', null)
+        .is('culled_at', null),
       supabase.from('rsvps').select('status').eq('event_id', id),
       supabase.from('bring_items').select('user_id').eq('event_id', id)
     ])

@@ -53,6 +53,7 @@ mockNuxtImport('useAppSettings', () => () => ({
   maxVotes: cfgMaxVotes
 }))
 mockNuxtImport('usePresence', () => () => ({ online: ref([]) }))
+mockNuxtImport('useVoteRefunds', () => () => {})
 
 // Heavy children pull in their own composables/network — stub them; this page
 // test only cares about the header + the admin-gated selector.

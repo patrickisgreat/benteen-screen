@@ -28,8 +28,10 @@ export function useAdminSuggestions(eventId: MaybeRefOrGetter<string | null | un
         .from('suggestions')
         .select(SELECT)
         .eq('event_id', id)
-        // Off the ballot while the author isn't "going" (admin-deleted rows still load).
+        // Off the ballot while the author isn't "going", and permanently once culled
+        // (admin-deleted rows still load for the moderation toggle).
         .is('rsvp_hidden_at', null)
+        .is('culled_at', null)
       if (error) throw error
       // Admins read every vote row (RLS); count only the live (non-soft-deleted)
       // ones so the admin count matches the public tally.
@@ -56,5 +58,5 @@ export function useAdminSuggestions(eventId: MaybeRefOrGetter<string | null | un
       .map(vote => vote.voter?.display_name ?? 'Unknown')
   }
 
-  return { suggestions, error, setDeleted, voterNames }
+  return { suggestions, error, refresh, setDeleted, voterNames }
 }

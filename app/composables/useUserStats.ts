@@ -37,8 +37,9 @@ export function useUserStats(userId: MaybeRefOrGetter<string | null>) {
       .from('suggestions')
       .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id, hidden_at)')
       .in('event_id', lockedIds)
-      // rsvp-hidden suggestions are off the ballot, so they can't be winners.
+      // rsvp-hidden and culled suggestions are off the ballot, so they can't be winners.
       .is('rsvp_hidden_at', null)
+      .is('culled_at', null)
     // The votes embed isn't declared in the generated types (no FK relationship
     // row), so PostgREST's inferred shape doesn't match — cast as useSuggestions does.
     // Admin drill-down reads every vote (RLS); count only live votes so the winner

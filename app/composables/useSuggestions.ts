@@ -36,7 +36,9 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
           .eq('event_id', id)
           .eq('deleted', false)
           // Hidden because the author left "going" — off the ballot until they return.
-          .is('rsvp_hidden_at', null),
+          .is('rsvp_hidden_at', null)
+          // Permanently culled (pruned as the event neared) — off the ballot for good.
+          .is('culled_at', null),
         supabase.rpc('suggestion_vote_counts', { p_event_id: id })
       ])
       if (rows.error) throw rows.error
