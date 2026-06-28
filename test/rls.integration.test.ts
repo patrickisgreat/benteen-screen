@@ -240,4 +240,57 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('rsvps').delete().eq('user_id', gateId)
     await admin!.from('invites').delete().eq('email', gateEmail)
   })
+
+  it('un-RSVP hides the user’s suggestions + votes; re-RSVP restores them', async () => {
+    const email = `rls_hide_${stamp}@example.com`
+    const uid = await makeUser(email)
+    await admin!.from('invites').insert({ email })
+    const client = await signInAs(email)
+
+    // Another member's suggestion (service role) for our user to vote on, plus our
+    // own suggestion B. Both happen while "going" (the participation gate).
+    const { data: a } = await admin!
+      .from('suggestions')
+      .insert({ event_id: eventId, user_id: memberId, tmdb_movie: { id: 800, title: 'Voted' } })
+      .select('id').single()
+    const aId = a!.id
+
+    await client.from('rsvps').insert({ event_id: eventId, user_id: uid, status: 'going' })
+    const { data: b } = await client
+      .from('suggestions').insert({ event_id: eventId, tmdb_movie: { id: 801, title: 'Mine' } })
+      .select('id').single()
+    const bId = b!.id
+    await client.from('votes').insert({ suggestion_id: aId })
+
+    // Baseline (going): B visible, vote live, tally counts A.
+    const beforeB = await admin!.from('suggestions').select('rsvp_hidden_at').eq('id', bId).single()
+    expect(beforeB.data!.rsvp_hidden_at, 'B starts visible').toBeNull()
+    const beforeVote = await admin!.from('votes').select('hidden_at').eq('suggestion_id', aId).eq('user_id', uid).single()
+    expect(beforeVote.data!.hidden_at, 'the vote starts live').toBeNull()
+    const tallyBefore = await client.rpc('suggestion_vote_counts', { p_event_id: eventId })
+    expect(Number((tallyBefore.data ?? []).find(r => r.suggestion_id === aId)?.votes), 'A counts the vote').toBe(1)
+
+    // Leave "going" → suggestions hidden, votes soft-deleted.
+    await client.from('rsvps').update({ status: 'maybe' }).eq('event_id', eventId).eq('user_id', uid)
+    const hiddenB = await admin!.from('suggestions').select('rsvp_hidden_at').eq('id', bId).single()
+    expect(hiddenB.data!.rsvp_hidden_at, 'B is rsvp-hidden after leaving going').not.toBeNull()
+    const hiddenVote = await admin!.from('votes').select('hidden_at').eq('suggestion_id', aId).eq('user_id', uid).single()
+    expect(hiddenVote.data!.hidden_at, 'the vote is soft-deleted after leaving going').not.toBeNull()
+    const tallyHidden = await client.rpc('suggestion_vote_counts', { p_event_id: eventId })
+    expect((tallyHidden.data ?? []).find(r => r.suggestion_id === aId), 'the hidden vote no longer counts').toBeUndefined()
+
+    // Return to "going" → restored to the exact prior state.
+    await client.from('rsvps').update({ status: 'going' }).eq('event_id', eventId).eq('user_id', uid)
+    const restoredB = await admin!.from('suggestions').select('rsvp_hidden_at').eq('id', bId).single()
+    expect(restoredB.data!.rsvp_hidden_at, 'B is restored on re-RSVP').toBeNull()
+    const restoredVote = await admin!.from('votes').select('hidden_at').eq('suggestion_id', aId).eq('user_id', uid).single()
+    expect(restoredVote.data!.hidden_at, 'the vote is restored on re-RSVP').toBeNull()
+    const tallyRestored = await client.rpc('suggestion_vote_counts', { p_event_id: eventId })
+    expect(Number((tallyRestored.data ?? []).find(r => r.suggestion_id === aId)?.votes), 'the vote counts again').toBe(1)
+
+    await admin!.from('votes').delete().eq('user_id', uid)
+    await admin!.from('suggestions').delete().in('id', [aId, bId])
+    await admin!.from('rsvps').delete().eq('user_id', uid)
+    await admin!.from('invites').delete().eq('email', email)
+  })
 })
