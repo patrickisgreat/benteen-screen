@@ -5,7 +5,8 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 
 interface InsertCall { table: string, payload: Record<string, unknown> }
 interface DeleteCall { table: string, filters: Record<string, unknown> }
-const calls: { inserts: InsertCall[], deletes: DeleteCall[] } = { inserts: [], deletes: [] }
+interface RpcCall { fn: string, args: Record<string, unknown> }
+const calls: { inserts: InsertCall[], deletes: DeleteCall[], rpcs: RpcCall[] } = { inserts: [], deletes: [], rpcs: [] }
 
 // Minimal Supabase stub that records inserts/deletes and satisfies refresh()+realtime.
 const supabase = {
@@ -41,7 +42,10 @@ const supabase = {
       }
     }
   },
-  rpc: () => Promise.resolve({ data: [], error: null }),
+  rpc: (fn: string, args: Record<string, unknown>) => {
+    calls.rpcs.push({ fn, args })
+    return Promise.resolve({ data: [], error: null })
+  },
   channel() {
     const ch = { on: () => ch, subscribe: () => ch, send: () => Promise.resolve('ok') }
     return ch
@@ -55,6 +59,7 @@ mockNuxtImport('useState', () => (key: string) => ref(key === 'my-id' ? 'me' : n
 beforeEach(() => {
   calls.inserts = []
   calls.deletes = []
+  calls.rpcs = []
 })
 
 describe('useSuggestions write path', () => {
@@ -78,6 +83,13 @@ describe('useSuggestions write path', () => {
     const { vote } = useSuggestions(ref('e1'))
     await vote({ id: 's1', votes: [{ user_id: 'me' }] } as never)
     expect(calls.inserts.find(i => i.table === 'votes')).toBeUndefined()
+  })
+
+  it('setBlurb() calls the author-only RPC with the suggestion id + text', async () => {
+    const { setBlurb } = useSuggestions(ref('e1'))
+    await setBlurb({ id: 's1' } as never, 'A desert-island pick for me.')
+    const call = calls.rpcs.find(r => r.fn === 'set_suggestion_blurb')
+    expect(call?.args).toEqual({ p_suggestion_id: 's1', p_blurb: 'A desert-island pick for me.' })
   })
 
   it('unvote() deletes by suggestion_id only — RLS scopes it to my row', async () => {

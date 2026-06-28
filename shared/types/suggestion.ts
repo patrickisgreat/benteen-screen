@@ -18,6 +18,9 @@ export interface Suggestion {
   tmdb_movie: TmdbMovie
   deleted: boolean
   created_at: string
+  // The suggester's personal note on why they picked it. Optional — only the
+  // reads that display it (overview) select it.
+  blurb?: string | null
   voteCount: number
   // `hidden_at` is present on admin/stats reads (to drop soft-deleted votes from
   // counts); the overview read strips it, so it's optional.
