@@ -32,7 +32,7 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
       const [rows, counts] = await Promise.all([
         supabase
           .from('suggestions')
-          .select('id, event_id, user_id, tmdb_movie, deleted, blurb, created_at, votes(user_id, hidden_at)')
+          .select('id, event_id, user_id, tmdb_movie, deleted, blurb, created_at, author:profiles!suggestions_user_id_fkey(display_name), votes(user_id, hidden_at)')
           .eq('event_id', id)
           .eq('deleted', false)
           // Hidden because the author left "going" — off the ballot until they return.
