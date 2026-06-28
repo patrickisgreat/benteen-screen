@@ -4,9 +4,11 @@ import type { Database } from '~/types/database.types'
 import type { Suggestion } from '#shared/types/suggestion'
 import type { TmdbMovie } from '#shared/types/movie'
 
-// Rows as they come back from the suggestions query (votes = only those the viewer
-// may read; the public count is merged in from the tally RPC below).
-type RawSuggestion = Omit<Suggestion, 'voteCount'>
+// Rows as they come back from the suggestions query: votes carry `hidden_at` so we
+// can drop the viewer's own soft-deleted (un-RSVP'd) votes before exposing them; the
+// public count is merged in from the tally RPC below.
+type RawVoteRow = { user_id: string, hidden_at: string | null }
+type RawSuggestionRow = Omit<Suggestion, 'voteCount' | 'votes'> & { votes: RawVoteRow[] }
 
 /**
  * Realtime suggestions for an event + the write actions. Vote *counts* come from
@@ -30,16 +32,24 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
       const [rows, counts] = await Promise.all([
         supabase
           .from('suggestions')
-          .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id)')
+          .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id, hidden_at)')
           .eq('event_id', id)
-          .eq('deleted', false),
+          .eq('deleted', false)
+          // Hidden because the author left "going" — off the ballot until they return.
+          .is('rsvp_hidden_at', null),
         supabase.rpc('suggestion_vote_counts', { p_event_id: id })
       ])
       if (rows.error) throw rows.error
       if (counts.error) throw counts.error
       const countById = new Map((counts.data ?? []).map(c => [c.suggestion_id, Number(c.votes)]))
-      return ((rows.data ?? []) as unknown as RawSuggestion[])
-        .map(s => ({ ...s, voteCount: countById.get(s.id) ?? 0 }))
+      return ((rows.data ?? []) as unknown as RawSuggestionRow[])
+        .map(s => ({
+          ...s,
+          // Drop the viewer's own soft-deleted votes so "did I vote" and my budget
+          // reflect live votes only (counts come from the tally, which also excludes them).
+          votes: (s.votes ?? []).filter(v => v.hidden_at == null).map(v => ({ user_id: v.user_id })),
+          voteCount: countById.get(s.id) ?? 0
+        }))
         .sort((a, b) => {
           const diff = b.voteCount - a.voteCount
           return diff !== 0 ? diff : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -108,5 +118,5 @@ export function useSuggestions(eventId: MaybeRefOrGetter<string | null | undefin
     await refresh()
   }
 
-  return { suggestions, error, alreadySuggested, suggest, vote, unvote, removeSuggestion }
+  return { suggestions, error, refresh, alreadySuggested, suggest, vote, unvote, removeSuggestion }
 }
