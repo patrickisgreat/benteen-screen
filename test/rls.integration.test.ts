@@ -371,4 +371,62 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('votes').delete().eq('user_id', memberId).in('suggestion_id', ids)
     await admin!.from('suggestions').delete().in('id', ids)
   })
+
+  it('locks in a top-3 voted suggestion within a week so an un-RSVP can’t hide it', async () => {
+    // Event 3 days out — inside the lock-in window.
+    const { data: ev } = await admin!
+      .from('events').insert({ title: 'Soon', event_date: new Date(stamp + 3 * 86_400_000).toISOString() })
+      .select('id').single()
+    const soonId = ev!.id
+
+    const email = `rls_lockin_${stamp}@example.com`
+    const uid = await makeUser(email)
+    await admin!.from('invites').insert({ email })
+    const client = await signInAs(email)
+    await client.from('rsvps').insert({ event_id: soonId, user_id: uid, status: 'going' })
+    const { data: a } = await client.from('suggestions').insert({ event_id: soonId, tmdb_movie: { id: 950, title: 'Contender' } }).select('id').single()
+    const { data: b } = await client.from('suggestions').insert({ event_id: soonId, tmdb_movie: { id: 951, title: 'Longshot' } }).select('id').single()
+    // Contender has a vote (top-3, >0); Longshot has none.
+    await admin!.from('votes').insert({ suggestion_id: a!.id, user_id: memberId })
+
+    // Author bails.
+    await client.from('rsvps').update({ status: 'no' }).eq('event_id', soonId).eq('user_id', uid)
+
+    const aRow = await admin!.from('suggestions').select('rsvp_hidden_at').eq('id', a!.id).single()
+    const bRow = await admin!.from('suggestions').select('rsvp_hidden_at').eq('id', b!.id).single()
+    expect(aRow.data!.rsvp_hidden_at, 'a top-3 voted title within a week stays on the ballot').toBeNull()
+    expect(bRow.data!.rsvp_hidden_at, 'a zero-vote title is still hidden on un-RSVP').not.toBeNull()
+
+    await admin!.from('votes').delete().in('suggestion_id', [a!.id, b!.id])
+    await admin!.from('suggestions').delete().in('id', [a!.id, b!.id])
+    await admin!.from('rsvps').delete().eq('user_id', uid)
+    await admin!.from('invites').delete().eq('email', email)
+    await admin!.from('events').delete().eq('id', soonId)
+  })
+
+  it('does not lock in a voted suggestion when the event is more than a week out', async () => {
+    const { data: ev } = await admin!
+      .from('events').insert({ title: 'Later', event_date: new Date(stamp + 30 * 86_400_000).toISOString() })
+      .select('id').single()
+    const farId = ev!.id
+
+    const email = `rls_nolock_${stamp}@example.com`
+    const uid = await makeUser(email)
+    await admin!.from('invites').insert({ email })
+    const client = await signInAs(email)
+    await client.from('rsvps').insert({ event_id: farId, user_id: uid, status: 'going' })
+    const { data: a } = await client.from('suggestions').insert({ event_id: farId, tmdb_movie: { id: 960, title: 'Early Bird' } }).select('id').single()
+    await admin!.from('votes').insert({ suggestion_id: a!.id, user_id: memberId })
+
+    await client.from('rsvps').update({ status: 'no' }).eq('event_id', farId).eq('user_id', uid)
+
+    const aRow = await admin!.from('suggestions').select('rsvp_hidden_at').eq('id', a!.id).single()
+    expect(aRow.data!.rsvp_hidden_at, 'a top title >1 week out is still hidden on un-RSVP').not.toBeNull()
+
+    await admin!.from('votes').delete().eq('suggestion_id', a!.id)
+    await admin!.from('suggestions').delete().eq('id', a!.id)
+    await admin!.from('rsvps').delete().eq('user_id', uid)
+    await admin!.from('invites').delete().eq('email', email)
+    await admin!.from('events').delete().eq('id', farId)
+  })
 })
