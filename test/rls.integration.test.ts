@@ -197,4 +197,47 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('suggestions').delete().eq('id', suggestionId)
     await admin!.from('invites').delete().eq('email', otherEmail)
   })
+
+  it('blocks suggesting/voting until you RSVP “going”, then allows it', async () => {
+    const gateEmail = `rls_gate_${stamp}@example.com`
+    const gateId = await makeUser(gateEmail)
+    await admin!.from('invites').insert({ email: gateEmail })
+    const gateClient = await signInAs(gateEmail)
+
+    // A suggestion seeded by the service role for the gate user to try to vote on.
+    const { data: seed } = await admin!
+      .from('suggestions')
+      .insert({ event_id: eventId, user_id: memberId, tmdb_movie: { id: 700, title: 'Gatekept' } })
+      .select('id')
+      .single()
+    const seedId = seed!.id
+
+    // Not RSVP'd → both participation writes are rejected by RLS.
+    const noSuggest = await gateClient.from('suggestions').insert({ event_id: eventId, tmdb_movie: { id: 701, title: 'Nope' } })
+    expect(noSuggest.error, 'suggesting without a going RSVP should be rejected').toBeTruthy()
+    const noVote = await gateClient.from('votes').insert({ suggestion_id: seedId })
+    expect(noVote.error, 'voting without a going RSVP should be rejected').toBeTruthy()
+
+    // A non-going RSVP is still not enough — going is the gate. Check both
+    // "maybe" and "no" explicitly so the going-only intent is airtight.
+    await gateClient.from('rsvps').insert({ event_id: eventId, user_id: gateId, status: 'maybe' })
+    const noVoteMaybe = await gateClient.from('votes').insert({ suggestion_id: seedId })
+    expect(noVoteMaybe.error, '“maybe” must not unlock voting').toBeTruthy()
+
+    await gateClient.from('rsvps').update({ status: 'no' }).eq('event_id', eventId).eq('user_id', gateId)
+    const noVoteNo = await gateClient.from('votes').insert({ suggestion_id: seedId })
+    expect(noVoteNo.error, '“no” must not unlock voting').toBeTruthy()
+
+    // Flip to going → both writes now succeed.
+    await gateClient.from('rsvps').update({ status: 'going' }).eq('event_id', eventId).eq('user_id', gateId)
+    const okSuggest = await gateClient.from('suggestions').insert({ event_id: eventId, tmdb_movie: { id: 702, title: 'Yes' } })
+    expect(okSuggest.error, 'suggesting while going should be allowed').toBeNull()
+    const okVote = await gateClient.from('votes').insert({ suggestion_id: seedId })
+    expect(okVote.error, 'voting while going should be allowed').toBeNull()
+
+    await admin!.from('votes').delete().eq('user_id', gateId)
+    await admin!.from('suggestions').delete().eq('event_id', eventId)
+    await admin!.from('rsvps').delete().eq('user_id', gateId)
+    await admin!.from('invites').delete().eq('email', gateEmail)
+  })
 })
