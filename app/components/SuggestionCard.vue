@@ -150,13 +150,15 @@ function onHeartClick(e: MouseEvent): void {
 
         <!-- What it's about (TMDB synopsis) — for anyone who'd rather not watch the trailer. -->
         <p
+        <button
           v-if="movie.overview"
-          class="text-xs text-muted mt-2 cursor-pointer"
+          type="button"
+          class="text-xs text-muted mt-2 text-left w-full cursor-pointer"
           :class="overviewOpen ? '' : 'line-clamp-2'"
           @click="overviewOpen = !overviewOpen"
         >
           {{ movie.overview }}
-        </p>
+        </button>
 
         <!-- The suggester's personal take. -->
         <div v-if="editingBlurb" class="mt-2 space-y-1">
