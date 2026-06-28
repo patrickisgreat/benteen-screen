@@ -27,6 +27,8 @@ const { suggestions, refresh: refreshSuggestions, alreadySuggested, suggest, vot
 const { myStatus, myPlusOnes, counts, setStatus, setGuests } = useRsvp(currentEventId)
 // Who else is looking at this movie night right now (Realtime Presence).
 const { online } = usePresence(currentEventId)
+// One-time "you got a vote back" nudges when a pick I voted for leaves the ballot.
+useVoteRefunds(currentEventId)
 
 const suggestedMovieIds = computed(() => suggestions.value.map(s => s.tmdb_movie.id))
 const maxVotes = computed(() => Math.max(1, ...suggestions.value.map(s => s.voteCount ?? 0)))
