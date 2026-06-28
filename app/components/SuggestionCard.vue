@@ -29,6 +29,9 @@ function saveBlurb(): void {
   emit('blurb', blurbDraft.value.trim())
   editingBlurb.value = false
 }
+// Attribute the pitch to the suggester by name (falls back if the name is missing).
+const suggesterName = computed(() => props.suggestion.author?.display_name?.trim() || null)
+const pitchHeader = computed(() => (suggesterName.value ? `${suggesterName.value}'s Personal Pitch` : 'Personal Pitch'))
 const year = computed(() => movieYear(movie.value))
 // Public count from the tally (votes.length would only see the viewer's own vote).
 const voteCount = computed(() => props.suggestion.voteCount ?? 0)
@@ -175,9 +178,14 @@ function onHeartClick(e: MouseEvent): void {
           </div>
         </div>
         <template v-else>
-          <blockquote v-if="suggestion.blurb" class="mt-2 text-xs italic text-muted border-l-2 border-primary/40 pl-2">
-            “{{ suggestion.blurb }}”
-            <UButton v-if="isOwner && !locked" label="edit" color="primary" variant="link" size="xs" class="not-italic ml-1 p-0" @click="startBlurb" />
+          <blockquote v-if="suggestion.blurb" class="mt-2 border-l-2 border-primary/40 pl-2.5">
+            <p class="text-xs font-semibold text-primary">
+              {{ pitchHeader }}:
+            </p>
+            <p class="text-sm font-medium italic text-default mt-0.5">
+              “{{ suggestion.blurb }}”
+              <UButton v-if="isOwner && !locked" label="edit" color="primary" variant="link" size="xs" class="not-italic font-normal align-baseline ml-1 p-0" @click="startBlurb" />
+            </p>
           </blockquote>
           <UButton
             v-else-if="isOwner && !locked"

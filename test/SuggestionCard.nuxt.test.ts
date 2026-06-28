@@ -129,6 +129,13 @@ describe('SuggestionCard', () => {
     expect(w.findAll('button').find(b => b.text().includes('Add your take'))).toBeUndefined()
   })
 
+  it('attributes the pitch to the suggester by name', async () => {
+    const withPitch = { ...suggestion, blurb: 'Trust me on this one.', author: { display_name: 'Alice' } }
+    const w = await mountSuspended(SuggestionCard, { props: { suggestion: withPitch, rank: 1, maxVotes: 2 } })
+    expect(w.text()).toContain('Alice\'s Personal Pitch')
+    expect(w.text()).toContain('Trust me on this one.')
+  })
+
   it('does not let a non-owner add a take', async () => {
     const notMine = { ...suggestion, user_id: 'someone-else' }
     const w = await mountSuspended(SuggestionCard, { props: { suggestion: notMine, rank: 1, maxVotes: 2 } })
