@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.9.0...v1.10.0) (2026-06-28)
+
+
+### Features
+
+* require a "going" RSVP to suggest or vote ([#127](https://github.com/patrickisgreat/benteen-screen/issues/127)) ([9b63187](https://github.com/patrickisgreat/benteen-screen/commit/9b63187e36299eaac649105e8a8e9dc50a2bf261))
+
 ## [1.9.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.8.0...v1.9.0) (2026-06-25)
 
 
