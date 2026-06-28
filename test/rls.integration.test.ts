@@ -429,4 +429,28 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('invites').delete().eq('email', email)
     await admin!.from('events').delete().eq('id', farId)
   })
+
+  it('claim_freed_votes notifies a voter once when their pick leaves the ballot', async () => {
+    await memberClient.from('rsvps').upsert({ event_id: eventId, user_id: memberId, status: 'going' }, { onConflict: 'event_id,user_id' })
+    const { data: s } = await admin!
+      .from('suggestions').insert({ event_id: eventId, user_id: adminUserId, tmdb_movie: { id: 970, title: 'Refunded' } })
+      .select('id').single()
+    await memberClient.from('votes').insert({ suggestion_id: s!.id })
+
+    // On the ballot → nothing to refund.
+    const before = await memberClient.rpc('claim_freed_votes', { p_event_id: eventId })
+    expect((before.data ?? []).find(r => r.suggestion_id === s!.id), 'no refund while on the ballot').toBeFalsy()
+
+    // Cull it → the member's vote is freed.
+    await admin!.from('suggestions').update({ culled_at: new Date().toISOString() }).eq('id', s!.id)
+
+    const first = await memberClient.rpc('claim_freed_votes', { p_event_id: eventId })
+    expect((first.data ?? []).find(r => r.suggestion_id === s!.id)?.title, 'the freed pick is reported once').toBe('Refunded')
+    const second = await memberClient.rpc('claim_freed_votes', { p_event_id: eventId })
+    expect((second.data ?? []).find(r => r.suggestion_id === s!.id), 'and never again').toBeFalsy()
+
+    await admin!.from('vote_refund_acks').delete().eq('user_id', memberId)
+    await admin!.from('votes').delete().eq('user_id', memberId).eq('suggestion_id', s!.id)
+    await admin!.from('suggestions').delete().eq('id', s!.id)
+  })
 })

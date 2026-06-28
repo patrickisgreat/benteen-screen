@@ -65,11 +65,18 @@ export interface Database {
         Update: { id?: string, event_id?: string | null, kind?: string, scope?: string | null, subject?: string | null, recipient_count?: number, sent_by?: string | null, created_at?: string }
         Relationships: []
       }
+      vote_refund_acks: {
+        Row: { user_id: string, suggestion_id: string, created_at: string }
+        Insert: { user_id: string, suggestion_id: string, created_at?: string }
+        Update: { user_id?: string, suggestion_id?: string, created_at?: string }
+        Relationships: []
+      }
     }
     Views: { [_ in never]: never }
     Functions: {
       admin_set_admin: { Args: { target_id: string, value: boolean }, Returns: undefined }
       admin_set_blocked: { Args: { target_id: string, value: boolean }, Returns: undefined }
+      claim_freed_votes: { Args: { p_event_id: string }, Returns: { suggestion_id: string, title: string | null }[] }
       cull_zero_votes: { Args: { p_event_id: string }, Returns: number }
       cull_to_top: { Args: { p_event_id: string, p_keep: number }, Returns: number }
       is_allowed: { Args: Record<string, never>, Returns: boolean }
