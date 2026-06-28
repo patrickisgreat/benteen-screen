@@ -1,6 +1,7 @@
 // @vitest-environment nuxt
-import { beforeEach, describe, expect, it } from 'vitest'
-import { ref } from 'vue'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick, ref } from 'vue'
+import { flushPromises } from '@vue/test-utils'
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import OverviewPage from '../app/pages/overview.vue'
 
@@ -21,6 +22,7 @@ const event = {
 const isAdmin = ref(false)
 const myId = ref<string | null>(null)
 const myStatus = ref<string | null>(null)
+const setStatus = vi.fn(async () => {})
 const suggestionList = ref<Array<Record<string, unknown>>>([])
 // Admin-configured caps (null = fall back to the limits.ts defaults).
 const cfgMaxSuggestions = ref<number | null>(null)
@@ -31,6 +33,7 @@ mockNuxtImport('useEvents', () => () => ({ events: ref([event]) }))
 mockNuxtImport('useTmdb', () => () => ({ posterUrl: () => null }))
 mockNuxtImport('useSuggestions', () => () => ({
   suggestions: suggestionList,
+  refresh: async () => {},
   alreadySuggested: () => false,
   suggest: async () => {},
   vote: async () => {},
@@ -41,7 +44,7 @@ mockNuxtImport('useRsvp', () => () => ({
   myStatus,
   myPlusOnes: ref(0),
   counts: ref({ going: 0, maybe: 0, no: 0, guests: 0 }),
-  setStatus: async () => {},
+  setStatus,
   setGuests: async () => {}
 }))
 mockNuxtImport('useToast', () => () => ({ add: () => {} }))
@@ -69,12 +72,17 @@ beforeEach(() => {
   isAdmin.value = false
   myId.value = null
   myStatus.value = 'going'
+  setStatus.mockClear()
   suggestionList.value = []
   cfgMaxSuggestions.value = null
   cfgMaxVotes.value = null
   // Some tests flip the date to the past; reset to upcoming each time.
   event.event_date = UPCOMING
 })
+
+// Use the real RsvpControl so we can click a status button to trigger the leave
+// flow; GuestStepper stays stubbed (it pulls its own bits).
+const rsvpStubs = { ...stubs, RsvpControl: false as const, GuestStepper: true }
 
 function mineSuggestion(i: number): Record<string, unknown> {
   return { id: `s${i}`, event_id: 'e1', user_id: 'me', tmdb_movie: { id: i, title: `M${i}` }, deleted: false, created_at: '2026-01-01', votes: [] }
@@ -146,5 +154,40 @@ describe('overview page', () => {
     myStatus.value = null
     const w = await mountSuspended(OverviewPage, { global: { stubs } })
     expect(w.text()).not.toContain('RSVP to join in')
+  })
+
+  it('warns before leaving “going” when I have suggestions or votes', async () => {
+    myId.value = 'me'
+    myStatus.value = 'going'
+    suggestionList.value = [mineSuggestion(1)] // mySuggestionCount = 1
+    const w = await mountSuspended(OverviewPage, { global: { stubs: rsvpStubs } })
+    await w.findAll('button').find(b => b.text().includes('Maybe'))?.trigger('click')
+    await nextTick()
+    // Doesn't leave yet — a confirmation appears instead.
+    expect(setStatus).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('Hide my stuff')
+  })
+
+  it('leaves immediately when there is nothing to hide', async () => {
+    myId.value = 'me'
+    myStatus.value = 'going'
+    suggestionList.value = [] // no suggestions, no votes
+    const w = await mountSuspended(OverviewPage, { global: { stubs: rsvpStubs } })
+    await w.findAll('button').find(b => b.text().includes('Maybe'))?.trigger('click')
+    await flushPromises()
+    expect(setStatus).toHaveBeenCalledWith('maybe')
+  })
+
+  it('hides my stuff once I confirm leaving', async () => {
+    myId.value = 'me'
+    myStatus.value = 'going'
+    suggestionList.value = [mineSuggestion(1)]
+    const w = await mountSuspended(OverviewPage, { global: { stubs: rsvpStubs } })
+    await w.findAll('button').find(b => b.text().includes('Maybe'))?.trigger('click')
+    await nextTick()
+    const confirm = [...document.body.querySelectorAll('button')].find(b => b.textContent?.includes('Hide my stuff'))
+    confirm?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    expect(setStatus).toHaveBeenCalledWith('maybe')
   })
 })

@@ -23,7 +23,7 @@ const trailerMovie = ref<TmdbMovie | null>(null)
 const currentEvent = computed(() => events.value[eventIndex.value] ?? null)
 const currentEventId = computed(() => currentEvent.value?.id ?? null)
 
-const { suggestions, alreadySuggested, suggest, vote, unvote, removeSuggestion } = useSuggestions(currentEventId)
+const { suggestions, refresh: refreshSuggestions, alreadySuggested, suggest, vote, unvote, removeSuggestion } = useSuggestions(currentEventId)
 const { myStatus, myPlusOnes, counts, setStatus, setGuests } = useRsvp(currentEventId)
 // Who else is looking at this movie night right now (Realtime Presence).
 const { online } = usePresence(currentEventId)
@@ -44,6 +44,20 @@ const winners = computed(() => topWinners(suggestions.value))
 // You must RSVP "going" to suggest or vote. RLS is the real gate (mirrors
 // public.is_going() in the migration); this just drives the UI.
 const isGoing = computed(() => myStatus.value === 'going')
+
+// Leaving "going" hides this user's suggestions + soft-deletes their votes (a
+// server-side trigger). Confirm first when they actually have something to lose.
+const pendingRsvp = ref<RsvpStatus | null>(null)
+const confirmLeaveOpen = ref(false)
+const leaveSummary = computed(() => {
+  const parts: string[] = []
+  if (mySuggestionCount.value > 0) parts.push(`${mySuggestionCount.value} suggestion${mySuggestionCount.value === 1 ? '' : 's'}`)
+  if (myVoteCount.value > 0) parts.push(`${myVoteCount.value} vote${myVoteCount.value === 1 ? '' : 's'}`)
+  return parts.join(' and ')
+})
+watch(confirmLeaveOpen, (open) => {
+  if (!open) pendingRsvp.value = null
+})
 
 // Per-event participation caps (mirrors the DB triggers — see shared/utils/limits).
 // Effective limit = admin-configured (app_settings) or the default in limits.ts.
@@ -123,8 +137,25 @@ async function onRemove(suggestion: Suggestion): Promise<void> {
     toast.add({ title: 'Suggestion removed', color: 'neutral' })
   }
 }
+async function applyRsvp(status: RsvpStatus): Promise<void> {
+  if (await run(() => setStatus(status), 'Could not update RSVP')) {
+    // The hide/restore happens in a DB trigger; re-pull so the list reflects it now.
+    await refreshSuggestions()
+  }
+}
 async function onRsvp(status: RsvpStatus): Promise<void> {
-  await run(() => setStatus(status), 'Could not update RSVP')
+  // Any status tap while "going" leaves "going" (tapping it again clears it).
+  if (myStatus.value === 'going' && (mySuggestionCount.value > 0 || myVoteCount.value > 0)) {
+    pendingRsvp.value = status
+    confirmLeaveOpen.value = true
+    return
+  }
+  await applyRsvp(status)
+}
+async function confirmLeave(): Promise<void> {
+  const status = pendingRsvp.value
+  confirmLeaveOpen.value = false
+  if (status) await applyRsvp(status)
 }
 async function onGuests(count: number): Promise<void> {
   await run(() => setGuests(count), 'Could not update guest count')
@@ -354,6 +385,22 @@ async function onGuests(count: number): Promise<void> {
 
     <EventInfoModal v-model:open="eventInfoOpen" :event="currentEvent" />
     <TrailerModal v-model:open="trailerOpen" :movie="trailerMovie" />
+
+    <!-- Warn before leaving "going" hides this user's suggestions + votes. -->
+    <UModal v-model:open="confirmLeaveOpen" title="Leave “Going”?">
+      <template #body>
+        <p class="text-sm text-muted">
+          You won't be marked as going, so your <strong class="text-default">{{ leaveSummary }}</strong>
+          for this movie night will be hidden. RSVP “Going” again and they'll come right back.
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2 w-full">
+          <UButton label="Stay going" color="neutral" variant="ghost" @click="confirmLeaveOpen = false" />
+          <UButton label="Hide my stuff" color="warning" icon="i-lucide-eye-off" @click="confirmLeave" />
+        </div>
+      </template>
+    </UModal>
   </UContainer>
 </template>
 
