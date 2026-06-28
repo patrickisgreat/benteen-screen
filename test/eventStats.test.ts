@@ -41,6 +41,21 @@ describe('computeEventStats', () => {
     expect(stats.submitterCount).toBe(1)
   })
 
+  it('excludes soft-deleted (un-RSVP) votes from the distinct voter count', () => {
+    const withHidden: Suggestion = {
+      id: 's1',
+      event_id: 'e1',
+      user_id: 'alice',
+      tmdb_movie: { id: 1, title: 'Heat' },
+      deleted: false,
+      created_at: '2026-01-01T00:00:00Z',
+      voteCount: 1,
+      votes: [{ user_id: 'live' }, { user_id: 'left', hidden_at: '2026-06-01T00:00:00Z' }]
+    }
+    const stats = computeEventStats({ suggestions: [withHidden], rsvps: [], bringItems: [] })
+    expect(stats.voterCount).toBe(1) // only 'live' — 'left' soft-deleted their vote on un-RSVP
+  })
+
   it('splits RSVPs into going / maybe / declined', () => {
     const stats = computeEventStats({
       suggestions: [],

@@ -23,7 +23,16 @@ const ownVoteRow = {
 const supabase = {
   from() {
     return {
-      select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [ownVoteRow], error: null }) }) }),
+      select: () => {
+        // Load chains .eq('event_id').eq('deleted').is('rsvp_hidden_at', null).
+        const chain = {
+          eq: () => chain,
+          is: () => chain,
+          then: (onFulfilled: (r: { data: unknown[], error: null }) => unknown) =>
+            Promise.resolve({ data: [ownVoteRow], error: null }).then(onFulfilled)
+        }
+        return chain
+      },
       insert: () => Promise.resolve({ error: null }),
       delete: () => ({ eq: () => Promise.resolve({ error: null }) })
     }

@@ -35,15 +35,17 @@ export function useUserStats(userId: MaybeRefOrGetter<string | null>) {
 
     const { data: pool } = await supabase
       .from('suggestions')
-      .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id)')
+      .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id, hidden_at)')
       .in('event_id', lockedIds)
+      // rsvp-hidden suggestions are off the ballot, so they can't be winners.
+      .is('rsvp_hidden_at', null)
     // The votes embed isn't declared in the generated types (no FK relationship
     // row), so PostgREST's inferred shape doesn't match — cast as useSuggestions does.
-    // Admin drill-down reads every vote (RLS), so the winner count is votes.length —
-    // populate voteCount so topWinners (which counts by voteCount) lines up.
+    // Admin drill-down reads every vote (RLS); count only live votes so the winner
+    // set matches the overview's double-feature.
     const byEvent = new Map<string, Suggestion[]>()
     for (const row of (pool ?? []) as unknown as Suggestion[]) {
-      const s = { ...row, voteCount: row.votes?.length ?? 0 }
+      const s = { ...row, voteCount: liveVoteCount(row.votes) }
       const list = byEvent.get(s.event_id) ?? []
       list.push(s)
       byEvent.set(s.event_id, list)

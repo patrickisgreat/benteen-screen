@@ -16,6 +16,7 @@ function builder(table: string) {
   const c: Record<string, unknown> = {
     select: () => c,
     eq: () => c,
+    is: () => c,
     then: (resolve: (v: unknown) => void) => {
       if (table === 'suggestions') return resolve({ data: data.suggestions, error: data.error })
       if (table === 'rsvps') return resolve({ data: data.rsvps, error: null })

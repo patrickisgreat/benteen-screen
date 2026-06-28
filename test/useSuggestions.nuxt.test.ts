@@ -29,7 +29,16 @@ const supabase = {
         }
         return chain
       },
-      select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [] }) }) })
+      select: () => {
+        // Load chains .eq('event_id').eq('deleted').is('rsvp_hidden_at', null).
+        const chain = {
+          eq: () => chain,
+          is: () => chain,
+          then: (onFulfilled: (r: { data: unknown[], error: null }) => unknown) =>
+            Promise.resolve({ data: [], error: null }).then(onFulfilled)
+        }
+        return chain
+      }
     }
   },
   rpc: () => Promise.resolve({ data: [], error: null }),

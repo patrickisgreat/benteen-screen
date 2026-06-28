@@ -15,6 +15,7 @@ const supabase = {
         if (col === 'event_id') eventId = val
         return chain
       },
+      is: () => chain,
       // `await`-ing the query registers a resolver for its event id.
       then: (onFulfilled: (r: { data: unknown[] }) => unknown) =>
         new Promise<{ data: unknown[] }>((resolve) => {

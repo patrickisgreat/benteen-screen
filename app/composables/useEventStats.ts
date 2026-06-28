@@ -15,8 +15,10 @@ export function useEventStats(eventId: MaybeRefOrGetter<string | null>) {
     const [suggestions, rsvps, bring] = await Promise.all([
       supabase
         .from('suggestions')
-        .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id)')
-        .eq('event_id', id),
+        .select('id, event_id, user_id, tmdb_movie, deleted, created_at, votes(user_id, hidden_at)')
+        .eq('event_id', id)
+        // rsvp-hidden suggestions are off the ballot (admin-deleted still load).
+        .is('rsvp_hidden_at', null),
       supabase.from('rsvps').select('status').eq('event_id', id),
       supabase.from('bring_items').select('user_id').eq('event_id', id)
     ])
@@ -26,9 +28,9 @@ export function useEventStats(eventId: MaybeRefOrGetter<string | null>) {
     return computeEventStats({
       // The votes embed isn't declared in the generated types, so cast as
       // useSuggestions does (the inferred shape doesn't match). Admins read every
-      // vote (RLS), so the count is votes.length — populate voteCount to match the
-      // shared Suggestion shape (the tally RPC is only needed where reads are scoped).
-      suggestions: ((suggestions.data ?? []) as unknown as Suggestion[]).map(s => ({ ...s, voteCount: s.votes?.length ?? 0 })),
+      // vote (RLS); count only live (non-soft-deleted) votes so totals match the
+      // public tally.
+      suggestions: ((suggestions.data ?? []) as unknown as Suggestion[]).map(s => ({ ...s, voteCount: liveVoteCount(s.votes) })),
       rsvps: rsvps.data ?? [],
       bringItems: bring.data ?? []
     })
