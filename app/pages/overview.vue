@@ -267,8 +267,11 @@ async function onGuests(count: number): Promise<void> {
                 description="Remove one from the list to free up a slot."
               />
             </template>
+            <!-- Only prompt to RSVP when there's actually an RSVP control to act on
+                 (the RsvpControl card is upcoming-only). For a past-but-unlocked event
+                 we just hide the suggest controls silently. -->
             <UAlert
-              v-else
+              v-else-if="isUpcoming(currentEvent.event_date)"
               icon="i-lucide-calendar-check"
               color="primary"
               variant="subtle"

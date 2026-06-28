@@ -218,10 +218,15 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     const noVote = await gateClient.from('votes').insert({ suggestion_id: seedId })
     expect(noVote.error, 'voting without a going RSVP should be rejected').toBeTruthy()
 
-    // A non-going RSVP ("maybe") is still not enough — going is the gate.
+    // A non-going RSVP is still not enough — going is the gate. Check both
+    // "maybe" and "no" explicitly so the going-only intent is airtight.
     await gateClient.from('rsvps').insert({ event_id: eventId, user_id: gateId, status: 'maybe' })
-    const stillNoVote = await gateClient.from('votes').insert({ suggestion_id: seedId })
-    expect(stillNoVote.error, '“maybe” must not unlock voting').toBeTruthy()
+    const noVoteMaybe = await gateClient.from('votes').insert({ suggestion_id: seedId })
+    expect(noVoteMaybe.error, '“maybe” must not unlock voting').toBeTruthy()
+
+    await gateClient.from('rsvps').update({ status: 'no' }).eq('event_id', eventId).eq('user_id', gateId)
+    const noVoteNo = await gateClient.from('votes').insert({ suggestion_id: seedId })
+    expect(noVoteNo.error, '“no” must not unlock voting').toBeTruthy()
 
     // Flip to going → both writes now succeed.
     await gateClient.from('rsvps').update({ status: 'going' }).eq('event_id', eventId).eq('user_id', gateId)
