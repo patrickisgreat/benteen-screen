@@ -70,6 +70,8 @@ export interface Database {
     Functions: {
       admin_set_admin: { Args: { target_id: string, value: boolean }, Returns: undefined }
       admin_set_blocked: { Args: { target_id: string, value: boolean }, Returns: undefined }
+      cull_zero_votes: { Args: { p_event_id: string }, Returns: number }
+      cull_to_top: { Args: { p_event_id: string, p_keep: number }, Returns: number }
       is_allowed: { Args: Record<string, never>, Returns: boolean }
       suggestion_vote_counts: { Args: { p_event_id: string }, Returns: { suggestion_id: string, votes: number }[] }
     }
