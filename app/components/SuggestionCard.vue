@@ -151,18 +151,7 @@ function onHeartClick(e: MouseEvent): void {
           />
         </div>
 
-        <!-- What it's about (TMDB synopsis) — for anyone who'd rather not watch the trailer. -->
-        <button
-          v-if="movie.overview"
-          type="button"
-          class="text-xs text-muted mt-2 text-left w-full cursor-pointer"
-          :class="overviewOpen ? '' : 'line-clamp-2'"
-          @click="overviewOpen = !overviewOpen"
-        >
-          {{ movie.overview }}
-        </button>
-
-        <!-- The suggester's personal take. -->
+        <!-- The suggester's personal take — sits above the TMDB synopsis. -->
         <div v-if="editingBlurb" class="mt-2 space-y-1">
           <UTextarea
             v-model="blurbDraft"
@@ -198,6 +187,17 @@ function onHeartClick(e: MouseEvent): void {
             @click="startBlurb"
           />
         </template>
+
+        <!-- What it's about (TMDB synopsis) — for anyone who'd rather not watch the trailer. -->
+        <button
+          v-if="movie.overview"
+          type="button"
+          class="text-xs text-muted mt-2 text-left w-full cursor-pointer"
+          :class="overviewOpen ? '' : 'line-clamp-2'"
+          @click="overviewOpen = !overviewOpen"
+        >
+          {{ movie.overview }}
+        </button>
       </div>
     </div>
   </UCard>
