@@ -51,12 +51,14 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
   const outsiderEmail = `rls_outsider_${stamp}@example.com`
 
   let memberId = ''
+  let adminUserId = ''
   let memberClient: SupabaseClient
   let outsiderClient: SupabaseClient
   let eventId = ''
 
   beforeAll(async () => {
     const adminId = await makeUser(adminEmail)
+    adminUserId = adminId
     memberId = await makeUser(memberEmail)
     await makeUser(outsiderEmail)
 
@@ -292,5 +294,81 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('suggestions').delete().in('id', [aId, bId])
     await admin!.from('rsvps').delete().eq('user_id', uid)
     await admin!.from('invites').delete().eq('email', email)
+  })
+
+  it('cull RPCs cut the right titles (zero-vote + keep-top-N) and are admin-only', async () => {
+    const adminClient = await signInAs(adminEmail)
+    const mk = async (movieId: number, title: string): Promise<string> => {
+      const { data } = await admin!
+        .from('suggestions').insert({ event_id: eventId, user_id: memberId, tmdb_movie: { id: movieId, title } })
+        .select('id').single()
+      return data!.id
+    }
+    const top = await mk(900, 'Top')
+    const mid = await mk(901, 'Mid')
+    const zero = await mk(902, 'Zero')
+    // Seed votes via the service role (exempt from the gate/cap): top=2, mid=1, zero=0.
+    await admin!.from('votes').insert([
+      { suggestion_id: top, user_id: memberId },
+      { suggestion_id: top, user_id: adminUserId },
+      { suggestion_id: mid, user_id: memberId }
+    ])
+
+    // A non-admin cannot prune.
+    const denied = await memberClient.rpc('cull_zero_votes', { p_event_id: eventId })
+    expect(denied.error, 'a non-admin must not be able to prune').toBeTruthy()
+
+    // Zero-vote tail-cull removes 'zero' only.
+    const z = await adminClient.rpc('cull_zero_votes', { p_event_id: eventId })
+    expect(z.error).toBeNull()
+    expect(z.data, 'one zero-vote title cut').toBe(1)
+    const zeroRow = await admin!.from('suggestions').select('culled_at').eq('id', zero).single()
+    expect(zeroRow.data!.culled_at, 'zero is culled').not.toBeNull()
+
+    // Keep-top-1 runoff cuts 'mid', keeps 'top'.
+    const r = await adminClient.rpc('cull_to_top', { p_event_id: eventId, p_keep: 1 })
+    expect(r.error).toBeNull()
+    expect(r.data, 'one runner-up cut').toBe(1)
+    const midRow = await admin!.from('suggestions').select('culled_at').eq('id', mid).single()
+    expect(midRow.data!.culled_at, 'mid is culled').not.toBeNull()
+    const topRow = await admin!.from('suggestions').select('culled_at').eq('id', top).single()
+    expect(topRow.data!.culled_at, 'top survives').toBeNull()
+
+    // The tally now reports only the survivor.
+    const tally = await memberClient.rpc('suggestion_vote_counts', { p_event_id: eventId })
+    expect((tally.data ?? []).map(t => t.suggestion_id), 'only the survivor is counted').toEqual([top])
+
+    await admin!.from('votes').delete().in('suggestion_id', [top, mid, zero])
+    await admin!.from('suggestions').delete().in('id', [top, mid, zero])
+  })
+
+  it('refunds a culled title’s vote back to the voter’s budget', async () => {
+    await memberClient.from('rsvps').upsert({ event_id: eventId, user_id: memberId, status: 'going' }, { onConflict: 'event_id,user_id' })
+    const mk = async (movieId: number, title: string): Promise<string> => {
+      const { data } = await admin!
+        .from('suggestions').insert({ event_id: eventId, user_id: memberId, tmdb_movie: { id: movieId, title } })
+        .select('id').single()
+      return data!.id
+    }
+    const ids = [await mk(910, 'A'), await mk(911, 'B'), await mk(912, 'C'), await mk(913, 'D')]
+
+    // Member spends the full 3-vote budget on A, B, C.
+    for (const id of ids.slice(0, 3)) {
+      const { error } = await memberClient.from('votes').insert({ suggestion_id: id })
+      expect(error, 'votes within the cap are allowed').toBeNull()
+    }
+    // At the cap, a 4th vote (D) is rejected.
+    const capped = await memberClient.from('votes').insert({ suggestion_id: ids[3] })
+    expect(capped.error, 'the 4th vote is over the cap').toBeTruthy()
+
+    // Cull C → the member's vote on it no longer counts toward their budget.
+    await admin!.from('suggestions').update({ culled_at: new Date().toISOString() }).eq('id', ids[2])
+
+    // The refunded slot lets the member vote on the surviving D.
+    const refunded = await memberClient.from('votes').insert({ suggestion_id: ids[3] })
+    expect(refunded.error, 'the freed slot lets the member vote again').toBeNull()
+
+    await admin!.from('votes').delete().eq('user_id', memberId).in('suggestion_id', ids)
+    await admin!.from('suggestions').delete().in('id', ids)
   })
 })
