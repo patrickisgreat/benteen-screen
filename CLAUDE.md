@@ -301,7 +301,12 @@ covering that behavior.
 
 - **Always work from a feature branch.** Never commit directly to `main`. Use descriptive
   names: `feat/vote-limits`, `fix/admin-voters-race`.
-- **Commit often.** Small, frequent, logical commits. Don't batch unrelated changes.
+- **Commit often — many small commits per PR.** A PR should land as a sequence of small,
+  logical commits, never one big squashed blob. Each commit is one coherent step (a schema
+  migration, a composable, the UI wiring, the tests for it) that builds and is independently
+  reviewable, so the PR can be **analyzed and unwound bit by bit** — read commit-by-commit,
+  `git bisect`, or revert a single step without losing the rest. If a commit needs "and" to
+  describe it, split it. Don't batch unrelated changes into one commit.
 - **Conventional commit messages.** Prefixes:
   - `feat:` — New feature or capability
   - `fix:` — Bug fix
