@@ -21,10 +21,14 @@ beforeEach(() => {
 })
 
 describe('sendAnnounce', () => {
-  it('BCCs recipients in groups of 50 — one send per group, not one giant send', async () => {
+  it('BCCs recipients in groups of 49 so every send stays within Resend\'s 50-recipient cap', async () => {
     const res = await sendAnnounce('key', 'from@x', params, recipients(120), opts)
     expect(emailSend).toHaveBeenCalledTimes(3)
-    expect(emailSend.mock.calls.map(c => (c[0] as { bcc: string[] }).bcc.length)).toEqual([50, 50, 20])
+    const sends = emailSend.mock.calls.map(c => c[0] as { to: string, bcc: string[] })
+    expect(sends.map(s => s.bcc.length)).toEqual([49, 49, 22])
+    // The `to` takes one slot, so to + bcc must never exceed 50 (the off-by-one that
+    // made full groups fail and only delivered the leftover).
+    for (const s of sends) expect(1 + s.bcc.length).toBeLessThanOrEqual(50)
     expect(res).toEqual({ sent: 120, failed: 0, error: null })
   })
 
@@ -36,11 +40,11 @@ describe('sendAnnounce', () => {
 
   it('continues past a failed group and reports partial delivery (not a total failure)', async () => {
     emailSend
-      .mockResolvedValueOnce({ data: { id: 're_1' }, error: null }) // group 1 (50) ok
-      .mockRejectedValueOnce(new Error('Too many recipients')) // group 2 (50) fails
-      .mockResolvedValueOnce({ data: { id: 're_3' }, error: null }) // group 3 (20) ok
+      .mockResolvedValueOnce({ data: { id: 're_1' }, error: null }) // group 1 (49) ok
+      .mockRejectedValueOnce(new Error('Too many recipients')) // group 2 (49) fails
+      .mockResolvedValueOnce({ data: { id: 're_3' }, error: null }) // group 3 (22) ok
     const res = await sendAnnounce('key', 'from@x', params, recipients(120), opts)
-    expect(res).toEqual({ sent: 70, failed: 50, error: 'Too many recipients' })
+    expect(res).toEqual({ sent: 71, failed: 49, error: 'Too many recipients' })
   })
 
   it('sends nothing for an empty recipient list', async () => {
