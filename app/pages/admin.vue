@@ -56,7 +56,8 @@ const tabs = [
   { label: 'Suggestions', icon: 'i-lucide-clapperboard', slot: 'suggestions' },
   { label: 'Bring list', icon: 'i-lucide-utensils', slot: 'bring' },
   { label: 'Invites', icon: 'i-lucide-mail-plus', slot: 'invites' },
-  { label: 'Comms', icon: 'i-lucide-megaphone', slot: 'comms' }
+  { label: 'Comms', icon: 'i-lucide-megaphone', slot: 'comms' },
+  { label: 'Settings', icon: 'i-lucide-settings', slot: 'settings' }
 ]
 
 // --- Overview stats (for the focused event) ---
@@ -375,10 +376,6 @@ function onSelectEvent(event: MovieEvent): void {
             <UButton label="Invite someone" icon="i-lucide-user-plus" size="sm" @click="inviteOpen = true" />
           </div>
 
-          <InviteLimitSetting />
-          <ParticipationLimitsSetting />
-          <ReminderCheckpointsSetting />
-
           <UAlert
             v-if="loadError"
             color="error"
@@ -500,6 +497,18 @@ function onSelectEvent(event: MovieEvent): void {
         <UCard v-else variant="subtle" class="text-center text-muted">
           Select an event to send a blast.
         </UCard>
+      </template>
+
+      <!-- SETTINGS (group-wide) -->
+      <template #settings>
+        <div class="space-y-5 max-w-2xl">
+          <p class="text-sm text-muted">
+            Group-wide settings — these apply across every event.
+          </p>
+          <InviteLimitSetting />
+          <ParticipationLimitsSetting />
+          <ReminderCheckpointsSetting />
+        </div>
       </template>
     </UTabs>
 
