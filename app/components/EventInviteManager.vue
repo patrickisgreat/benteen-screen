@@ -12,6 +12,23 @@ const props = defineProps<{ eventId: string, event?: MovieEvent | null }>()
 const toast = useToast()
 const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites } = useEventInvites(() => props.eventId)
 const { save: saveInviteOptions } = useInviteOptions(() => props.eventId)
+const { setEnabled: setRemindersEnabled } = useEventReminders(() => props.eventId)
+
+// Per-event auto-reminder toggle (defaults on). Re-sync if the event loads late.
+const remindersOn = ref(props.event?.reminders_enabled ?? true)
+watch(() => props.event?.id, () => {
+  remindersOn.value = props.event?.reminders_enabled ?? true
+})
+async function onToggleReminders(value: boolean): Promise<void> {
+  remindersOn.value = value
+  try {
+    await setRemindersEnabled(value)
+    toast.add({ title: value ? 'Auto-reminders on for this event' : 'Auto-reminders off for this event', icon: 'i-lucide-check', color: 'success' })
+  } catch {
+    remindersOn.value = !value // revert on failure
+    toast.add({ title: 'Could not update reminders', color: 'error' })
+  }
+}
 // The TRUE RSVP total = e-vite email replies + in-app RSVPs, merged + deduped.
 // `stats.*` above is the email funnel only (invited/opened/clicked); these are the
 // reconciled headcounts the admin actually plans around.
@@ -352,6 +369,14 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
         @click="onSend"
       />
     </div>
+
+    <!-- Per-event auto-reminder toggle -->
+    <USwitch
+      :model-value="remindersOn"
+      label="Auto-remind people who haven't RSVP'd"
+      description="On the reminder checkpoints set in admin settings. Off skips this event."
+      @update:model-value="onToggleReminders"
+    />
 
     <!-- Bulk select toolbar -->
     <div v-if="invites.length" class="flex items-center gap-3 px-1">
