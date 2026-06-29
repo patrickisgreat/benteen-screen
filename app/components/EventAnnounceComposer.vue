@@ -40,17 +40,26 @@ async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: stri
   }
   sending.value = true
   try {
-    const res = await $fetch<{ ok: boolean, count: number }>('/api/events/announce', {
+    const res = await $fetch<{ ok: boolean, count: number, failed?: number, error?: string | null }>('/api/events/announce', {
       method: 'POST',
       body: { eventId: props.eventId, subject: event.data.subject || undefined, message: event.data.message, scope: event.data.scope }
     })
-    toast.add({
-      title: res.count ? `Sent to ${res.count} ${res.count === 1 ? 'person' : 'people'}` : 'No recipients matched',
-      icon: 'i-lucide-send',
-      color: res.count ? 'success' : 'warning'
-    })
-    state.subject = ''
-    state.message = ''
+    const failed = res.failed ?? 0
+    if (res.count && failed) {
+      // Partial delivery — some groups went out, some didn't (don't pretend full success).
+      toast.add({ title: `Sent to ${res.count}, ${failed} failed`, description: res.error ?? undefined, icon: 'i-lucide-send', color: 'warning' })
+    } else if (res.count) {
+      toast.add({ title: `Sent to ${res.count} ${res.count === 1 ? 'person' : 'people'}`, icon: 'i-lucide-send', color: 'success' })
+    } else if (failed) {
+      toast.add({ title: 'Could not send the blast', description: res.error ?? undefined, color: 'error' })
+    } else {
+      toast.add({ title: 'No recipients matched', color: 'warning' })
+    }
+    // Keep the draft if nothing went out, so the admin can retry.
+    if (res.count) {
+      state.subject = ''
+      state.message = ''
+    }
   } catch (error) {
     toast.add({ title: 'Could not send the blast', description: messageOf(error), color: 'error' })
   } finally {

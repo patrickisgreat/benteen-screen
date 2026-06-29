@@ -101,10 +101,69 @@ const INVITE_INTER_BATCH_MS = 250
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
-function chunk<T>(items: readonly T[], size: number): T[][] {
+/** Split a list into fixed-size groups (last group may be smaller). */
+export function chunk<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = []
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
   return out
+}
+
+// Resend caps a single send (to + cc + bcc) at 50 recipients — distinct from the
+// 100-per-request batch endpoint above, which is a different Resend API.
+const ANNOUNCE_RECIPIENT_LIMIT = 50
+
+export interface SendAnnounceResult {
+  /** Recipients in groups that sent successfully. */
+  readonly sent: number
+  /** Recipients in groups that failed. */
+  readonly failed: number
+  /** First failure message (e.g. an unverified sender domain); null on full success. */
+  readonly error: string | null
+}
+
+/**
+ * Sends one announcement to many recipients, BCC'd in groups of 50 (Resend's
+ * per-send recipient cap — a single BCC to more than that is rejected, which is
+ * what 502'd the blast). Continues past a failed group so a mid-blast error
+ * doesn't lose the groups that already went out, returning sent/failed counts +
+ * the first error like `sendEventInvites`.
+ *
+ * ⚠️ At-least-once, like the e-vite blast: announcements have no per-recipient
+ * record, so a retry after a partial failure re-delivers to the groups that
+ * already succeeded. The returned `failed`/`error` are the operator's signal.
+ */
+export async function sendAnnounce(
+  apiKey: string,
+  from: string,
+  params: { subject: string, html: string, text: string, replyTo?: string },
+  recipients: readonly string[],
+  opts: { groupSize?: number, interBatchMs?: number } = {}
+): Promise<SendAnnounceResult> {
+  const groupSize = opts.groupSize ?? ANNOUNCE_RECIPIENT_LIMIT
+  const interBatchMs = opts.interBatchMs ?? INVITE_INTER_BATCH_MS
+  const groups = chunk(recipients, groupSize)
+  let sent = 0
+  let firstError: string | null = null
+  for (let i = 0; i < groups.length; i++) {
+    if (i > 0) await sleep(interBatchMs)
+    const group = groups[i]!
+    try {
+      await sendEmail(apiKey, from, {
+        to: from, // a `to` is required; real recipients are BCC'd
+        bcc: [...group],
+        subject: params.subject,
+        html: params.html,
+        text: params.text,
+        replyTo: params.replyTo
+      })
+      sent += group.length
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Unknown error'
+      if (!firstError) firstError = message
+      console.error('[events/announce] batch failed -', message)
+    }
+  }
+  return { sent, failed: recipients.length - sent, error: firstError }
 }
 
 /** One guest's prepared e-vite: the `event_invites` row id + the built email. */

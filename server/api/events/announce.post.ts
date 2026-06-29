@@ -63,30 +63,29 @@ export default defineEventHandler(async (event) => {
     link: `${resolveOrigin(event)}/overview`
   })
 
-  try {
-    await sendEmail(resendApiKey, resendFrom, {
-      to: resendFrom, // a `to` is required; real recipients are BCC'd
-      bcc: emails,
+  // Send in BCC groups of 50 (Resend's per-send cap). Continues past a failed
+  // group, so a mid-blast error doesn't lose the groups that already delivered —
+  // the result reports sent/failed for the UI to surface (no all-or-nothing 502).
+  const { sent, failed, error } = await sendAnnounce(
+    resendApiKey,
+    resendFrom,
+    { subject: mail.subject, html: mail.html, text: mail.text, replyTo: user.email ?? undefined },
+    emails
+  )
+
+  // Record what actually went out (best-effort — a logging failure must not fail
+  // the request; surface it in logs instead).
+  if (sent > 0) {
+    const { error: logError } = await admin.from('comms_log').insert({
+      event_id: eventId,
+      kind: 'announcement',
+      scope,
       subject: mail.subject,
-      html: mail.html,
-      text: mail.text,
-      replyTo: user.email ?? undefined
+      recipient_count: sent,
+      sent_by: userId
     })
-  } catch (error) {
-    throw createError({ statusCode: 502, statusMessage: error instanceof Error ? error.message : 'Send failed' })
+    if (logError) console.error('[events/announce] comms_log insert failed -', logError.message)
   }
 
-  // Record the send in the comms log (best-effort — the email already went out, so a
-  // logging failure must not fail the request; surface it in logs instead).
-  const { error: logError } = await admin.from('comms_log').insert({
-    event_id: eventId,
-    kind: 'announcement',
-    scope,
-    subject: mail.subject,
-    recipient_count: emails.length,
-    sent_by: userId
-  })
-  if (logError) console.error('[events/announce] comms_log insert failed -', logError.message)
-
-  return { ok: true, count: emails.length }
+  return { ok: true, count: sent, failed, error }
 })
