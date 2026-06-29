@@ -28,6 +28,21 @@ export interface DueReminder {
   invites: ReminderInvite[]
 }
 
+/** Parse an admin's free-text checkpoint list ("7, 3, 1") into a sorted-desc,
+ *  de-duplicated array of positive whole days. Junk and non-positive values drop. */
+export function parseReminderDays(input: string): number[] {
+  const days = input
+    .split(/[\s,]+/)
+    .map(s => Math.floor(Number(s)))
+    .filter(n => Number.isFinite(n) && n > 0)
+  return [...new Set(days)].sort((a, b) => b - a)
+}
+
+/** Render checkpoints back to "7, 3, 1" for the input field. */
+export function formatReminderDays(days: ReadonlyArray<number>): string {
+  return [...days].sort((a, b) => b - a).join(', ')
+}
+
 /** Whole days from `now` until the event (floored: an event 7d4h away is 7). */
 export function daysUntil(now: Date, eventIso: string): number {
   return Math.floor((new Date(eventIso).getTime() - now.getTime()) / 86_400_000)

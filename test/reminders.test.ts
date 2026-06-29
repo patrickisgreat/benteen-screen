@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { daysUntil, selectDueReminders, type ReminderEvent } from '../shared/utils/reminders'
+import { daysUntil, formatReminderDays, parseReminderDays, selectDueReminders, type ReminderEvent } from '../shared/utils/reminders'
 
 const NOW = new Date('2026-06-29T15:00:00Z')
 const inDays = (n: number): string => new Date(NOW.getTime() + n * 86_400_000).toISOString()
@@ -9,6 +9,19 @@ const invite = (over: Partial<ReminderEvent['invites'][number]> = {}): ReminderE
 })
 const event = (over: Partial<ReminderEvent> = {}): ReminderEvent => ({
   id: 'e1', title: 'Movie Night', event_date: inDays(7), reminders_enabled: true, invites: [invite()], ...over
+})
+
+describe('parseReminderDays / formatReminderDays', () => {
+  it('parses, sorts desc, de-dupes, and drops junk / non-positive', () => {
+    expect(parseReminderDays('1, 3, 7')).toEqual([7, 3, 1])
+    expect(parseReminderDays('7 7 3')).toEqual([7, 3])
+    expect(parseReminderDays('7, abc, 0, -2, 3')).toEqual([7, 3])
+    expect(parseReminderDays('')).toEqual([])
+  })
+  it('formats back to a sorted-desc list', () => {
+    expect(formatReminderDays([1, 7, 3])).toBe('7, 3, 1')
+    expect(formatReminderDays([])).toBe('')
+  })
 })
 
 describe('daysUntil', () => {
