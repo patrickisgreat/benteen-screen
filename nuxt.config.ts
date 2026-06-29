@@ -31,6 +31,9 @@ export default defineNuxtConfig({
     resendFrom: 'Benteen Screen On The Green <movienight@benteenscreenonthegreen.com>',
     // Signing secret for Resend (Svix) webhooks → /api/webhooks/resend.
     resendWebhookSecret: '',
+    // Shared secret guarding the reminder cron route. Vercel Cron sends it as
+    // `Authorization: Bearer <CRON_SECRET>`; mapped from the unprefixed env var.
+    cronSecret: process.env.CRON_SECRET || '',
     // Absolute site URL used in email links; falls back to the request origin.
     siteUrl: ''
   },
