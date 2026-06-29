@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.1](https://github.com/patrickisgreat/benteen-screen/compare/v1.16.0...v1.16.1) (2026-06-29)
+
+
+### Bug Fixes
+
+* comms blast 502 — chunk BCC under Resend's 50-recipient cap ([#142](https://github.com/patrickisgreat/benteen-screen/issues/142)) ([fdcf5a9](https://github.com/patrickisgreat/benteen-screen/commit/fdcf5a99040fc7ca4f1640358247dec4f0bd6f32))
+
 ## [1.16.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.15.0...v1.16.0) (2026-06-29)
 
 
