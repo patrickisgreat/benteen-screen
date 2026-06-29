@@ -105,6 +105,41 @@ export function buildAnnounceEmail(opts: {
   return { subject, html, text }
 }
 
+/** Nudge an invitee who hasn't RSVP'd yet. Same one-click RSVP buttons as the
+ *  e-vite (token in the query — no sign-in); `daysLeft` drives the urgency copy. */
+export function buildEventReminderEmail(opts: {
+  eventTitle: string
+  eventDate: string | null
+  daysLeft: number
+  rsvpUrl: string // base: https://site/rsvp?token=abc
+  appUrl?: string | null
+}): BuiltEmail {
+  const last = opts.daysLeft <= 1
+  const when = opts.daysLeft <= 0 ? 'today' : opts.daysLeft === 1 ? 'tomorrow' : `in ${opts.daysLeft} days`
+  const heading = last ? 'Last call' : 'Don\'t forget to RSVP'
+  const subject = last ? `Last call: RSVP for ${opts.eventTitle}` : `Reminder: RSVP for ${opts.eventTitle}`
+
+  const rsvp = (status: string, label: string, bg: string): string =>
+    `<a href="${escapeHtml(`${opts.rsvpUrl}&status=${status}`)}" style="display:inline-block;background:${bg};color:#fff;text-decoration:none;padding:11px 18px;border-radius:8px;font-weight:600;font-size:15px;margin:0 8px 8px 0">${escapeHtml(label)}</a>`
+
+  const lineup = opts.appUrl
+    ? `<p style="margin:20px 0 0;font-size:14px"><a href="${escapeHtml(opts.appUrl)}" style="color:#16a34a;font-weight:600;text-decoration:none">See the lineup &amp; vote →</a></p>`
+    : ''
+
+  const html = shell(
+    `<h1 style="font-size:20px;margin:0 0 4px">${heading} 🎬</h1>`
+    + `<p style="color:#6b7280;margin:0 0 16px"><strong>${escapeHtml(opts.eventTitle)}</strong>${opts.eventDate ? ` — ${escapeHtml(opts.eventDate)}` : ''}</p>`
+    + `<p>Movie Night is ${when} and we haven't heard from you yet. Are you in?</p>`
+    + `<p style="margin:22px 0 4px">${rsvp('going', 'I\'m going', '#16a34a')}${rsvp('maybe', 'Maybe', '#6b7280')}${rsvp('no', 'Can\'t make it', '#374151')}</p>`
+    + lineup
+  )
+  const text = `${heading} — ${opts.eventTitle}${opts.eventDate ? ` (${opts.eventDate})` : ''}.`
+    + `\n\nMovie Night is ${when} and we haven't heard from you yet.`
+    + `\n\nRSVP:\nGoing: ${opts.rsvpUrl}&status=going\nMaybe: ${opts.rsvpUrl}&status=maybe\nCan't make it: ${opts.rsvpUrl}&status=no`
+    + (opts.appUrl ? `\n\nSee the lineup & vote: ${opts.appUrl}` : '')
+  return { subject, html, text }
+}
+
 // ---- Themeable per-event e-vite -------------------------------------------
 
 interface Palette {
