@@ -8,12 +8,24 @@ vi.mock('resend', () => ({
   }
 }))
 
-const { sendBatch } = await import('../server/utils/email')
+const { sendBatch, chunk } = await import('../server/utils/email')
 
 const mail = (to: string) => ({ to, subject: 's', html: '<p>h</p>', text: 't' })
 
 beforeEach(() => {
   batchSend.mockReset()
+})
+
+describe('chunk', () => {
+  it('splits into fixed-size groups (last group may be smaller)', () => {
+    const items = Array.from({ length: 120 }, (_, i) => i)
+    const groups = chunk(items, 50)
+    expect(groups.map(g => g.length)).toEqual([50, 50, 20])
+  })
+  it('returns one group when under the size, and none when empty', () => {
+    expect(chunk([1, 2, 3], 50)).toEqual([[1, 2, 3]])
+    expect(chunk([], 50)).toEqual([])
+  })
 })
 
 describe('sendBatch', () => {

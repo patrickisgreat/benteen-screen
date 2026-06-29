@@ -101,7 +101,8 @@ const INVITE_INTER_BATCH_MS = 250
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
-function chunk<T>(items: readonly T[], size: number): T[][] {
+/** Split a list into fixed-size groups (last group may be smaller). */
+export function chunk<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = []
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
   return out

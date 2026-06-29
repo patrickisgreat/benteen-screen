@@ -63,15 +63,23 @@ export default defineEventHandler(async (event) => {
     link: `${resolveOrigin(event)}/overview`
   })
 
+  // Resend caps a single send at 50 recipients (to + cc + bcc), so a blast to a
+  // larger group must go out as several BCC'd emails — otherwise Resend rejects the
+  // whole send and the blast 502s. A small gap between sends stays under the rate limit.
+  const RECIPIENT_LIMIT = 50
+  const groups = chunk(emails, RECIPIENT_LIMIT)
   try {
-    await sendEmail(resendApiKey, resendFrom, {
-      to: resendFrom, // a `to` is required; real recipients are BCC'd
-      bcc: emails,
-      subject: mail.subject,
-      html: mail.html,
-      text: mail.text,
-      replyTo: user.email ?? undefined
-    })
+    for (let i = 0; i < groups.length; i++) {
+      if (i > 0) await new Promise(resolve => setTimeout(resolve, 250))
+      await sendEmail(resendApiKey, resendFrom, {
+        to: resendFrom, // a `to` is required; real recipients are BCC'd
+        bcc: groups[i],
+        subject: mail.subject,
+        html: mail.html,
+        text: mail.text,
+        replyTo: user.email ?? undefined
+      })
+    }
   } catch (error) {
     throw createError({ statusCode: 502, statusMessage: error instanceof Error ? error.message : 'Send failed' })
   }
