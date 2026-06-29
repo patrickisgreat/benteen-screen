@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.14.0...v1.15.0) (2026-06-29)
+
+
+### Features
+
+* auto RSVP reminders for e-vite non-responders ([#140](https://github.com/patrickisgreat/benteen-screen/issues/140)) ([849aca0](https://github.com/patrickisgreat/benteen-screen/commit/849aca086ad2486df0b90f1e1d0050b8b16c571b))
+
 ## [1.14.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.13.1...v1.14.0) (2026-06-28)
 
 
