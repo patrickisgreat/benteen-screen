@@ -18,21 +18,21 @@ export interface Database {
         Relationships: []
       }
       app_settings: {
-        Row: { id: boolean, max_invites: number | null, max_suggestions: number | null, max_votes: number | null, updated_at: string }
-        Insert: { id?: boolean, max_invites?: number | null, max_suggestions?: number | null, max_votes?: number | null, updated_at?: string }
-        Update: { id?: boolean, max_invites?: number | null, max_suggestions?: number | null, max_votes?: number | null, updated_at?: string }
+        Row: { id: boolean, max_invites: number | null, max_suggestions: number | null, max_votes: number | null, reminder_days: number[], updated_at: string }
+        Insert: { id?: boolean, max_invites?: number | null, max_suggestions?: number | null, max_votes?: number | null, reminder_days?: number[], updated_at?: string }
+        Update: { id?: boolean, max_invites?: number | null, max_suggestions?: number | null, max_votes?: number | null, reminder_days?: number[], updated_at?: string }
         Relationships: []
       }
       event_invites: {
-        Row: { id: string, event_id: string, email: string, display_name: string | null, token: string, rsvp: string | null, rsvp_at: string | null, plus_ones: number, invited_by: string | null, resend_id: string | null, sent_at: string | null, delivered_at: string | null, opened_at: string | null, clicked_at: string | null, bounced_at: string | null, created_at: string }
-        Insert: { id?: string, event_id: string, email: string, display_name?: string | null, token?: string, rsvp?: string | null, rsvp_at?: string | null, plus_ones?: number, invited_by?: string | null, resend_id?: string | null, sent_at?: string | null, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null, created_at?: string }
-        Update: { id?: string, event_id?: string, email?: string, display_name?: string | null, token?: string, rsvp?: string | null, rsvp_at?: string | null, plus_ones?: number, invited_by?: string | null, resend_id?: string | null, sent_at?: string | null, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null, created_at?: string }
+        Row: { id: string, event_id: string, email: string, display_name: string | null, token: string, rsvp: string | null, rsvp_at: string | null, plus_ones: number, invited_by: string | null, resend_id: string | null, sent_at: string | null, delivered_at: string | null, opened_at: string | null, clicked_at: string | null, bounced_at: string | null, reminded_at: string | null, created_at: string }
+        Insert: { id?: string, event_id: string, email: string, display_name?: string | null, token?: string, rsvp?: string | null, rsvp_at?: string | null, plus_ones?: number, invited_by?: string | null, resend_id?: string | null, sent_at?: string | null, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null, reminded_at?: string | null, created_at?: string }
+        Update: { id?: string, event_id?: string, email?: string, display_name?: string | null, token?: string, rsvp?: string | null, rsvp_at?: string | null, plus_ones?: number, invited_by?: string | null, resend_id?: string | null, sent_at?: string | null, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null, reminded_at?: string | null, created_at?: string }
         Relationships: []
       }
       events: {
-        Row: { id: string, title: string, description: string, event_date: string, start_time: string | null, location: string | null, location_url: string | null, poster_url: string | null, voting_locked_at: string | null, invite_options: Record<string, unknown> | null, poster_display: Record<string, unknown> | null, created_by: string | null, created_at: string }
-        Insert: { id?: string, title: string, description?: string, event_date: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, voting_locked_at?: string | null, invite_options?: Record<string, unknown> | null, poster_display?: Record<string, unknown> | null, created_by?: string | null, created_at?: string }
-        Update: { id?: string, title?: string, description?: string, event_date?: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, voting_locked_at?: string | null, invite_options?: Record<string, unknown> | null, poster_display?: Record<string, unknown> | null, created_by?: string | null, created_at?: string }
+        Row: { id: string, title: string, description: string, event_date: string, start_time: string | null, location: string | null, location_url: string | null, poster_url: string | null, voting_locked_at: string | null, invite_options: Record<string, unknown> | null, poster_display: Record<string, unknown> | null, reminders_enabled: boolean, created_by: string | null, created_at: string }
+        Insert: { id?: string, title: string, description?: string, event_date: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, voting_locked_at?: string | null, invite_options?: Record<string, unknown> | null, poster_display?: Record<string, unknown> | null, reminders_enabled?: boolean, created_by?: string | null, created_at?: string }
+        Update: { id?: string, title?: string, description?: string, event_date?: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, voting_locked_at?: string | null, invite_options?: Record<string, unknown> | null, poster_display?: Record<string, unknown> | null, reminders_enabled?: boolean, created_by?: string | null, created_at?: string }
         Relationships: []
       }
       rsvps: {

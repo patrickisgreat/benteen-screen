@@ -14,6 +14,8 @@ export interface MovieEvent {
   invite_options: Record<string, unknown> | null
   /** Per-event poster header display (jsonb). Read via normalizePosterDisplay. */
   poster_display: Record<string, unknown> | null
+  /** Whether the auto RSVP-reminder cron emails this event's non-responders. */
+  reminders_enabled: boolean
   created_at: string
 }
 

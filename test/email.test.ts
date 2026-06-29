@@ -3,12 +3,33 @@ import type { InviteOptions } from '../shared/types/invite-options'
 import {
   buildAnnounceEmail,
   buildEventInviteEmail,
+  buildEventReminderEmail,
   buildInviteEmail,
   escapeHtml,
   formatEmailDate,
   htmlToText,
   uniqueEmails
 } from '../shared/utils/email'
+
+describe('buildEventReminderEmail', () => {
+  it('includes the tokenized one-click RSVP links', () => {
+    const m = buildEventReminderEmail({ eventTitle: 'Jaws', eventDate: 'Friday', daysLeft: 3, rsvpUrl: 'https://x/rsvp?token=abc' })
+    expect(m.html).toContain('https://x/rsvp?token=abc&amp;status=going')
+    expect(m.text).toContain('https://x/rsvp?token=abc&status=no')
+  })
+
+  it('uses "in N days" copy and a normal subject when there is time', () => {
+    const m = buildEventReminderEmail({ eventTitle: 'Jaws', eventDate: null, daysLeft: 3, rsvpUrl: 'https://x/rsvp?token=abc' })
+    expect(m.subject).toBe('Reminder: RSVP for Jaws')
+    expect(m.text).toContain('in 3 days')
+  })
+
+  it('switches to "Last call" + "tomorrow" at one day out', () => {
+    const m = buildEventReminderEmail({ eventTitle: 'Jaws', eventDate: null, daysLeft: 1, rsvpUrl: 'https://x/rsvp?token=abc' })
+    expect(m.subject).toBe('Last call: RSVP for Jaws')
+    expect(m.text).toContain('tomorrow')
+  })
+})
 
 describe('buildEventInviteEmail', () => {
   it('includes tokenized Going/Maybe/No RSVP links', () => {
