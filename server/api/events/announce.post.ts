@@ -63,38 +63,29 @@ export default defineEventHandler(async (event) => {
     link: `${resolveOrigin(event)}/overview`
   })
 
-  // Resend caps a single send at 50 recipients (to + cc + bcc), so a blast to a
-  // larger group must go out as several BCC'd emails — otherwise Resend rejects the
-  // whole send and the blast 502s. A small gap between sends stays under the rate limit.
-  const RECIPIENT_LIMIT = 50
-  const groups = chunk(emails, RECIPIENT_LIMIT)
-  try {
-    for (let i = 0; i < groups.length; i++) {
-      if (i > 0) await new Promise(resolve => setTimeout(resolve, 250))
-      await sendEmail(resendApiKey, resendFrom, {
-        to: resendFrom, // a `to` is required; real recipients are BCC'd
-        bcc: groups[i],
-        subject: mail.subject,
-        html: mail.html,
-        text: mail.text,
-        replyTo: user.email ?? undefined
-      })
-    }
-  } catch (error) {
-    throw createError({ statusCode: 502, statusMessage: error instanceof Error ? error.message : 'Send failed' })
+  // Send in BCC groups of 50 (Resend's per-send cap). Continues past a failed
+  // group, so a mid-blast error doesn't lose the groups that already delivered —
+  // the result reports sent/failed for the UI to surface (no all-or-nothing 502).
+  const { sent, failed, error } = await sendAnnounce(
+    resendApiKey,
+    resendFrom,
+    { subject: mail.subject, html: mail.html, text: mail.text, replyTo: user.email ?? undefined },
+    emails
+  )
+
+  // Record what actually went out (best-effort — a logging failure must not fail
+  // the request; surface it in logs instead).
+  if (sent > 0) {
+    const { error: logError } = await admin.from('comms_log').insert({
+      event_id: eventId,
+      kind: 'announcement',
+      scope,
+      subject: mail.subject,
+      recipient_count: sent,
+      sent_by: userId
+    })
+    if (logError) console.error('[events/announce] comms_log insert failed -', logError.message)
   }
 
-  // Record the send in the comms log (best-effort — the email already went out, so a
-  // logging failure must not fail the request; surface it in logs instead).
-  const { error: logError } = await admin.from('comms_log').insert({
-    event_id: eventId,
-    kind: 'announcement',
-    scope,
-    subject: mail.subject,
-    recipient_count: emails.length,
-    sent_by: userId
-  })
-  if (logError) console.error('[events/announce] comms_log insert failed -', logError.message)
-
-  return { ok: true, count: emails.length }
+  return { ok: true, count: sent, failed, error }
 })
