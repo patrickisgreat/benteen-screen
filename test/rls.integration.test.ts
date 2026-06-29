@@ -489,4 +489,34 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
 
     await admin!.from('suggestions').delete().in('id', [sid, theirs!.id])
   })
+
+  it('mirrors a member’s in-app RSVP into their e-vite row (set / change / clear)', async () => {
+    const email = `rls_sync_${stamp}@example.com`
+    const uid = await makeUser(email)
+    await admin!.from('invites').insert({ email })
+    const client = await signInAs(email)
+    // The member is on this event's e-vite list, not yet responded.
+    await admin!.from('event_invites').insert({ event_id: eventId, email })
+
+    // In-app RSVP → mirrored to the e-vite row.
+    await client.from('rsvps').upsert({ event_id: eventId, user_id: uid, status: 'going' }, { onConflict: 'event_id,user_id' })
+    let row = await admin!.from('event_invites').select('rsvp, rsvp_at').eq('event_id', eventId).eq('email', email).single()
+    expect(row.data!.rsvp, 'in-app going mirrors to the e-vite row').toBe('going')
+    expect(row.data!.rsvp_at, 'and stamps a response time').not.toBeNull()
+
+    // Changing the in-app answer updates the e-vite row.
+    await client.from('rsvps').update({ status: 'maybe' }).eq('event_id', eventId).eq('user_id', uid)
+    row = await admin!.from('event_invites').select('rsvp').eq('event_id', eventId).eq('email', email).single()
+    expect(row.data!.rsvp, 'a changed answer is mirrored').toBe('maybe')
+
+    // Clearing the in-app RSVP resets them to "no reply".
+    await client.from('rsvps').delete().eq('event_id', eventId).eq('user_id', uid)
+    row = await admin!.from('event_invites').select('rsvp, rsvp_at').eq('event_id', eventId).eq('email', email).single()
+    expect(row.data!.rsvp, 'un-RSVP clears the e-vite response').toBeNull()
+    expect(row.data!.rsvp_at, 'and the response time').toBeNull()
+
+    await admin!.from('event_invites').delete().eq('event_id', eventId).eq('email', email)
+    await admin!.from('rsvps').delete().eq('user_id', uid)
+    await admin!.from('invites').delete().eq('email', email)
+  })
 })
