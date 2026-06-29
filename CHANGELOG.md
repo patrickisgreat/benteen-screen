@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.15.0...v1.16.0) (2026-06-29)
+
+
+### Features
+
+* group admin settings into a Settings tab ([#143](https://github.com/patrickisgreat/benteen-screen/issues/143)) ([d1cf96f](https://github.com/patrickisgreat/benteen-screen/commit/d1cf96f7a4906630c0e4fcf96b06d80d766ac110))
+
 ## [1.15.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.14.0...v1.15.0) (2026-06-29)
 
 
