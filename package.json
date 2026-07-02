@@ -21,7 +21,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@iconify-json/lucide": "^1.2.113",
+    "@iconify-json/lucide": "^1.2.115",
     "@iconify-json/simple-icons": "^1.2.86",
     "@nuxt/ui": "^4.9.0",
     "@nuxtjs/supabase": "^2.0.9",
