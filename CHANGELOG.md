@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.2](https://github.com/patrickisgreat/benteen-screen/compare/v1.16.1...v1.16.2) (2026-07-04)
+
+
+### Bug Fixes
+
+* chunk announce BCC at 49, not 50 (the `to` takes a slot) ([#152](https://github.com/patrickisgreat/benteen-screen/issues/152)) ([3900fe5](https://github.com/patrickisgreat/benteen-screen/commit/3900fe577790fe32475742974361596961ee9107))
+
 ## [1.16.1](https://github.com/patrickisgreat/benteen-screen/compare/v1.16.0...v1.16.1) (2026-06-29)
 
 
