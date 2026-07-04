@@ -13,6 +13,7 @@ const invites = ref([
   { id: 'b', event_id: 'e', email: 'sam@x.com', display_name: 'Sam', token: '2', rsvp: null, rsvp_at: null, invited_by: null, resend_id: null, sent_at: null, delivered_at: null, opened_at: null, clicked_at: null, bounced_at: null, created_at: '' }
 ])
 const sendFn = vi.fn<() => Promise<SendResult>>(async () => ({ sent: 0, failed: 0, error: null }))
+const remindFn = vi.fn<() => Promise<SendResult>>(async () => ({ sent: 0, failed: 0, error: null }))
 const removeMany = vi.fn(async () => {})
 const seedFn = vi.fn(async () => 0)
 const saveOptionsFn = vi.fn(async () => {})
@@ -41,7 +42,8 @@ mockNuxtImport('useEventInvites', () => () => ({
   removeInvite: async () => {},
   removeInvites: removeMany,
   seedFromLastEvent: seedFn,
-  sendInvites: sendFn
+  sendInvites: sendFn,
+  remindNonResponders: remindFn
 }))
 mockNuxtImport('useToast', () => () => ({ add: (t: Toast) => toasts.push(t) }))
 mockNuxtImport('useInviteOptions', () => () => ({ save: saveOptionsFn }))
@@ -183,5 +185,19 @@ describe('EventInviteManager', () => {
     await flushPromises()
     expect(saveOptionsFn).toHaveBeenCalledTimes(1)
     expect(toasts.at(-1)?.title).toContain('saved')
+  })
+
+  it('manually reminds non-responders on click', async () => {
+    const prev = invites.value
+    // One e-vited, non-responding guest (rsvp null + sent_at set) → remindable.
+    invites.value = [{ ...prev[1]!, rsvp: null, sent_at: 't' }]
+    remindFn.mockClear()
+    remindFn.mockResolvedValueOnce({ sent: 1, failed: 0, error: null })
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e', event: eventObj } })
+    await w.findAll('button').find(b => b.text().includes('Remind'))!.trigger('click')
+    await flushPromises()
+    expect(remindFn).toHaveBeenCalled()
+    expect(toasts.at(-1)?.title).toContain('Reminded 1')
+    invites.value = prev
   })
 })

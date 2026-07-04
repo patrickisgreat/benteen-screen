@@ -10,7 +10,7 @@ import { INVITE_ACCENTS, INVITE_THEMES, type InviteAccent, type InviteOptions, t
 // and shows live RSVP / open / click tracking.
 const props = defineProps<{ eventId: string, event?: MovieEvent | null }>()
 const toast = useToast()
-const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites } = useEventInvites(() => props.eventId)
+const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders } = useEventInvites(() => props.eventId)
 const { save: saveInviteOptions } = useInviteOptions(() => props.eventId)
 const { setEnabled: setRemindersEnabled } = useEventReminders(() => props.eventId)
 
@@ -39,7 +39,42 @@ const newName = ref('')
 const sending = ref(false)
 const seeding = ref(false)
 const deleting = ref(false)
+const reminding = ref(false)
 const emailSchema = z.string().email()
+
+// People who were e-vited but haven't RSVP'd — the manual "remind now" audience.
+const remindable = computed(() => invites.value.filter(i => !i.rsvp && i.sent_at).length)
+
+async function onRemind(): Promise<void> {
+  reminding.value = true
+  try {
+    const { sent, failed, error } = await remindNonResponders()
+    if (sent && failed) {
+      toast.add({ title: `Reminded ${sent}, ${failed} failed`, description: error ?? undefined, icon: 'i-lucide-bell', color: 'warning' })
+    } else if (sent) {
+      toast.add({ title: `Reminded ${sent} ${sent === 1 ? 'person' : 'people'}`, icon: 'i-lucide-bell', color: 'success' })
+    } else if (failed) {
+      toast.add({ title: 'Could not send reminders', description: error ?? undefined, color: 'error' })
+    } else {
+      toast.add({ title: 'Everyone has already replied', color: 'neutral' })
+    }
+  } catch (error) {
+    toast.add({ title: 'Could not send reminders', description: error instanceof Error ? error.message : undefined, color: 'error' })
+  } finally {
+    reminding.value = false
+  }
+}
+
+// A link the admin can personally text/DM someone: it opens the one-click RSVP page.
+async function copyRsvpLink(invite: EventInvite): Promise<void> {
+  const url = `${location.origin}/rsvp?token=${invite.token}`
+  try {
+    await navigator.clipboard.writeText(url)
+    toast.add({ title: 'RSVP link copied', icon: 'i-lucide-check', color: 'success' })
+  } catch {
+    toast.add({ title: 'Copy failed — here it is', description: url, color: 'warning' })
+  }
+}
 
 // --- E-vite editor ---------------------------------------------------------
 const THEME_LABELS: Record<InviteTheme, string> = { marquee: 'Marquee', neon: 'Neon', classic: 'Classic' }
@@ -368,6 +403,16 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
         :disabled="!unsent"
         @click="onSend"
       />
+      <UButton
+        :label="remindable ? `Remind ${remindable} non-responder${remindable === 1 ? '' : 's'}` : 'No one to remind'"
+        icon="i-lucide-bell"
+        color="neutral"
+        variant="outline"
+        size="sm"
+        :loading="reminding"
+        :disabled="!remindable"
+        @click="onRemind"
+      />
     </div>
 
     <!-- Per-event auto-reminder toggle -->
@@ -419,6 +464,15 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
           </p>
         </div>
         <UBadge :label="statusBadge(invite).label" :color="statusBadge(invite).color" variant="subtle" size="sm" class="shrink-0" />
+        <UButton
+          icon="i-lucide-link"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          aria-label="Copy RSVP link"
+          class="shrink-0"
+          @click="copyRsvpLink(invite)"
+        />
         <UButton
           icon="i-lucide-x"
           color="neutral"
