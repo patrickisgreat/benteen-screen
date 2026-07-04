@@ -55,37 +55,23 @@ export default defineEventHandler(async (event) => {
 
   const origin = resolveOrigin(event)
   const appUrl = `${origin}/overview`
-  const stamp = now.toISOString()
   let totalSent = 0
 
   for (const d of due) {
-    const items = d.invites.map((inv) => {
-      const mail = buildEventReminderEmail({
-        eventTitle: d.eventTitle,
-        eventDate: formatEmailDate(d.eventDate) || null,
-        daysLeft: d.daysLeft,
-        rsvpUrl: `${origin}/rsvp?token=${inv.token}`,
-        appUrl
-      })
-      return { to: inv.email, subject: mail.subject, html: mail.html, text: mail.text }
+    const { sent } = await sendEventReminders(admin, {
+      apiKey: resendApiKey,
+      from: resendFrom,
+      eventTitle: d.eventTitle,
+      eventDate: formatEmailDate(d.eventDate) || null,
+      daysLeft: d.daysLeft,
+      origin,
+      appUrl,
+      invites: d.invites
     })
-
-    let ids: (string | null)[]
-    try {
-      ;({ ids } = await sendBatch(resendApiKey, resendFrom, items))
-    } catch (e) {
-      // A batch fails as a unit (e.g. an unverified sender). Leave reminded_at
-      // untouched so the next run retries; don't fail the whole cron.
-      console.error('[crons/reminders] batch failed -', e instanceof Error ? e.message : e)
-      continue
+    if (sent > 0) {
+      await admin.from('comms_log').insert({ event_id: d.eventId, kind: 'reminder', subject: `Reminder — ${d.eventTitle}`, recipient_count: sent })
+      totalSent += sent
     }
-
-    // Stamp + log only the invites that actually went out (got a Resend id).
-    const sentIds = d.invites.filter((_, i) => ids[i] != null).map(inv => inv.id)
-    if (!sentIds.length) continue
-    await admin.from('event_invites').update({ reminded_at: stamp }).in('id', sentIds)
-    await admin.from('comms_log').insert({ event_id: d.eventId, kind: 'reminder', subject: `Reminder — ${d.eventTitle}`, recipient_count: sentIds.length })
-    totalSent += sentIds.length
   }
 
   return { ok: true, events: due.length, sent: totalSent }
