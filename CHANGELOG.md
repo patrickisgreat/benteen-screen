@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.17.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.16.2...v1.17.0) (2026-07-04)
+
+
+### Features
+
+* manual "remind non-responders" button + copyable RSVP link ([#153](https://github.com/patrickisgreat/benteen-screen/issues/153)) ([81dc32f](https://github.com/patrickisgreat/benteen-screen/commit/81dc32f8247edbeed40831d46cd02c00f897d819))
+
+
+### Bug Fixes
+
+* **ci:** skip the Claude review on Dependabot PRs ([#155](https://github.com/patrickisgreat/benteen-screen/issues/155)) ([0bd3d61](https://github.com/patrickisgreat/benteen-screen/commit/0bd3d61db12d491defcdd8b6be9b03968d424069))
+
 ## [1.16.2](https://github.com/patrickisgreat/benteen-screen/compare/v1.16.1...v1.16.2) (2026-07-04)
 
 
