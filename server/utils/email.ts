@@ -108,9 +108,12 @@ export function chunk<T>(items: readonly T[], size: number): T[][] {
   return out
 }
 
-// Resend caps a single send (to + cc + bcc) at 50 recipients — distinct from the
-// 100-per-request batch endpoint above, which is a different Resend API.
-const ANNOUNCE_RECIPIENT_LIMIT = 50
+// Resend caps a single send at 50 recipients across to + cc + bcc. We always set
+// one `to` (so real addresses stay BCC-hidden), which uses a slot — so only 49 BCC
+// fit per send. (50 BCC + the `to` = 51 → Resend rejects the whole group, which is
+// why a blast to >49 only delivered the final leftover group.) Distinct from the
+// 100-per-request batch endpoint above — that's a different Resend API.
+const ANNOUNCE_RECIPIENT_LIMIT = 49
 
 export interface SendAnnounceResult {
   /** Recipients in groups that sent successfully. */
