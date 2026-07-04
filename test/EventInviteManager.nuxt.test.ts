@@ -71,6 +71,8 @@ beforeEach(() => {
   toasts.length = 0
   sendFn.mockReset()
   sendFn.mockResolvedValue({ sent: 0, failed: 0, error: null })
+  remindFn.mockReset()
+  remindFn.mockResolvedValue({ sent: 0, failed: 0, error: null })
 })
 
 describe('EventInviteManager', () => {
@@ -187,17 +189,33 @@ describe('EventInviteManager', () => {
     expect(toasts.at(-1)?.title).toContain('saved')
   })
 
-  it('manually reminds non-responders on click', async () => {
+  // Mount with one e-vited, non-responding guest (rsvp null + sent_at) so the
+  // remind button is enabled, click it, then restore the shared fixture.
+  async function clickRemind(): Promise<void> {
     const prev = invites.value
-    // One e-vited, non-responding guest (rsvp null + sent_at set) → remindable.
     invites.value = [{ ...prev[1]!, rsvp: null, sent_at: 't' }]
-    remindFn.mockClear()
-    remindFn.mockResolvedValueOnce({ sent: 1, failed: 0, error: null })
     const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e', event: eventObj } })
     await w.findAll('button').find(b => b.text().includes('Remind'))!.trigger('click')
     await flushPromises()
-    expect(remindFn).toHaveBeenCalled()
-    expect(toasts.at(-1)?.title).toContain('Reminded 1')
     invites.value = prev
+  }
+
+  it('reports a successful manual reminder', async () => {
+    remindFn.mockResolvedValueOnce({ sent: 1, failed: 0, error: null })
+    await clickRemind()
+    expect(remindFn).toHaveBeenCalled()
+    expect(toasts.at(-1)).toMatchObject({ title: 'Reminded 1 person', color: 'success' })
+  })
+
+  it('reports a partial manual reminder (some sent, some failed) with the reason', async () => {
+    remindFn.mockResolvedValueOnce({ sent: 2, failed: 1, error: 'Unverified domain' })
+    await clickRemind()
+    expect(toasts.at(-1)).toMatchObject({ title: 'Reminded 2, 1 failed', description: 'Unverified domain', color: 'warning' })
+  })
+
+  it('reports an all-failed manual reminder as an error with the reason', async () => {
+    remindFn.mockResolvedValueOnce({ sent: 0, failed: 2, error: 'Unverified domain' })
+    await clickRemind()
+    expect(toasts.at(-1)).toMatchObject({ title: 'Could not send reminders', description: 'Unverified domain', color: 'error' })
   })
 })

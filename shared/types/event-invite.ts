@@ -17,6 +17,7 @@ export interface EventInvite {
   opened_at: string | null
   clicked_at: string | null
   bounced_at: string | null
+  reminded_at: string | null
   created_at: string
 }
 

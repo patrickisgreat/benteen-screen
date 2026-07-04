@@ -230,6 +230,8 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
   if (invite.rsvp === 'going') return { label: 'Going', color: 'success' }
   if (invite.rsvp === 'maybe') return { label: 'Maybe', color: 'warning' }
   if (invite.rsvp === 'no') return { label: 'Can\'t make it', color: 'neutral' }
+  // Nudged but still no reply — so admins can see who's been reminded (and not double-send).
+  if (invite.reminded_at) return { label: 'Reminded', color: 'info' }
   if (invite.clicked_at) return { label: 'Clicked', color: 'info' }
   if (invite.opened_at) return { label: 'Opened', color: 'info' }
   if (invite.sent_at) return { label: 'Sent', color: 'neutral' }
