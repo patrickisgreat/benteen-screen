@@ -2,13 +2,14 @@ import { Resend } from 'resend'
 import type { H3Event } from 'h3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '~/types/database.types'
+import { buildEventReminderEmail } from '../../shared/utils/email'
 
 // The email *builders* (subject/html/text) live in shared/utils/email.ts so the
 // admin UI can render a live preview with the exact same output. This server-only
 // module keeps the Resend send wrappers, the config/origin helpers its routes
-// share, and the e-vite batch orchestration (`sendEventInvites`). The API key must
-// never reach the client; only *types* are imported from supabase-js / the DB
-// types, so this file still loads outside the `#supabase/server` runtime.
+// share, and the batch orchestration (`sendEventInvites` / `sendEventReminders`).
+// The API key must never reach the client; the only value imported is a pure
+// builder from shared/utils, so this file still loads outside `#supabase/server`.
 
 // Resend's constructor just stores the key (it opens no connection), but a large
 // invite blast would otherwise build a fresh client per 100-recipient batch.
@@ -270,4 +271,73 @@ export async function sendEventInvites(
     }
   }
   return { sent, failed: failures.length, error: failures[0]?.error ?? null }
+}
+
+// ── Reminder sends (shared by the daily cron + the manual "remind now" route) ──
+
+/** One non-responder to nudge: the `event_invites` row id + their token link. */
+export interface ReminderRecipient {
+  readonly id: string
+  readonly email: string
+  readonly token: string
+}
+
+/**
+ * Sends the RSVP reminder to a list of non-responders for one event, in
+ * rate-limit-friendly batches, and stamps `reminded_at` on the ones that went
+ * out. Each reminder is a distinct one-click token email (like the e-vite), so it
+ * uses the batch endpoint, not a BCC. Returns sent/failed counts + the first
+ * error; the caller records the `comms_log` entry.
+ */
+export async function sendEventReminders(
+  db: SupabaseClient<Database>,
+  opts: {
+    readonly apiKey: string
+    readonly from: string
+    readonly replyTo?: string
+    readonly eventTitle: string
+    readonly eventDate: string | null // already formatted for the email body
+    readonly daysLeft: number
+    readonly origin: string
+    readonly appUrl: string
+    readonly invites: readonly ReminderRecipient[]
+    readonly batchSize?: number
+    readonly interBatchMs?: number
+  }
+): Promise<{ sent: number, failed: number, error: string | null }> {
+  const batchSize = opts.batchSize ?? INVITE_BATCH_SIZE
+  const interBatchMs = opts.interBatchMs ?? INVITE_INTER_BATCH_MS
+  const stamp = new Date().toISOString()
+  let sent = 0
+  let firstError: string | null = null
+  const batches = chunk(opts.invites, batchSize)
+  for (let b = 0; b < batches.length; b++) {
+    if (b > 0) await sleep(interBatchMs)
+    const group = batches[b]!
+    try {
+      const items = group.map((inv) => {
+        const mail = buildEventReminderEmail({
+          eventTitle: opts.eventTitle,
+          eventDate: opts.eventDate,
+          daysLeft: opts.daysLeft,
+          rsvpUrl: `${opts.origin}/rsvp?token=${inv.token}`,
+          appUrl: opts.appUrl
+        })
+        return { to: inv.email, subject: mail.subject, html: mail.html, text: mail.text, replyTo: opts.replyTo }
+      })
+      const { ids } = await sendBatch(opts.apiKey, opts.from, items)
+      // Stamp only the ones Resend accepted, so a failed batch retries next time.
+      const sentIds = group.filter((_, i) => ids[i] != null).map(inv => inv.id)
+      if (sentIds.length) {
+        const { error: stampError } = await db.from('event_invites').update({ reminded_at: stamp }).in('id', sentIds)
+        if (stampError) console.warn('[reminders] reminded_at stamp failed -', stampError.message)
+      }
+      sent += sentIds.length
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Unknown error'
+      if (!firstError) firstError = message
+      console.error('[reminders] batch failed -', message)
+    }
+  }
+  return { sent, failed: opts.invites.length - sent, error: firstError }
 }

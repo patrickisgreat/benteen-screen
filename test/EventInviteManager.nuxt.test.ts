@@ -13,6 +13,7 @@ const invites = ref([
   { id: 'b', event_id: 'e', email: 'sam@x.com', display_name: 'Sam', token: '2', rsvp: null, rsvp_at: null, invited_by: null, resend_id: null, sent_at: null, delivered_at: null, opened_at: null, clicked_at: null, bounced_at: null, created_at: '' }
 ])
 const sendFn = vi.fn<() => Promise<SendResult>>(async () => ({ sent: 0, failed: 0, error: null }))
+const remindFn = vi.fn<() => Promise<SendResult>>(async () => ({ sent: 0, failed: 0, error: null }))
 const removeMany = vi.fn(async () => {})
 const seedFn = vi.fn(async () => 0)
 const saveOptionsFn = vi.fn(async () => {})
@@ -41,7 +42,8 @@ mockNuxtImport('useEventInvites', () => () => ({
   removeInvite: async () => {},
   removeInvites: removeMany,
   seedFromLastEvent: seedFn,
-  sendInvites: sendFn
+  sendInvites: sendFn,
+  remindNonResponders: remindFn
 }))
 mockNuxtImport('useToast', () => () => ({ add: (t: Toast) => toasts.push(t) }))
 mockNuxtImport('useInviteOptions', () => () => ({ save: saveOptionsFn }))
@@ -69,6 +71,8 @@ beforeEach(() => {
   toasts.length = 0
   sendFn.mockReset()
   sendFn.mockResolvedValue({ sent: 0, failed: 0, error: null })
+  remindFn.mockReset()
+  remindFn.mockResolvedValue({ sent: 0, failed: 0, error: null })
 })
 
 describe('EventInviteManager', () => {
@@ -183,5 +187,35 @@ describe('EventInviteManager', () => {
     await flushPromises()
     expect(saveOptionsFn).toHaveBeenCalledTimes(1)
     expect(toasts.at(-1)?.title).toContain('saved')
+  })
+
+  // Mount with one e-vited, non-responding guest (rsvp null + sent_at) so the
+  // remind button is enabled, click it, then restore the shared fixture.
+  async function clickRemind(): Promise<void> {
+    const prev = invites.value
+    invites.value = [{ ...prev[1]!, rsvp: null, sent_at: 't' }]
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e', event: eventObj } })
+    await w.findAll('button').find(b => b.text().includes('Remind'))!.trigger('click')
+    await flushPromises()
+    invites.value = prev
+  }
+
+  it('reports a successful manual reminder', async () => {
+    remindFn.mockResolvedValueOnce({ sent: 1, failed: 0, error: null })
+    await clickRemind()
+    expect(remindFn).toHaveBeenCalled()
+    expect(toasts.at(-1)).toMatchObject({ title: 'Reminded 1 person', color: 'success' })
+  })
+
+  it('reports a partial manual reminder (some sent, some failed) with the reason', async () => {
+    remindFn.mockResolvedValueOnce({ sent: 2, failed: 1, error: 'Unverified domain' })
+    await clickRemind()
+    expect(toasts.at(-1)).toMatchObject({ title: 'Reminded 2, 1 failed', description: 'Unverified domain', color: 'warning' })
+  })
+
+  it('reports an all-failed manual reminder as an error with the reason', async () => {
+    remindFn.mockResolvedValueOnce({ sent: 0, failed: 2, error: 'Unverified domain' })
+    await clickRemind()
+    expect(toasts.at(-1)).toMatchObject({ title: 'Could not send reminders', description: 'Unverified domain', color: 'error' })
   })
 })
