@@ -139,6 +139,19 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     return { sent: result.sent, failed: result.failed, error: result.error }
   }
 
+  /** Manually email everyone who was e-vited but hasn't RSVP'd yet, now (bypassing
+   *  the checkpoint schedule + throttle). Returns sent/failed + the first error. */
+  async function remindNonResponders(): Promise<{ sent: number, failed: number, error: string | null }> {
+    const id = toValue(eventId)
+    if (!id) return { sent: 0, failed: 0, error: null }
+    const result = await $fetch<{ ok: boolean, sent: number, failed: number, error: string | null }>(
+      `/api/events/${id}/reminders/send`,
+      { method: 'POST' }
+    )
+    await refresh()
+    return { sent: result.sent, failed: result.failed, error: result.error }
+  }
+
   // Live updates as RSVPs / opens land (event_invites is in the realtime publication).
   let channel: ReturnType<typeof supabase.channel> | null = null
   watch(() => toValue(eventId), (id) => {
@@ -160,5 +173,5 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     if (channel) supabase.removeChannel(channel)
   })
 
-  return { invites, pending, stats, refresh, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites }
+  return { invites, pending, stats, refresh, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders }
 }
