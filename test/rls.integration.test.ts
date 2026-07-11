@@ -429,6 +429,46 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('events').delete().eq('id', farId)
   })
 
+  it('lets another member re-suggest a movie whose earlier suggestion was hidden by un-RSVP', async () => {
+    const { data: ev } = await admin!
+      .from('events').insert({ title: 'Resuggest', event_date: new Date(stamp + 20 * 86_400_000).toISOString() })
+      .select('id').single()
+    const evId = ev!.id
+    const mario = { id: 502356, title: 'The Super Mario Bros. Movie' }
+
+    // Author A suggests Mario, then leaves "going" → A's Mario is hidden.
+    const emailA = `rls_resA_${stamp}@example.com`
+    const uidA = await makeUser(emailA)
+    await admin!.from('invites').insert({ email: emailA })
+    const clientA = await signInAs(emailA)
+    await clientA.from('rsvps').insert({ event_id: evId, user_id: uidA, status: 'going' })
+    const { data: sA } = await clientA.from('suggestions').insert({ event_id: evId, tmdb_movie: mario }).select('id').single()
+    await clientA.from('rsvps').update({ status: 'no' }).eq('event_id', evId).eq('user_id', uidA)
+
+    // Member B (going) can now submit the same movie — previously a unique violation.
+    const emailB = `rls_resB_${stamp}@example.com`
+    const uidB = await makeUser(emailB)
+    await admin!.from('invites').insert({ email: emailB })
+    const clientB = await signInAs(emailB)
+    await clientB.from('rsvps').insert({ event_id: evId, user_id: uidB, status: 'going' })
+    const reSuggest = await clientB.from('suggestions').insert({ event_id: evId, tmdb_movie: mario }).select('id').single()
+    expect(reSuggest.error, 'B can re-suggest the movie A hid by un-RSVPing').toBeNull()
+    const sBId = reSuggest.data!.id
+
+    // A returns to "going": their Mario must stay hidden (B's is live) — no collision.
+    const back = await clientA.from('rsvps').update({ status: 'going' }).eq('event_id', evId).eq('user_id', uidA)
+    expect(back.error, 're-RSVP does not error even though the movie is taken').toBeNull()
+    const aRow = await admin!.from('suggestions').select('rsvp_hidden_at').eq('id', sA!.id).single()
+    const bRow = await admin!.from('suggestions').select('rsvp_hidden_at').eq('id', sBId).single()
+    expect(aRow.data!.rsvp_hidden_at, 'A\'s original stays hidden — B\'s is on the ballot').not.toBeNull()
+    expect(bRow.data!.rsvp_hidden_at, 'B\'s re-suggestion is live').toBeNull()
+
+    await admin!.from('suggestions').delete().in('id', [sA!.id, sBId])
+    await admin!.from('rsvps').delete().in('user_id', [uidA, uidB])
+    await admin!.from('invites').delete().in('email', [emailA, emailB])
+    await admin!.from('events').delete().eq('id', evId)
+  })
+
   it('claim_freed_votes notifies a voter once when their pick leaves the ballot', async () => {
     await memberClient.from('rsvps').upsert({ event_id: eventId, user_id: memberId, status: 'going' }, { onConflict: 'event_id,user_id' })
     const { data: s } = await admin!
