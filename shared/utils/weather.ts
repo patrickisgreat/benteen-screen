@@ -17,15 +17,42 @@ export function describeWeather(code: number): WeatherDescription {
   return { label: 'Thunderstorm', icon: 'i-lucide-cloud-lightning' }
 }
 
+/** A resolved location, whichever geocoder produced it. */
+export interface GeocodedPlace {
+  latitude: number
+  longitude: number
+  name: string | null
+}
+
+/** Minimal shape of a Nominatim search hit. lat/lon arrive as strings. */
+export interface NominatimResult {
+  lat?: string
+  lon?: string
+  display_name?: string
+}
+
 /**
- * Open-Meteo's geocoder resolves place *names*, not street addresses — the whole
- * free-text location ("1900 Lakewood Ave SE, Atlanta, GA", "Benteen Park, Atlanta")
- * usually returns no match, which is why the card's weather silently blanks out.
- * Derive fallback candidates to try in order: the full string first, then each
- * comma-separated segment left-to-right. Left-to-right keeps the most specific
- * hit — a park/venue name beats the city, the city beats the state/ZIP — and the
- * caller stops at the first that geocodes. Capped so a long address can't fan out
- * into many upstream requests. Deduped case-insensitively.
+ * Parse the first Nominatim hit defensively — every field may be missing and
+ * lat/lon are strings that may not be numeric. Nominatim resolves street
+ * addresses ("1447 Benteen Ave SE"), which Open-Meteo's name-only geocoder
+ * can't, so it is the primary geocoder for event locations.
+ */
+export function parseNominatimPlace(results: readonly NominatimResult[] | null | undefined): GeocodedPlace | null {
+  const first = results?.[0]
+  if (!first) return null
+  const latitude = Number(first.lat)
+  const longitude = Number(first.lon)
+  if (!first.lat || !first.lon || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null
+  return { latitude, longitude, name: first.display_name?.trim() || null }
+}
+
+/**
+ * Fallback candidates for Open-Meteo's geocoder (used when Nominatim misses),
+ * which resolves place *names*, not street addresses. Try the full string
+ * first, then each comma-separated segment left-to-right — a park/venue name
+ * beats the city, the city beats the state/ZIP — and the caller stops at the
+ * first that geocodes. Capped so a long address can't fan out into many
+ * upstream requests. Deduped case-insensitively.
  */
 export function geocodeCandidates(location: string, limit = 4): string[] {
   const seen = new Set<string>()

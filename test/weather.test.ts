@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeWeather, forecastDaysAway, geocodeCandidates, withinForecastWindow } from '../shared/utils/weather'
+import { describeWeather, forecastDaysAway, geocodeCandidates, parseNominatimPlace, withinForecastWindow } from '../shared/utils/weather'
 
 describe('describeWeather', () => {
   it('maps representative WMO codes to labels', () => {
@@ -15,6 +15,39 @@ describe('describeWeather', () => {
     for (const code of [0, 2, 45, 61, 71, 82, 95]) {
       expect(describeWeather(code).icon).toMatch(/^i-lucide-/)
     }
+  })
+})
+
+describe('parseNominatimPlace', () => {
+  it('parses a street-address hit (lat/lon arrive as strings)', () => {
+    // The regression: "1447 Benteen Ave SE" has no commas, so the Open-Meteo
+    // candidate fallback had nothing to try — Nominatim resolves it directly.
+    expect(parseNominatimPlace([{
+      lat: '33.7146957',
+      lon: '-84.3669406',
+      display_name: '1447, Benteen Avenue Southeast, Atlanta, Georgia, United States'
+    }])).toEqual({
+      latitude: 33.7146957,
+      longitude: -84.3669406,
+      name: '1447, Benteen Avenue Southeast, Atlanta, Georgia, United States'
+    })
+  })
+
+  it('returns null when there are no results', () => {
+    expect(parseNominatimPlace([])).toBeNull()
+    expect(parseNominatimPlace(null)).toBeNull()
+    expect(parseNominatimPlace(undefined)).toBeNull()
+  })
+
+  it('returns null when lat/lon are missing or not numeric', () => {
+    expect(parseNominatimPlace([{ display_name: 'Somewhere' }])).toBeNull()
+    expect(parseNominatimPlace([{ lat: 'abc', lon: '-84.4' }])).toBeNull()
+    expect(parseNominatimPlace([{ lat: '33.7', lon: '' }])).toBeNull()
+  })
+
+  it('nulls out a missing or blank display name', () => {
+    expect(parseNominatimPlace([{ lat: '33.7', lon: '-84.4' }])?.name).toBeNull()
+    expect(parseNominatimPlace([{ lat: '33.7', lon: '-84.4', display_name: '  ' }])?.name).toBeNull()
   })
 })
 
