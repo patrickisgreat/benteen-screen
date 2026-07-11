@@ -54,6 +54,11 @@ begin
     select coalesce(array_agg(id), array[]::uuid[]) into restored_ids from upd;
 
     -- 2. Un-hide this user's own votes for the event (budget-reconciled in step 3).
+    --    Deliberately unconditional: this can leave a live vote on a suggestion that
+    --    step 1 kept rsvp-hidden (movie re-suggested by someone else). That state is
+    --    benign — vote counting and the vote-limit check both join through the
+    --    suggestion and require rsvp_hidden_at is null, so the vote is inert; a later
+    --    un-RSVP simply re-hides it.
     update public.votes v
       set hidden_at = null
       from public.suggestions s
