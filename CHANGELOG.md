@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.3](https://github.com/patrickisgreat/benteen-screen/compare/v1.17.2...v1.17.3) (2026-07-11)
+
+
+### Bug Fixes
+
+* **ci:** auto-repair Dependabot's broken npm lockfiles ([#170](https://github.com/patrickisgreat/benteen-screen/issues/170)) ([272ca17](https://github.com/patrickisgreat/benteen-screen/commit/272ca178146936c3f92314e40a8af1615b149fc8))
+
 ## [1.17.2](https://github.com/patrickisgreat/benteen-screen/compare/v1.17.1...v1.17.2) (2026-07-11)
 
 
