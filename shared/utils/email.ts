@@ -140,6 +140,65 @@ export function buildEventReminderEmail(opts: {
   return { subject, html, text }
 }
 
+/** One event's line in the admin reminder digest. `eventDate` is already
+ *  formatted (or null); `remindedCount` is how many non-responders were nudged. */
+export interface AdminReminderDigestItem {
+  readonly eventTitle: string
+  readonly eventDate: string | null
+  readonly daysLeft: number
+  readonly remindedCount: number
+}
+
+/** How far out an event is, in the digest's words. */
+function daysLeftPhrase(daysLeft: number): string {
+  if (daysLeft <= 0) return 'today'
+  if (daysLeft === 1) return 'tomorrow'
+  return `in ${daysLeft} days`
+}
+
+/**
+ * Admin-facing digest sent after the daily reminder cron nudges non-responders —
+ * one summary per run so admins can see the automated sends they never trigger by
+ * hand. Lists each event reminded and how many people it reached.
+ */
+export function buildAdminReminderDigestEmail(opts: {
+  items: readonly AdminReminderDigestItem[]
+  totalReminded: number
+  adminUrl: string
+}): BuiltEmail {
+  const people = opts.totalReminded === 1 ? 'person' : 'people'
+  const events = opts.items.length === 1 ? 'event' : 'events'
+  const subject = `Movie night reminders sent — ${opts.totalReminded} ${people} nudged`
+
+  const rowsHtml = opts.items
+    .map((it) => {
+      const date = it.eventDate ? ` &middot; ${escapeHtml(it.eventDate)}` : ''
+      const n = it.remindedCount === 1 ? 'person' : 'people'
+      return `<li style="margin:0 0 8px"><strong>${escapeHtml(it.eventTitle)}</strong>${date}`
+        + ` — reminded ${it.remindedCount} ${n} (${daysLeftPhrase(it.daysLeft)})</li>`
+    })
+    .join('')
+  const html = shell(
+    `<h1 style="font-size:20px;margin:0 0 12px">RSVP reminders went out 🎬</h1>`
+    + `<p>Today's reminder nudged <strong>${opts.totalReminded} ${people}</strong> who hadn't RSVP'd yet, across ${opts.items.length} ${events}:</p>`
+    + `<ul style="padding-left:20px;margin:0 0 16px">${rowsHtml}</ul>`
+    + `<p style="margin:20px 0">${ctaButton('Open the admin dashboard', opts.adminUrl)}</p>`
+    + `<p style="font-size:13px;color:#6b7280">You're getting this because you're an admin of Benteen Screen On The Green.</p>`
+  )
+
+  const rowsText = opts.items
+    .map((it) => {
+      const date = it.eventDate ? ` (${it.eventDate})` : ''
+      return `- ${it.eventTitle}${date} — reminded ${it.remindedCount} (${daysLeftPhrase(it.daysLeft)})`
+    })
+    .join('\n')
+  const text = `RSVP reminders went out.`
+    + `\n\nNudged ${opts.totalReminded} ${people} across ${opts.items.length} ${events}:\n${rowsText}`
+    + `\n\nAdmin dashboard: ${opts.adminUrl}`
+
+  return { subject, html, text }
+}
+
 // ---- Themeable per-event e-vite -------------------------------------------
 
 interface Palette {
