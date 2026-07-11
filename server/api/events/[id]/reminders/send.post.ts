@@ -45,16 +45,19 @@ export default defineEventHandler(async (event) => {
     invites: queue
   })
 
-  if (sent > 0) {
-    const { error: logError } = await db.from('comms_log').insert({
-      event_id: eventId,
-      kind: 'reminder',
-      subject: `Reminder — ${ev.title}`,
-      recipient_count: sent,
-      sent_by: userId
-    })
-    if (logError) console.error('[events/reminders/send] comms_log insert failed -', logError.message)
-  }
+  // An attempt was made (the empty-queue case returned above), so log the outcome
+  // — success, partial, or total failure — to the admin Comms log.
+  const { error: logError } = await db.from('comms_log').insert({
+    event_id: eventId,
+    kind: 'reminder',
+    subject: `Reminder — ${ev.title}`,
+    recipient_count: sent,
+    failed_count: failed,
+    status: commsStatus(sent, failed),
+    error,
+    sent_by: userId
+  })
+  if (logError) console.error('[events/reminders/send] comms_log insert failed -', logError.message)
 
   return { ok: true, sent, failed, error }
 })
