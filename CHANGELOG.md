@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.2](https://github.com/patrickisgreat/benteen-screen/compare/v1.17.1...v1.17.2) (2026-07-11)
+
+
+### Bug Fixes
+
+* weather card blank for street-address locations — geocode via Nominatim ([#166](https://github.com/patrickisgreat/benteen-screen/issues/166)) ([61137c9](https://github.com/patrickisgreat/benteen-screen/commit/61137c978999e3908630108841c86f682753c526))
+
 ## [1.17.1](https://github.com/patrickisgreat/benteen-screen/compare/v1.17.0...v1.17.1) (2026-07-11)
 
 
