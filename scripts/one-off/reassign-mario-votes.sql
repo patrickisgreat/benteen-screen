@@ -66,20 +66,34 @@ begin
     and exists (select 1 from public.votes t where t.suggestion_id = v_target and t.user_id = v.user_id);
   get diagnostics v_deduped = row_count;
 
-  -- Move the remaining votes onto the target. hidden_at is preserved on purpose:
-  -- a voter who has since un-RSVP'd keeps their vote hidden (it should not count),
-  -- while still-"going" voters' votes count again now that the target is on the
-  -- ballot. Each voter can have voted on this movie only once, so no voter ends up
-  -- with two Mario votes and nobody's per-event vote budget changes.
+  -- Move a source vote onto the target ONLY when its owner still has an open slot —
+  -- same rule the restore trigger applies. A voter who re-spent their freed vote
+  -- while the movie was off the ballot is at their limit, so their old vote does not
+  -- come back (it stays on the hidden source, not counting). Only currently-live
+  -- votes (hidden_at is null) are candidates; a voter who has since un-RSVP'd keeps
+  -- their vote hidden and untouched.
   with sources as (
     select id from public.suggestions
     where event_id = v_event_id and (tmdb_movie ->> 'id') = v_tmdb_id and id <> v_target
+  ),
+  movable as (
+    select v.suggestion_id, v.user_id
+    from public.votes v
+    join sources s on s.id = v.suggestion_id
+    where v.hidden_at is null
+      and (
+        select count(*) from public.votes vv
+        join public.suggestions ss on ss.id = vv.suggestion_id
+        where vv.user_id = v.user_id and vv.hidden_at is null
+          and ss.event_id = v_event_id and ss.deleted = false
+          and ss.rsvp_hidden_at is null and ss.culled_at is null
+      ) < public.vote_limit()
   )
   update public.votes v
     set suggestion_id = v_target
-  from sources s
-  where v.suggestion_id = s.id;
+  from movable m
+  where v.suggestion_id = m.suggestion_id and v.user_id = m.user_id;
   get diagnostics v_moved = row_count;
 
-  raise notice 'Reassigned % vote(s) onto suggestion % (dropped % duplicate(s)).', v_moved, v_target, v_deduped;
+  raise notice 'Reassigned % vote(s) onto suggestion % (dropped % duplicate(s)); votes whose owner was at their limit were left behind.', v_moved, v_target, v_deduped;
 end $$;
