@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.4](https://github.com/patrickisgreat/benteen-screen/compare/v1.17.3...v1.17.4) (2026-07-11)
+
+
+### Bug Fixes
+
+* stop RSVP reminders emailing members who already RSVP'd in-app ([#172](https://github.com/patrickisgreat/benteen-screen/issues/172)) ([e33cfac](https://github.com/patrickisgreat/benteen-screen/commit/e33cfacd5e100aa04aea98b34595bc5063ce94f3))
+
 ## [1.17.3](https://github.com/patrickisgreat/benteen-screen/compare/v1.17.2...v1.17.3) (2026-07-11)
 
 
