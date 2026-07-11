@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.1](https://github.com/patrickisgreat/benteen-screen/compare/v1.17.0...v1.17.1) (2026-07-11)
+
+
+### Bug Fixes
+
+* event-card weather for real locations + admin digest when reminders go out ([#164](https://github.com/patrickisgreat/benteen-screen/issues/164)) ([479eabb](https://github.com/patrickisgreat/benteen-screen/commit/479eabbe7a666cbe70a69e22f018f6b12f567475))
+
 ## [1.17.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.16.2...v1.17.0) (2026-07-04)
 
 
