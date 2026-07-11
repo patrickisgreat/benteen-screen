@@ -4,7 +4,7 @@ import { nextTick, ref } from 'vue'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 import type { CommsLogEntry } from '../app/composables/useCommsLog'
 
-interface LogRow { id: string, kind: string, scope: string | null, subject: string | null, recipient_count: number, sent_by: string | null, created_at: string }
+interface LogRow { id: string, kind: string, scope: string | null, subject: string | null, recipient_count: number, failed_count?: number, status?: string, error?: string | null, sent_by: string | null, created_at: string }
 let logRows: LogRow[] = []
 const profiles = [{ id: 'pat', display_name: 'Pat' }]
 
@@ -50,5 +50,25 @@ describe('useCommsLog', () => {
     const { entries } = useCommsLog(ref('e1'))
     await settle(entries)
     expect(entries.value[0]!.kind).toBe('announcement')
+  })
+
+  it('surfaces a reminder with its failure status, failed count, and error', async () => {
+    logRows = [{
+      id: 'c4', kind: 'reminder', scope: null, subject: 'Reminder — Jaws',
+      recipient_count: 3, failed_count: 2, status: 'partial', error: 'Unverified domain',
+      sent_by: null, created_at: '2026-06-21T00:00:00Z'
+    }]
+    const { entries } = useCommsLog(ref('e1'))
+    await settle(entries)
+    expect(entries.value[0]).toMatchObject({
+      kind: 'reminder', status: 'partial', recipientCount: 3, failedCount: 2, error: 'Unverified domain'
+    })
+  })
+
+  it('defaults status to sent and failedCount to 0 for legacy rows without the columns', async () => {
+    logRows = [{ id: 'c5', kind: 'announcement', scope: null, subject: 'Legacy', recipient_count: 4, sent_by: null, created_at: '2026-06-22T00:00:00Z' }]
+    const { entries } = useCommsLog(ref('e1'))
+    await settle(entries)
+    expect(entries.value[0]).toMatchObject({ status: 'sent', failedCount: 0, error: null })
   })
 })
