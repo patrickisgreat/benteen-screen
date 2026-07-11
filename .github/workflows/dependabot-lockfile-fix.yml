@@ -1,0 +1,64 @@
+name: Fix Dependabot lockfile
+
+# Dependabot's npm updater regenerates package-lock.json with its own tooling
+# and drops the nested dedup entries this lockfile needs (e.g.
+# node_modules/@nuxt/cli/node_modules/cac@6.7.14 — parents that require
+# versions conflicting with the hoisted root copies). The result fails
+# `npm ci` ("Missing: … from lock file") on every Dependabot npm PR.
+#
+# This job re-resolves the lockfile with the SAME npm that CI uses (via
+# .nvmrc), pushes the correction back to the Dependabot branch, and
+# re-dispatches CI (a push made with the workflow token doesn't retrigger
+# `pull_request` workflows on its own).
+#
+# Scope is deliberately tight: Dependabot-authored, same-repo branches only,
+# and the lockfile is regenerated with --ignore-scripts so no package code
+# runs. If Dependabot later force-pushes a rebase, the fix commit is dropped
+# and this workflow simply runs again.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths: [package-lock.json]
+
+permissions:
+  contents: write # push the corrected lockfile
+  actions: write # re-dispatch ci.yml on the branch
+
+concurrency:
+  group: dependabot-lockfile-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  fix-lockfile:
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Re-resolve the lockfile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Verify the lockfile satisfies npm ci
+        run: npm ci --dry-run --ignore-scripts
+      - name: Push the correction and re-dispatch CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if git diff --quiet package-lock.json; then
+            echo "Lockfile already consistent — nothing to fix."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore(deps): repair lockfile after Dependabot update"
+          git push origin "HEAD:$BRANCH"
+          gh workflow run ci.yml --ref "$BRANCH"
