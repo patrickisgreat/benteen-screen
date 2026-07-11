@@ -520,3 +520,70 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('invites').delete().eq('email', email)
   })
 })
+
+describe.skipIf(!ready)('e-vite adopts an existing in-app RSVP on insert', () => {
+  const stamp = Date.now()
+  const goingEmail = `evite_going_${stamp}@example.com`
+  const explicitEmail = `evite_explicit_${stamp}@example.com`
+  const myUserIds: string[] = []
+  let eventId = ''
+
+  beforeAll(async () => {
+    const goingId = await makeUser(goingEmail)
+    const explicitId = await makeUser(explicitEmail)
+    myUserIds.push(goingId, explicitId)
+    await admin!.from('invites').insert([{ email: goingEmail }, { email: explicitEmail }])
+    const { data: ev, error } = await admin!
+      .from('events')
+      .insert({ title: 'Sync-Back Night', event_date: new Date(stamp + 7 * 86_400_000).toISOString() })
+      .select('id')
+      .single()
+    if (error || !ev) throw error ?? new Error('event seed failed')
+    eventId = ev.id
+    // Both members RSVP in-app BEFORE any e-vite row exists — the reminder-gap
+    // scenario: the rsvps→evite trigger has nothing to update yet.
+    const { error: rsvpError } = await admin!.from('rsvps').insert([
+      { event_id: eventId, user_id: goingId, status: 'going' },
+      { event_id: eventId, user_id: explicitId, status: 'going' }
+    ])
+    if (rsvpError) throw rsvpError
+  }, 30_000)
+
+  afterAll(async () => {
+    if (!admin) return
+    await admin.from('events').delete().eq('id', eventId)
+    await admin.from('invites').delete().in('email', [goingEmail, explicitEmail])
+    for (const id of myUserIds) await admin.auth.admin.deleteUser(id)
+  })
+
+  it('an invite created after the member RSVP\'d in-app adopts their response (case-insensitive)', async () => {
+    const { data, error } = await admin!
+      .from('event_invites')
+      .insert({ event_id: eventId, email: goingEmail.toUpperCase() })
+      .select('rsvp, rsvp_at')
+      .single()
+    expect(error).toBeNull()
+    expect(data?.rsvp, 'invite adopts the in-app RSVP so reminders skip them').toBe('going')
+    expect(data?.rsvp_at).toBeTruthy()
+  })
+
+  it('an invite for an email with no in-app RSVP stays a non-responder', async () => {
+    const { data, error } = await admin!
+      .from('event_invites')
+      .insert({ event_id: eventId, email: `evite_quiet_${stamp}@example.com` })
+      .select('rsvp')
+      .single()
+    expect(error).toBeNull()
+    expect(data?.rsvp).toBeNull()
+  })
+
+  it('an explicitly-set rsvp on insert is not clobbered by the member\'s in-app response', async () => {
+    const { data, error } = await admin!
+      .from('event_invites')
+      .insert({ event_id: eventId, email: explicitEmail, rsvp: 'no' })
+      .select('rsvp')
+      .single()
+    expect(error).toBeNull()
+    expect(data?.rsvp).toBe('no')
+  })
+})
