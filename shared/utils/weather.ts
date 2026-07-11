@@ -17,6 +17,32 @@ export function describeWeather(code: number): WeatherDescription {
   return { label: 'Thunderstorm', icon: 'i-lucide-cloud-lightning' }
 }
 
+/**
+ * Open-Meteo's geocoder resolves place *names*, not street addresses — the whole
+ * free-text location ("1900 Lakewood Ave SE, Atlanta, GA", "Benteen Park, Atlanta")
+ * usually returns no match, which is why the card's weather silently blanks out.
+ * Derive fallback candidates to try in order: the full string first, then each
+ * comma-separated segment left-to-right. Left-to-right keeps the most specific
+ * hit — a park/venue name beats the city, the city beats the state/ZIP — and the
+ * caller stops at the first that geocodes. Capped so a long address can't fan out
+ * into many upstream requests. Deduped case-insensitively.
+ */
+export function geocodeCandidates(location: string, limit = 4): string[] {
+  const seen = new Set<string>()
+  const candidates: string[] = []
+  const push = (value: string): void => {
+    const trimmed = value.trim()
+    const key = trimmed.toLowerCase()
+    if (trimmed && !seen.has(key) && candidates.length < limit) {
+      seen.add(key)
+      candidates.push(trimmed)
+    }
+  }
+  push(location)
+  for (const segment of location.split(',')) push(segment)
+  return candidates
+}
+
 /** Whole days from `now` until the event date (negative = past). */
 export function forecastDaysAway(eventDate: string, now: Date): number | null {
   const target = new Date(`${eventDate.slice(0, 10)}T00:00:00Z`)

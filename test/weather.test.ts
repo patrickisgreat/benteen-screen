@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeWeather, forecastDaysAway, withinForecastWindow } from '../shared/utils/weather'
+import { describeWeather, forecastDaysAway, geocodeCandidates, withinForecastWindow } from '../shared/utils/weather'
 
 describe('describeWeather', () => {
   it('maps representative WMO codes to labels', () => {
@@ -15,6 +15,46 @@ describe('describeWeather', () => {
     for (const code of [0, 2, 45, 61, 71, 82, 95]) {
       expect(describeWeather(code).icon).toMatch(/^i-lucide-/)
     }
+  })
+})
+
+describe('geocodeCandidates', () => {
+  it('tries the full location first, then each comma segment left-to-right', () => {
+    expect(geocodeCandidates('Benteen Park, Atlanta, GA')).toEqual([
+      'Benteen Park, Atlanta, GA',
+      'Benteen Park',
+      'Atlanta',
+      'GA'
+    ])
+  })
+
+  it('trims whitespace around each segment', () => {
+    expect(geocodeCandidates('1900 Lakewood Ave SE ,  Atlanta ')).toEqual([
+      '1900 Lakewood Ave SE ,  Atlanta',
+      '1900 Lakewood Ave SE',
+      'Atlanta'
+    ])
+  })
+
+  it('returns a single candidate when there are no commas', () => {
+    expect(geocodeCandidates('Atlanta')).toEqual(['Atlanta'])
+  })
+
+  it('dedupes segments case-insensitively so a place is not queried twice', () => {
+    // Both segments collapse to one candidate; only the full string differs.
+    expect(geocodeCandidates('Atlanta, ATLANTA')).toEqual(['Atlanta, ATLANTA', 'Atlanta'])
+  })
+
+  it('caps the number of candidates so a long address cannot fan out', () => {
+    expect(geocodeCandidates('a, b, c, d, e, f')).toEqual(['a, b, c, d, e, f', 'a', 'b', 'c'])
+  })
+
+  it('ignores empty segments from trailing or doubled commas', () => {
+    expect(geocodeCandidates('Benteen Park, Atlanta,')).toEqual([
+      'Benteen Park, Atlanta,',
+      'Benteen Park',
+      'Atlanta'
+    ])
   })
 })
 
