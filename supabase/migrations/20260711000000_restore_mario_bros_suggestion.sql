@@ -9,8 +9,10 @@
 -- participation-limit triggers deliberately don't apply — the same exemption
 -- the Firestore import relied on (see 20260623000000_restore_participation_limits.sql).
 --
--- Idempotent: re-running reuses the existing suggestion and the vote copy
--- upserts with `on conflict do nothing`. Fails loudly (aborting the whole
+-- Idempotent: a live suggestion of the movie already on the event (any
+-- author, incl. rsvp-hidden/culled — the event+movie unique index counts
+-- those) is adopted and reassigned to Ryan rather than inserted again, and
+-- the vote copy upserts with `on conflict do nothing`. Fails loudly (aborting the whole
 -- migration) if the profile, the historic suggestion, or an upcoming event
 -- can't be found, rather than silently doing nothing.
 -- ============================================================================
@@ -56,14 +58,20 @@ begin
   end if;
   raise notice 'Attaching to event "%" (%)', target_title, target_event;
 
-  -- Reuse Ryan's existing suggestion of it on that event, else create one.
+  -- The suggestions_event_movie_unique index allows only one live suggestion
+  -- of a movie per event, whoever authored it. If one already exists (possibly
+  -- rsvp-hidden or culled), adopt it: reassign to Ryan and restore it to the
+  -- ballot. Only insert when there is none.
   select id into suggestion
   from public.suggestions
   where event_id = target_event
-    and user_id = ryan_id
     and tmdb_movie->>'id' = movie->>'id'
     and deleted = false;
-  if suggestion is null then
+  if suggestion is not null then
+    update public.suggestions
+    set user_id = ryan_id, rsvp_hidden_at = null, culled_at = null
+    where id = suggestion;
+  else
     insert into public.suggestions (event_id, user_id, tmdb_movie)
     values (target_event, ryan_id, movie)
     returning id into suggestion;
