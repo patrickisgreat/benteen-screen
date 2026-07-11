@@ -60,9 +60,9 @@ export interface Database {
         Relationships: []
       }
       comms_log: {
-        Row: { id: string, event_id: string | null, kind: string, scope: string | null, subject: string | null, recipient_count: number, sent_by: string | null, created_at: string }
-        Insert: { id?: string, event_id?: string | null, kind: string, scope?: string | null, subject?: string | null, recipient_count?: number, sent_by?: string | null, created_at?: string }
-        Update: { id?: string, event_id?: string | null, kind?: string, scope?: string | null, subject?: string | null, recipient_count?: number, sent_by?: string | null, created_at?: string }
+        Row: { id: string, event_id: string | null, kind: string, scope: string | null, subject: string | null, recipient_count: number, failed_count: number, status: string, error: string | null, sent_by: string | null, created_at: string }
+        Insert: { id?: string, event_id?: string | null, kind: string, scope?: string | null, subject?: string | null, recipient_count?: number, failed_count?: number, status?: string, error?: string | null, sent_by?: string | null, created_at?: string }
+        Update: { id?: string, event_id?: string | null, kind?: string, scope?: string | null, subject?: string | null, recipient_count?: number, failed_count?: number, status?: string, error?: string | null, sent_by?: string | null, created_at?: string }
         Relationships: []
       }
       vote_refund_acks: {

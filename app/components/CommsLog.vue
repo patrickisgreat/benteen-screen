@@ -5,8 +5,15 @@ defineProps<{ entries: CommsLogEntry[] }>()
 
 const KIND = {
   announcement: { icon: 'i-lucide-megaphone', label: 'Announcement' },
-  invite: { icon: 'i-lucide-mail-plus', label: 'E-vite' }
+  invite: { icon: 'i-lucide-mail-plus', label: 'E-vite' },
+  reminder: { icon: 'i-lucide-alarm-clock', label: 'Reminder' }
 } as const
+
+const STATUS = {
+  sent: { label: 'Sent', color: 'success' },
+  partial: { label: 'Partial', color: 'warning' },
+  failed: { label: 'Failed', color: 'error' }
+} as const satisfies Record<CommsLogEntry['status'], { label: string, color: 'success' | 'warning' | 'error' }>
 </script>
 
 <template>
@@ -25,10 +32,17 @@ const KIND = {
             <p class="text-xs text-muted">
               {{ KIND[e.kind].label }}<span v-if="e.scope"> · {{ e.scope }}</span>
               · {{ e.recipientCount }} recipient{{ e.recipientCount === 1 ? '' : 's' }}
+              <span v-if="e.failedCount"> · {{ e.failedCount }} failed</span>
               <span v-if="e.sentByName"> · by {{ e.sentByName }}</span>
             </p>
+            <p v-if="e.error" class="text-xs text-error mt-1 break-words">
+              {{ e.error }}
+            </p>
           </div>
-          <time class="text-xs text-muted shrink-0">{{ formatDateTime(e.createdAt) }}</time>
+          <div class="flex flex-col items-end gap-1 shrink-0">
+            <UBadge :label="STATUS[e.status].label" :color="STATUS[e.status].color" variant="subtle" size="sm" />
+            <time class="text-xs text-muted">{{ formatDateTime(e.createdAt) }}</time>
+          </div>
         </div>
       </UCard>
     </div>

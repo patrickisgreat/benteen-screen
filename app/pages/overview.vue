@@ -399,8 +399,10 @@ async function onGuests(count: number): Promise<void> {
       <template #body>
         <p class="text-sm text-muted">
           You won't be marked as going, so your <strong class="text-default">{{ leaveSummary }}</strong>
-          for this movie night will be hidden. RSVP “Going” again and they'll come right back.
-          <span class="block mt-2 text-xs">A top-3 pick within a week of the night stays locked in.</span>
+          for this movie night will be hidden. RSVP “Going” again to bring them back — but a movie
+          someone else re-suggested meanwhile stays theirs, and a freed vote returns only if it still
+          fits the voter's ballot.
+          <span class="block mt-2 text-xs">A top-3 pick (with at least one vote) stays locked in.</span>
         </p>
       </template>
       <template #footer>

@@ -1,15 +1,32 @@
 import type { MaybeRefOrGetter } from 'vue'
+import type { CommsStatus } from '#shared/utils/comms'
 import type { Database } from '~/types/database.types'
 
-/** One sent communication (announcement or invite blast) for an event. */
+export type CommsLogKind = 'announcement' | 'invite' | 'reminder'
+
+const KINDS: readonly CommsLogKind[] = ['announcement', 'invite', 'reminder']
+const STATUSES: readonly CommsStatus[] = ['sent', 'partial', 'failed']
+
+/** One sent communication (announcement, invite blast, or reminder) for an event. */
 export interface CommsLogEntry {
   id: string
-  kind: 'announcement' | 'invite'
+  kind: CommsLogKind
   scope: string | null
   subject: string | null
+  /** Recipients the send reached (Resend accepted). */
   recipientCount: number
+  /** Recipients Resend rejected (0 on a clean send). */
+  failedCount: number
+  status: CommsStatus
+  /** First failure message when status is partial/failed; null otherwise. */
+  error: string | null
   sentByName: string | null
   createdAt: string
+}
+
+/** Narrow a free-text DB value to a known member, falling back to `fallback`. */
+function oneOf<T extends string>(values: readonly T[], value: string, fallback: T): T {
+  return (values as readonly string[]).includes(value) ? value as T : fallback
 }
 
 /**
@@ -33,7 +50,7 @@ export function useCommsLog(eventId: MaybeRefOrGetter<string | null | undefined>
     load: async (id) => {
       const { data, error } = await supabase
         .from('comms_log')
-        .select('id, kind, scope, subject, recipient_count, sent_by, created_at')
+        .select('id, kind, scope, subject, recipient_count, failed_count, status, error, sent_by, created_at')
         .eq('event_id', id)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -47,11 +64,14 @@ export function useCommsLog(eventId: MaybeRefOrGetter<string | null | undefined>
 
       return rows.map(r => ({
         id: r.id,
-        // DB CHECK constrains kind to this set; narrow at the boundary.
-        kind: r.kind === 'invite' ? 'invite' : 'announcement',
+        // DB CHECK constrains kind/status to a known set; narrow at the boundary.
+        kind: oneOf(KINDS, r.kind, 'announcement'),
         scope: r.scope,
         subject: r.subject,
         recipientCount: r.recipient_count,
+        failedCount: r.failed_count ?? 0,
+        status: oneOf(STATUSES, r.status ?? 'sent', 'sent'),
+        error: r.error ?? null,
         sentByName: r.sent_by ? nameById.get(r.sent_by) ?? null : null,
         createdAt: r.created_at
       }))
