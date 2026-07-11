@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 import type { H3Event } from 'h3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '~/types/database.types'
-import { buildEventReminderEmail } from '../../shared/utils/email'
+import { type AdminReminderDigestItem, buildAdminReminderDigestEmail, buildEventReminderEmail, uniqueEmails } from '../../shared/utils/email'
 
 // The email *builders* (subject/html/text) live in shared/utils/email.ts so the
 // admin UI can render a live preview with the exact same output. This server-only
@@ -271,6 +271,43 @@ export async function sendEventInvites(
     }
   }
   return { sent, failed: failures.length, error: failures[0]?.error ?? null }
+}
+
+/**
+ * Emails a run summary to every admin after the daily reminder cron sends nudges,
+ * so admins see the automated sends they never trigger by hand. Admins are BCC'd
+ * (a required `to` uses the sender address, keeping admin addresses hidden from one
+ * another). Returns how many admins were notified; sends nothing when there are no
+ * admin emails. The caller runs this best-effort — the reminders already went out,
+ * so a digest failure must not fail the cron.
+ */
+export async function sendAdminReminderDigest(
+  db: SupabaseClient<Database>,
+  opts: {
+    readonly apiKey: string
+    readonly from: string
+    readonly items: readonly AdminReminderDigestItem[]
+    readonly totalReminded: number
+    readonly adminUrl: string
+  }
+): Promise<{ notified: number }> {
+  const { data: admins } = await db.from('profiles').select('email').eq('is_admin', true)
+  const recipients = uniqueEmails((admins ?? []).map(a => a.email))
+  if (!recipients.length) return { notified: 0 }
+
+  const mail = buildAdminReminderDigestEmail({
+    items: opts.items,
+    totalReminded: opts.totalReminded,
+    adminUrl: opts.adminUrl
+  })
+  await sendEmail(opts.apiKey, opts.from, {
+    to: opts.from, // a `to` is required; admins are BCC'd so addresses stay hidden
+    bcc: recipients,
+    subject: mail.subject,
+    html: mail.html,
+    text: mail.text
+  })
+  return { notified: recipients.length }
 }
 
 // ── Reminder sends (shared by the daily cron + the manual "remind now" route) ──

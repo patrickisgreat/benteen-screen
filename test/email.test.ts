@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { InviteOptions } from '../shared/types/invite-options'
 import {
+  buildAdminReminderDigestEmail,
   buildAnnounceEmail,
   buildEventInviteEmail,
   buildEventReminderEmail,
@@ -103,6 +104,58 @@ describe('buildEventInviteEmail', () => {
     const m = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc', appUrl: 'https://x/overview', options: opts({}) })
     expect(m.html).toContain('https://x/overview')
     expect(m.text).toContain('https://x/overview')
+  })
+})
+
+describe('buildAdminReminderDigestEmail', () => {
+  const items = [
+    { eventTitle: 'Jaws', eventDate: 'Friday, July 17, 2026', daysLeft: 3, remindedCount: 4 },
+    { eventTitle: 'The Thing', eventDate: null, daysLeft: 1, remindedCount: 1 }
+  ]
+
+  it('summarizes the run in the subject with correct pluralization', () => {
+    const m = buildAdminReminderDigestEmail({ items, totalReminded: 5, adminUrl: 'https://x/admin' })
+    expect(m.subject).toBe('Movie night reminders sent — 5 people nudged')
+  })
+
+  it('says "person" (singular) when exactly one was nudged', () => {
+    const single = [{ eventTitle: 'Jaws', eventDate: null, daysLeft: 2, remindedCount: 1 }]
+    const m = buildAdminReminderDigestEmail({ items: single, totalReminded: 1, adminUrl: 'https://x/admin' })
+    expect(m.subject).toBe('Movie night reminders sent — 1 person nudged')
+  })
+
+  it('lists each event, its count, and how far out it is', () => {
+    const m = buildAdminReminderDigestEmail({ items, totalReminded: 5, adminUrl: 'https://x/admin' })
+    expect(m.html).toContain('Jaws')
+    expect(m.html).toContain('reminded 4 people (in 3 days)')
+    expect(m.html).toContain('reminded 1 person (tomorrow)')
+    expect(m.text).toContain('- Jaws (Friday, July 17, 2026) — reminded 4 (in 3 days)')
+    expect(m.text).toContain('- The Thing — reminded 1 (tomorrow)')
+  })
+
+  it('links to the admin dashboard', () => {
+    const m = buildAdminReminderDigestEmail({ items, totalReminded: 5, adminUrl: 'https://x/admin' })
+    expect(m.html).toContain('https://x/admin')
+    expect(m.text).toContain('https://x/admin')
+  })
+
+  it('escapes an event title so a crafted title cannot inject HTML', () => {
+    const m = buildAdminReminderDigestEmail({
+      items: [{ eventTitle: '<script>alert(1)</script>', eventDate: null, daysLeft: 0, remindedCount: 2 }],
+      totalReminded: 2,
+      adminUrl: 'https://x/admin'
+    })
+    expect(m.html).not.toContain('<script>')
+    expect(m.html).toContain('&lt;script&gt;')
+  })
+
+  it('says "today" for a same-day event', () => {
+    const m = buildAdminReminderDigestEmail({
+      items: [{ eventTitle: 'Alien', eventDate: null, daysLeft: 0, remindedCount: 2 }],
+      totalReminded: 2,
+      adminUrl: 'https://x/admin'
+    })
+    expect(m.html).toContain('(today)')
   })
 })
 

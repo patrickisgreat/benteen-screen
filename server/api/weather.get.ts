@@ -28,10 +28,16 @@ export default defineEventHandler(async (event): Promise<Forecast> => {
   if (!withinForecastWindow(date, new Date())) return UNAVAILABLE
 
   try {
-    const geo = await $fetch<GeoResponse>('https://geocoding-api.open-meteo.com/v1/search', {
-      query: { name: location, count: 1, language: 'en', format: 'json' }
-    })
-    const place = geo.results?.[0]
+    // Open-Meteo's geocoder only resolves place names, so try the full location
+    // then progressively simpler segments (see geocodeCandidates) until one hits.
+    let place: { latitude: number, longitude: number, name: string } | undefined
+    for (const candidate of geocodeCandidates(location)) {
+      const geo = await $fetch<GeoResponse>('https://geocoding-api.open-meteo.com/v1/search', {
+        query: { name: candidate, count: 1, language: 'en', format: 'json' }
+      })
+      place = geo.results?.[0]
+      if (place) break
+    }
     if (!place) return UNAVAILABLE
 
     const fc = await $fetch<ForecastResponse>('https://api.open-meteo.com/v1/forecast', {
