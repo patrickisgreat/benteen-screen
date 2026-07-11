@@ -469,6 +469,94 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('events').delete().eq('id', evId)
   })
 
+  it('returns a freed vote on the author\'s re-RSVP when the voter still has an open slot', async () => {
+    const { data: ev } = await admin!
+      .from('events').insert({ title: 'BudgetOk', event_date: new Date(stamp + 21 * 86_400_000).toISOString() })
+      .select('id').single()
+    const evId = ev!.id
+
+    // Author A suggests a movie; member B votes for it (B: 1 of 3).
+    const emailA = `rls_budA_${stamp}@example.com`
+    const uidA = await makeUser(emailA)
+    await admin!.from('invites').insert({ email: emailA })
+    const clientA = await signInAs(emailA)
+    await clientA.from('rsvps').insert({ event_id: evId, user_id: uidA, status: 'going' })
+    const { data: sMovie } = await clientA.from('suggestions').insert({ event_id: evId, tmdb_movie: { id: 700, title: 'Pick' } }).select('id').single()
+
+    const emailB = `rls_budB_${stamp}@example.com`
+    const uidB = await makeUser(emailB)
+    await admin!.from('invites').insert({ email: emailB })
+    const clientB = await signInAs(emailB)
+    await clientB.from('rsvps').insert({ event_id: evId, user_id: uidB, status: 'going' })
+    await clientB.from('votes').insert({ suggestion_id: sMovie!.id })
+
+    // A leaves → the movie is hidden and B's vote on it stops counting (B frees a slot).
+    await clientA.from('rsvps').update({ status: 'no' }).eq('event_id', evId).eq('user_id', uidA)
+    // B spends the freed slot on one other title (B is now at 2 of 3 — still room).
+    const { data: filler } = await admin!.from('suggestions').insert({ event_id: evId, user_id: uidA, tmdb_movie: { id: 701, title: 'Filler' } }).select('id').single()
+    await clientB.from('votes').insert({ suggestion_id: filler!.id })
+
+    // A returns → the movie is back and B is under the cap, so B's original vote counts again.
+    await clientA.from('rsvps').update({ status: 'going' }).eq('event_id', evId).eq('user_id', uidA)
+    const bVote = await admin!.from('votes').select('hidden_at').eq('suggestion_id', sMovie!.id).eq('user_id', uidB).single()
+    expect(bVote.data!.hidden_at, 'the freed vote returns while the voter has an open slot').toBeNull()
+
+    await admin!.from('votes').delete().in('suggestion_id', [sMovie!.id, filler!.id])
+    await admin!.from('suggestions').delete().in('id', [sMovie!.id, filler!.id])
+    await admin!.from('rsvps').delete().in('user_id', [uidA, uidB])
+    await admin!.from('invites').delete().in('email', [emailA, emailB])
+    await admin!.from('events').delete().eq('id', evId)
+  })
+
+  it('does not return a freed vote on re-RSVP when the voter has since filled their budget', async () => {
+    const { data: ev } = await admin!
+      .from('events').insert({ title: 'BudgetFull', event_date: new Date(stamp + 22 * 86_400_000).toISOString() })
+      .select('id').single()
+    const evId = ev!.id
+
+    const emailA = `rls_bfA_${stamp}@example.com`
+    const uidA = await makeUser(emailA)
+    await admin!.from('invites').insert({ email: emailA })
+    const clientA = await signInAs(emailA)
+    await clientA.from('rsvps').insert({ event_id: evId, user_id: uidA, status: 'going' })
+    const { data: sMovie } = await clientA.from('suggestions').insert({ event_id: evId, tmdb_movie: { id: 800, title: 'Author Pick' } }).select('id').single()
+
+    // Three filler titles for B to spend votes on (default vote limit is 3).
+    const fillers: string[] = []
+    for (const fid of [801, 802, 803]) {
+      const { data } = await admin!.from('suggestions').insert({ event_id: evId, user_id: uidA, tmdb_movie: { id: fid, title: `F${fid}` } }).select('id').single()
+      fillers.push(data!.id)
+    }
+
+    const emailB = `rls_bfB_${stamp}@example.com`
+    const uidB = await makeUser(emailB)
+    await admin!.from('invites').insert({ email: emailB })
+    const clientB = await signInAs(emailB)
+    await clientB.from('rsvps').insert({ event_id: evId, user_id: uidB, status: 'going' })
+    // B votes the author's pick + two fillers → at the cap of 3.
+    await clientB.from('votes').insert({ suggestion_id: sMovie!.id })
+    await clientB.from('votes').insert({ suggestion_id: fillers[0]! })
+    await clientB.from('votes').insert({ suggestion_id: fillers[1]! })
+
+    // A leaves → the pick is hidden, freeing B's slot; B re-spends it on the third filler.
+    await clientA.from('rsvps').update({ status: 'no' }).eq('event_id', evId).eq('user_id', uidA)
+    const reSpend = await clientB.from('votes').insert({ suggestion_id: fillers[2]! })
+    expect(reSpend.error, 'B can re-spend the freed slot').toBeNull()
+
+    // A returns → B would be at 4; the oldest vote (the author's pick) drops out.
+    await clientA.from('rsvps').update({ status: 'going' }).eq('event_id', evId).eq('user_id', uidA)
+    const pickVote = await admin!.from('votes').select('hidden_at').eq('suggestion_id', sMovie!.id).eq('user_id', uidB).single()
+    const reSpendVote = await admin!.from('votes').select('hidden_at').eq('suggestion_id', fillers[2]!).eq('user_id', uidB).single()
+    expect(pickVote.data!.hidden_at, 'the returned vote drops out — B already re-spent that slot').not.toBeNull()
+    expect(reSpendVote.data!.hidden_at, 'the newer re-spent vote is kept').toBeNull()
+
+    await admin!.from('votes').delete().in('suggestion_id', [sMovie!.id, ...fillers])
+    await admin!.from('suggestions').delete().in('id', [sMovie!.id, ...fillers])
+    await admin!.from('rsvps').delete().in('user_id', [uidA, uidB])
+    await admin!.from('invites').delete().in('email', [emailA, emailB])
+    await admin!.from('events').delete().eq('id', evId)
+  })
+
   it('claim_freed_votes notifies a voter once when their pick leaves the ballot', async () => {
     await memberClient.from('rsvps').upsert({ event_id: eventId, user_id: memberId, status: 'going' }, { onConflict: 'event_id,user_id' })
     const { data: s } = await admin!
