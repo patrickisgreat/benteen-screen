@@ -56,13 +56,15 @@ export default defineEventHandler(async (event) => {
   const origin = resolveOrigin(event)
   const appUrl = `${origin}/overview`
   let totalSent = 0
+  const digest: AdminReminderDigestItem[] = []
 
   for (const d of due) {
+    const eventDate = formatEmailDate(d.eventDate) || null
     const { sent } = await sendEventReminders(admin, {
       apiKey: resendApiKey,
       from: resendFrom,
       eventTitle: d.eventTitle,
-      eventDate: formatEmailDate(d.eventDate) || null,
+      eventDate,
       daysLeft: d.daysLeft,
       origin,
       appUrl,
@@ -71,8 +73,26 @@ export default defineEventHandler(async (event) => {
     if (sent > 0) {
       await admin.from('comms_log').insert({ event_id: d.eventId, kind: 'reminder', subject: `Reminder — ${d.eventTitle}`, recipient_count: sent })
       totalSent += sent
+      digest.push({ eventTitle: d.eventTitle, eventDate, daysLeft: d.daysLeft, remindedCount: sent })
     }
   }
 
-  return { ok: true, events: due.length, sent: totalSent }
+  // Notify admins of the automated send they don't otherwise see. Best-effort:
+  // the reminders already went out, so a digest failure must not fail the cron.
+  let notified = 0
+  if (totalSent > 0) {
+    try {
+      ;({ notified } = await sendAdminReminderDigest(admin, {
+        apiKey: resendApiKey,
+        from: resendFrom,
+        items: digest,
+        totalReminded: totalSent,
+        adminUrl: `${origin}/admin`
+      }))
+    } catch (e) {
+      console.error('[crons/reminders] admin digest failed -', e instanceof Error ? e.message : e)
+    }
+  }
+
+  return { ok: true, events: due.length, sent: totalSent, adminsNotified: notified }
 })
