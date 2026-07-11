@@ -372,8 +372,7 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('suggestions').delete().in('id', ids)
   })
 
-  it('locks in a top-3 voted suggestion within a week so an un-RSVP can’t hide it', async () => {
-    // Event 3 days out — inside the lock-in window.
+  it('locks in a top-3 voted suggestion so an un-RSVP can’t hide it', async () => {
     const { data: ev } = await admin!
       .from('events').insert({ title: 'Soon', event_date: new Date(stamp + 3 * 86_400_000).toISOString() })
       .select('id').single()
@@ -394,7 +393,7 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
 
     const aRow = await admin!.from('suggestions').select('rsvp_hidden_at').eq('id', a!.id).single()
     const bRow = await admin!.from('suggestions').select('rsvp_hidden_at').eq('id', b!.id).single()
-    expect(aRow.data!.rsvp_hidden_at, 'a top-3 voted title within a week stays on the ballot').toBeNull()
+    expect(aRow.data!.rsvp_hidden_at, 'a top-3 voted title stays on the ballot').toBeNull()
     expect(bRow.data!.rsvp_hidden_at, 'a zero-vote title is still hidden on un-RSVP').not.toBeNull()
 
     await admin!.from('votes').delete().in('suggestion_id', [a!.id, b!.id])
@@ -404,7 +403,7 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('events').delete().eq('id', soonId)
   })
 
-  it('does not lock in a voted suggestion when the event is more than a week out', async () => {
+  it('locks in a top-3 voted suggestion even when the event is more than a week out', async () => {
     const { data: ev } = await admin!
       .from('events').insert({ title: 'Later', event_date: new Date(stamp + 30 * 86_400_000).toISOString() })
       .select('id').single()
@@ -421,7 +420,7 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await client.from('rsvps').update({ status: 'no' }).eq('event_id', farId).eq('user_id', uid)
 
     const aRow = await admin!.from('suggestions').select('rsvp_hidden_at').eq('id', a!.id).single()
-    expect(aRow.data!.rsvp_hidden_at, 'a top title >1 week out is still hidden on un-RSVP').not.toBeNull()
+    expect(aRow.data!.rsvp_hidden_at, 'a top-3 voted title stays on the ballot regardless of how far out the event is').toBeNull()
 
     await admin!.from('votes').delete().eq('suggestion_id', a!.id)
     await admin!.from('suggestions').delete().eq('id', a!.id)
