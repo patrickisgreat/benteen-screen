@@ -1,4 +1,5 @@
 import type { Forecast } from '#shared/types/weather'
+import type { GeocodedPlace, NominatimResult } from '#shared/utils/weather'
 
 // Proxies Open-Meteo (free, no API key) so the client gets a small, predictable
 // forecast and we can defend against the upstream's full payload. Treats the
@@ -7,6 +8,30 @@ import type { Forecast } from '#shared/types/weather'
 
 interface GeoResponse {
   results?: Array<{ latitude: number, longitude: number, name: string }>
+}
+
+// Nominatim (OpenStreetMap) resolves street addresses ("1447 Benteen Ave SE"),
+// which Open-Meteo's name-only geocoder cannot — a comma-less address used to
+// produce zero usable candidates and the card silently blanked out. Their usage
+// policy requires an identifying User-Agent.
+async function geocode(location: string): Promise<GeocodedPlace | null> {
+  const nominatim = await $fetch<NominatimResult[]>('https://nominatim.openstreetmap.org/search', {
+    query: { q: location, format: 'jsonv2', limit: 1 },
+    headers: { 'User-Agent': 'benteen-screen-on-the-green/1.0 (event weather card)' }
+  }).catch(() => null)
+  const place = parseNominatimPlace(nominatim)
+  if (place) return place
+
+  // Fallback: Open-Meteo's place-name geocoder, trying the full location then
+  // progressively simpler comma segments (venue → city → state).
+  for (const candidate of geocodeCandidates(location)) {
+    const geo = await $fetch<GeoResponse>('https://geocoding-api.open-meteo.com/v1/search', {
+      query: { name: candidate, count: 1, language: 'en', format: 'json' }
+    })
+    const hit = geo.results?.[0]
+    if (hit) return { latitude: hit.latitude, longitude: hit.longitude, name: hit.name }
+  }
+  return null
 }
 interface ForecastResponse {
   daily?: {
@@ -28,16 +53,7 @@ export default defineEventHandler(async (event): Promise<Forecast> => {
   if (!withinForecastWindow(date, new Date())) return UNAVAILABLE
 
   try {
-    // Open-Meteo's geocoder only resolves place names, so try the full location
-    // then progressively simpler segments (see geocodeCandidates) until one hits.
-    let place: { latitude: number, longitude: number, name: string } | undefined
-    for (const candidate of geocodeCandidates(location)) {
-      const geo = await $fetch<GeoResponse>('https://geocoding-api.open-meteo.com/v1/search', {
-        query: { name: candidate, count: 1, language: 'en', format: 'json' }
-      })
-      place = geo.results?.[0]
-      if (place) break
-    }
+    const place = await geocode(location)
     if (!place) return UNAVAILABLE
 
     const fc = await $fetch<ForecastResponse>('https://api.open-meteo.com/v1/forecast', {
