@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Mock the Resend SDK's single-send endpoint (sendAnnounce → sendEmail → emails.send).
-const { emailSend } = vi.hoisted(() => ({ emailSend: vi.fn() }))
+// Mock the Resend SDK's batch endpoint (sendAnnounce → sendBatch → batch.send).
+const { batchSend } = vi.hoisted(() => ({ batchSend: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
-    emails = { send: emailSend }
+    batch = { send: batchSend }
   }
 }))
 
@@ -12,44 +12,53 @@ const { sendAnnounce } = await import('../server/utils/email')
 
 const params = { subject: 's', html: '<p>h</p>', text: 't' }
 const recipients = (n: number): string[] => Array.from({ length: n }, (_, i) => `u${i}@x.com`)
-// Skip the inter-group delay so tests don't actually wait.
+// Skip the inter-batch delay so tests don't actually wait.
 const opts = { interBatchMs: 0 }
 
+const acceptAll = (items: unknown[]) =>
+  Promise.resolve({ data: { data: items.map((_, i) => ({ id: `re_${i}` })) }, error: null })
+
 beforeEach(() => {
-  emailSend.mockReset()
-  emailSend.mockResolvedValue({ data: { id: 're_1' }, error: null })
+  batchSend.mockReset()
+  batchSend.mockImplementation(acceptAll)
 })
 
 describe('sendAnnounce', () => {
-  it('BCCs recipients in groups of 49 so every send stays within Resend\'s 50-recipient cap', async () => {
+  it('sends one email per recipient in batches of 100', async () => {
     const res = await sendAnnounce('key', 'from@x', params, recipients(120), opts)
-    expect(emailSend).toHaveBeenCalledTimes(3)
-    const sends = emailSend.mock.calls.map(c => c[0] as { to: string, bcc: string[] })
-    expect(sends.map(s => s.bcc.length)).toEqual([49, 49, 22])
-    // The `to` takes one slot, so to + bcc must never exceed 50 (the off-by-one that
-    // made full groups fail and only delivered the leftover).
-    for (const s of sends) expect(1 + s.bcc.length).toBeLessThanOrEqual(50)
-    expect(res).toEqual({ sent: 120, failed: 0, error: null })
+    expect(batchSend).toHaveBeenCalledTimes(2)
+    const batches = batchSend.mock.calls.map(c => c[0] as Array<{ to: string, bcc?: string[] }>)
+    expect(batches.map(b => b.length)).toEqual([100, 20])
+    // Each recipient gets their own email — no BCC, addresses never shared.
+    expect(batches[0]![0]).toMatchObject({ to: 'u0@x.com', subject: 's' })
+    for (const b of batches) for (const item of b) expect(item.bcc).toBeUndefined()
+    expect(res.sent).toBe(120)
+    expect(res.failed).toBe(0)
+    expect(res.error).toBeNull()
   })
 
-  it('sends a single group untouched when under the cap', async () => {
-    const res = await sendAnnounce('key', 'from@x', params, recipients(10), opts)
-    expect(emailSend).toHaveBeenCalledTimes(1)
-    expect(res.sent).toBe(10)
+  it('returns each accepted recipient with its Resend id for engagement rows', async () => {
+    const res = await sendAnnounce('key', 'from@x', params, recipients(2), opts)
+    expect(res.recipients).toEqual([
+      { email: 'u0@x.com', resendId: 're_0' },
+      { email: 'u1@x.com', resendId: 're_1' }
+    ])
   })
 
-  it('continues past a failed group and reports partial delivery (not a total failure)', async () => {
-    emailSend
-      .mockResolvedValueOnce({ data: { id: 're_1' }, error: null }) // group 1 (49) ok
-      .mockRejectedValueOnce(new Error('Too many recipients')) // group 2 (49) fails
-      .mockResolvedValueOnce({ data: { id: 're_3' }, error: null }) // group 3 (22) ok
+  it('continues past a failed batch and reports partial delivery (not a total failure)', async () => {
+    batchSend
+      .mockImplementationOnce(acceptAll) // batch 1 (100) ok
+      .mockRejectedValueOnce(new Error('Unverified domain')) // batch 2 (20) fails
     const res = await sendAnnounce('key', 'from@x', params, recipients(120), opts)
-    expect(res).toEqual({ sent: 71, failed: 49, error: 'Too many recipients' })
+    expect(res.sent).toBe(100)
+    expect(res.failed).toBe(20)
+    expect(res.error).toBe('Unverified domain')
+    expect(res.recipients).toHaveLength(100)
   })
 
   it('sends nothing for an empty recipient list', async () => {
     const res = await sendAnnounce('key', 'from@x', params, [], opts)
-    expect(emailSend).not.toHaveBeenCalled()
-    expect(res).toEqual({ sent: 0, failed: 0, error: null })
+    expect(batchSend).not.toHaveBeenCalled()
+    expect(res).toEqual({ sent: 0, failed: 0, error: null, recipients: [] })
   })
 })

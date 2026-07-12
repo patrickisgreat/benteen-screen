@@ -65,28 +65,46 @@ export default defineEventHandler(async (event) => {
     link: `${resolveOrigin(event)}/overview`
   })
 
-  // Send in BCC groups of 50 (Resend's per-send cap). Continues past a failed
-  // group, so a mid-blast error doesn't lose the groups that already delivered —
-  // the result reports sent/failed for the UI to surface (no all-or-nothing 502).
-  const { sent, failed, error } = await sendAnnounce(
+  // One email per recipient via the batch endpoint (addresses stay private,
+  // each send gets its own Resend id for engagement tracking). Continues past a
+  // failed batch, so a mid-blast error doesn't lose the batches that already
+  // delivered — the result reports sent/failed for the UI (no all-or-nothing 502).
+  const { sent, failed, error, recipients } = await sendAnnounce(
     resendApiKey,
     resendFrom,
     { subject: mail.subject, html: mail.html, text: mail.text, replyTo: user.email ?? undefined },
     emails
   )
 
-  // Record what actually went out (best-effort — a logging failure must not fail
-  // the request; surface it in logs instead).
-  if (sent > 0) {
-    const { error: logError } = await admin.from('comms_log').insert({
-      event_id: eventId,
-      kind: 'announcement',
-      scope,
-      subject: mail.subject,
-      recipient_count: sent,
-      sent_by: userId
-    })
-    if (logError) console.error('[events/announce] comms_log insert failed -', logError.message)
+  // Record what actually went out — including total failures, so the comms log
+  // shows the attempt (best-effort: a logging failure must not fail the request).
+  if (sent > 0 || failed > 0) {
+    const { data: logRow, error: logError } = await admin
+      .from('comms_log')
+      .insert({
+        event_id: eventId,
+        kind: 'announcement',
+        scope,
+        subject: mail.subject,
+        body: message,
+        recipient_count: sent,
+        failed_count: failed,
+        status: commsStatus(sent, failed),
+        error,
+        sent_by: userId
+      })
+      .select('id')
+      .single()
+    if (logError) {
+      console.error('[events/announce] comms_log insert failed -', logError.message)
+    } else if (recipients.length) {
+      // Per-recipient rows correlate webhook engagement (delivered/opened/clicked)
+      // back to this blast. The emails already went out — log-and-continue.
+      const { error: recipientsError } = await admin.from('comms_recipients').insert(
+        recipients.map(r => ({ comms_log_id: logRow.id, email: r.email, resend_id: r.resendId }))
+      )
+      if (recipientsError) console.error('[events/announce] comms_recipients insert failed -', recipientsError.message)
+    }
   }
 
   return { ok: true, count: sent, failed, error }

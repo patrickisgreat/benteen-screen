@@ -109,65 +109,67 @@ export function chunk<T>(items: readonly T[], size: number): T[][] {
   return out
 }
 
-// Resend caps a single send at 50 recipients across to + cc + bcc. We always set
-// one `to` (so real addresses stay BCC-hidden), which uses a slot — so only 49 BCC
-// fit per send. (50 BCC + the `to` = 51 → Resend rejects the whole group, which is
-// why a blast to >49 only delivered the final leftover group.) Distinct from the
-// 100-per-request batch endpoint above — that's a different Resend API.
-const ANNOUNCE_RECIPIENT_LIMIT = 49
+/** One accepted announcement send: the recipient + Resend's message id (for
+ *  webhook correlation; null when Resend accepted but returned no id). */
+export interface AnnounceRecipientResult {
+  readonly email: string
+  readonly resendId: string | null
+}
 
 export interface SendAnnounceResult {
-  /** Recipients in groups that sent successfully. */
+  /** Recipients in batches that sent successfully. */
   readonly sent: number
-  /** Recipients in groups that failed. */
+  /** Recipients in batches that failed. */
   readonly failed: number
   /** First failure message (e.g. an unverified sender domain); null on full success. */
   readonly error: string | null
+  /** The accepted sends, for recording per-recipient engagement rows. */
+  readonly recipients: readonly AnnounceRecipientResult[]
 }
 
 /**
- * Sends one announcement to many recipients, BCC'd in groups of 50 (Resend's
- * per-send recipient cap — a single BCC to more than that is rejected, which is
- * what 502'd the blast). Continues past a failed group so a mid-blast error
- * doesn't lose the groups that already went out, returning sent/failed counts +
- * the first error like `sendEventInvites`.
+ * Sends one announcement as an individual email per recipient via the batch
+ * endpoint (100 distinct emails per request). Addresses stay private — each
+ * recipient sees only their own — and every send gets its own Resend message
+ * id, which is what makes per-recipient delivered/opened/clicked tracking
+ * possible (the old BCC groups shared one id across 49 hidden recipients).
+ * Continues past a failed batch so a mid-blast error doesn't lose the batches
+ * that already went out, returning sent/failed counts + the first error like
+ * `sendEventInvites`.
  *
- * ⚠️ At-least-once, like the e-vite blast: announcements have no per-recipient
- * record, so a retry after a partial failure re-delivers to the groups that
- * already succeeded. The returned `failed`/`error` are the operator's signal.
+ * ⚠️ At-least-once, like the e-vite blast: a retry after a partial failure
+ * re-delivers to recipients whose batch already succeeded. The returned
+ * `failed`/`error` are the operator's signal.
  */
 export async function sendAnnounce(
   apiKey: string,
   from: string,
   params: { subject: string, html: string, text: string, replyTo?: string },
   recipients: readonly string[],
-  opts: { groupSize?: number, interBatchMs?: number } = {}
+  opts: { batchSize?: number, interBatchMs?: number } = {}
 ): Promise<SendAnnounceResult> {
-  const groupSize = opts.groupSize ?? ANNOUNCE_RECIPIENT_LIMIT
+  const batchSize = opts.batchSize ?? INVITE_BATCH_SIZE
   const interBatchMs = opts.interBatchMs ?? INVITE_INTER_BATCH_MS
-  const groups = chunk(recipients, groupSize)
-  let sent = 0
+  const batches = chunk(recipients, batchSize)
+  const accepted: AnnounceRecipientResult[] = []
   let firstError: string | null = null
-  for (let i = 0; i < groups.length; i++) {
+  for (let i = 0; i < batches.length; i++) {
     if (i > 0) await sleep(interBatchMs)
-    const group = groups[i]!
+    const batch = batches[i]!
     try {
-      await sendEmail(apiKey, from, {
-        to: from, // a `to` is required; real recipients are BCC'd
-        bcc: [...group],
-        subject: params.subject,
-        html: params.html,
-        text: params.text,
-        replyTo: params.replyTo
-      })
-      sent += group.length
+      const { ids } = await sendBatch(
+        apiKey,
+        from,
+        batch.map(email => ({ to: email, subject: params.subject, html: params.html, text: params.text, replyTo: params.replyTo }))
+      )
+      batch.forEach((email, j) => accepted.push({ email, resendId: ids[j] ?? null }))
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Unknown error'
       if (!firstError) firstError = message
       console.error('[events/announce] batch failed -', message)
     }
   }
-  return { sent, failed: recipients.length - sent, error: firstError }
+  return { sent: accepted.length, failed: recipients.length - accepted.length, error: firstError, recipients: accepted }
 }
 
 /** One guest's prepared e-vite: the `event_invites` row id + the built email. */
