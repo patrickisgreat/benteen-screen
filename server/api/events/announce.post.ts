@@ -5,7 +5,9 @@ import type { Database } from '~/types/database.types'
 const bodySchema = z.object({
   eventId: z.string().uuid(),
   subject: z.string().trim().max(200).optional(),
-  message: z.string().trim().min(1).max(5000),
+  // Rich HTML from the composer's editor (markup inflates length — hence 10k);
+  // must have actual text, not just empty tags. Sanitized in buildAnnounceEmail.
+  message: z.string().max(10000).refine(m => htmlToText(m).length > 0),
   scope: z.enum(['members', 'going', 'invited'])
 })
 

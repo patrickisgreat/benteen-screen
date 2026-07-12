@@ -28,6 +28,29 @@ export function htmlToText(html: string): string {
     .trim()
 }
 
+// The attribute-less tags the announce composer's editor (tiptap StarterKit)
+// emits. Anything else — including any tag carrying an attribute — stays escaped.
+const ANNOUNCE_RICH_TAGS = ['p', 'br', 'h1', 'h2', 'h3', 'h4', 'strong', 'em', 's', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'hr'] as const
+
+/**
+ * Sanitize rich-text HTML for an email body: escape everything, then restore
+ * only the exact literal tags above. Safe by construction — a tag with any
+ * attribute (`onerror=`, `href=`, `style=`) never matches the exact escaped
+ * form, so no markup we didn't explicitly re-allow can survive. Plain text
+ * passes through unchanged apart from newlines becoming <br>.
+ */
+export function sanitizeEmailHtml(html: string): string {
+  let out = escapeHtml(html)
+  for (const tag of ANNOUNCE_RICH_TAGS) {
+    out = out
+      .replaceAll(`&lt;${tag}&gt;`, `<${tag}>`)
+      .replaceAll(`&lt;/${tag}&gt;`, `</${tag}>`)
+  }
+  // The loop restores <br>; this handles the self-closing <br/> form tiptap
+  // sometimes emits. Raw newlines (plain-text callers) become breaks too.
+  return out.replaceAll('&lt;br/&gt;', '<br>').replace(/\n/g, '<br>')
+}
+
 export interface BuiltEmail {
   subject: string
   html: string
@@ -93,15 +116,16 @@ export function buildAnnounceEmail(opts: {
   subject?: string
 }): BuiltEmail {
   const subject = opts.subject?.trim() || `${opts.eventTitle} — Benteen Screen On The Green`
-  // The admin message is plain text; escape it and preserve line breaks.
-  const messageHtml = escapeHtml(opts.message).replace(/\n/g, '<br>')
+  // The admin message is rich text from the composer's editor; keep only its
+  // known tags (plain text still works — newlines become <br>).
+  const messageHtml = sanitizeEmailHtml(opts.message)
   const html = shell(
     `<h1 style="font-size:20px;margin:0 0 4px">${escapeHtml(opts.eventTitle)}</h1>`
     + (opts.eventDate ? `<p style="color:#6b7280;margin:0 0 16px">${escapeHtml(opts.eventDate)}</p>` : '')
-    + `<p>${messageHtml}</p>`
+    + `<div>${messageHtml}</div>`
     + `<p style="margin:20px 0">${ctaButton('View on Benteen Screen', opts.link)}</p>`
   )
-  const text = `${opts.eventTitle}${opts.eventDate ? ` — ${opts.eventDate}` : ''}\n\n${opts.message}\n\n${opts.link}`
+  const text = `${opts.eventTitle}${opts.eventDate ? ` — ${opts.eventDate}` : ''}\n\n${htmlToText(opts.message)}\n\n${opts.link}`
   return { subject, html, text }
 }
 
