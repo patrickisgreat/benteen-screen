@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { MovieEvent } from '#shared/types/event'
 import type { CalendarEvent } from '#shared/utils/calendar'
+import type { BringItem } from '#shared/types/bring'
 
 const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{ event: MovieEvent | null }>()
@@ -10,7 +11,27 @@ const { myStatus, myPlusOnes, counts, setStatus, setGuests } = useRsvp(eventId)
 // The merged "who's coming" roster (in-app + e-vite email replies). Members see
 // fellow members; admins also see email-only guests (event_invites is admin-only).
 const { roster } = useEventRsvps(eventId)
-const { items, claim, unclaim } = useBringList(eventId)
+const { items, addItem, claim, unclaim, remove } = useBringList(eventId)
+const { run } = useToastAction()
+const toast = useToast()
+
+// Members add items they're bringing themselves (claimSelf), unlike the admin
+// tab which curates open slots. Removal is limited in the UI (and by RLS) to
+// items you added.
+async function onAddBring(label: string): Promise<void> {
+  if (await run(() => addItem(label), 'Could not add your item')) {
+    toast.add({ title: 'Added to the bring list', icon: 'i-lucide-check', color: 'success' })
+  }
+}
+async function onRemoveBring(item: BringItem): Promise<void> {
+  await run(() => remove(item), 'Could not remove the item')
+}
+async function onClaim(item: BringItem): Promise<void> {
+  await run(() => claim(item), 'Could not claim the item')
+}
+async function onUnclaim(item: BringItem): Promise<void> {
+  await run(() => unclaim(item), 'Could not unclaim the item')
+}
 
 const calEvent = computed<CalendarEvent | null>(() => {
   const e = props.event
@@ -145,8 +166,10 @@ function downloadIcs(): void {
           </h3>
           <BringList
             :items="items"
-            @claim="claim"
-            @unclaim="unclaim"
+            @add="onAddBring"
+            @claim="onClaim"
+            @unclaim="onUnclaim"
+            @remove="onRemoveBring"
           />
         </div>
       </div>

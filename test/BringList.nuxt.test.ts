@@ -8,7 +8,9 @@ mockNuxtImport('useAuth', () => () => ({ myId: ref('me'), isAdmin: ref(false) })
 
 const items = [
   { id: 'b1', event_id: 'e1', label: 'Chips', note: null, user_id: null, created_by: 'x', bringer: null },
-  { id: 'b2', event_id: 'e1', label: 'Drinks', note: null, user_id: 'me', created_by: 'me', bringer: { display_name: 'Me' } }
+  { id: 'b2', event_id: 'e1', label: 'Drinks', note: null, user_id: 'me', created_by: 'me', bringer: { display_name: 'Me' } },
+  // My custom item that someone else has since claimed — no longer mine to remove.
+  { id: 'b3', event_id: 'e1', label: 'Salsa', note: null, user_id: 'other', created_by: 'me', bringer: { display_name: 'Ann' } }
 ]
 
 describe('BringList (public claim view)', () => {
@@ -37,9 +39,28 @@ describe('BringList (public claim view)', () => {
     expect(w.emitted('unclaim')?.[0]).toEqual([items[1]])
   })
 
-  it('has no add input — the list is admin-curated', async () => {
+  it('emits add for a custom item a member types in', async () => {
     const w = await mountSuspended(BringList, { props: { items } })
-    expect(w.find('input').exists()).toBe(false)
+    await w.find('input').setValue('Brownies')
+    const addBtn = w.findAll('button').find(b => b.text().trim() === 'Add')
+    await addBtn?.trigger('click')
+    expect(w.emitted('add')?.[0]).toEqual(['Brownies'])
+  })
+
+  it('does not emit add for a blank label', async () => {
+    const w = await mountSuspended(BringList, { props: { items } })
+    await w.find('input').setValue('   ')
+    await w.find('input').trigger('keydown.enter')
+    expect(w.emitted('add')).toBeUndefined()
+  })
+
+  it('emits remove only for an item I added and still hold', async () => {
+    const w = await mountSuspended(BringList, { props: { items } })
+    const removeBtns = w.findAll('button').filter(b => b.attributes('aria-label') === 'Remove item')
+    // b1 is admin-created and b3 is claimed by someone else — only b2 is removable.
+    expect(removeBtns).toHaveLength(1)
+    await removeBtns[0]!.trigger('click')
+    expect(w.emitted('remove')?.[0]).toEqual([items[1]])
   })
 })
 
