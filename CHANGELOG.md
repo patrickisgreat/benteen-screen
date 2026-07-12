@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.18.0...v1.19.0) (2026-07-12)
+
+
+### Features
+
+* rich text editor + reusable templates in the Comms tab ([#176](https://github.com/patrickisgreat/benteen-screen/issues/176)) ([4861d85](https://github.com/patrickisgreat/benteen-screen/commit/4861d85b65e8378a9b2db428dfcba407110a2ab7))
+
 ## [1.18.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.17.4...v1.18.0) (2026-07-12)
 
 
