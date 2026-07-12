@@ -36,9 +36,11 @@ const state = reactive<{ subject: string, message: string, scope: Scope }>({
 
 const messageHasText = computed(() => htmlToText(state.message).length > 0)
 
+// The subject always mirrors the chosen template — including clearing it for a
+// subject-less template — so the form never shows a stale draft as "applied".
 function applyTemplate(template: CommsTemplate): void {
   state.message = template.body
-  if (template.subject) state.subject = template.subject
+  state.subject = template.subject ?? ''
 }
 
 async function onSaveTemplate(): Promise<void> {
@@ -52,7 +54,9 @@ async function onSaveTemplate(): Promise<void> {
 }
 
 async function onRemoveTemplate(template: CommsTemplate): Promise<void> {
-  await run(() => removeTemplate(template), 'Could not delete the template')
+  if (await run(() => removeTemplate(template), 'Could not delete the template')) {
+    toast.add({ title: 'Template deleted', icon: 'i-lucide-check', color: 'success' })
+  }
 }
 
 function messageOf(error: unknown): string | undefined {

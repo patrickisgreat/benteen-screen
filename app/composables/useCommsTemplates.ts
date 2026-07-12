@@ -34,7 +34,8 @@ export function useCommsTemplates(): {
   // created_by is omitted (the DB defaults it to auth.uid()).
   async function saveTemplate(name: string, subject: string | null, body: string): Promise<void> {
     const trimmed = name.trim()
-    if (!trimmed || !body.trim()) return
+    // htmlToText, not trim: an empty editor emits markup like <p></p>.
+    if (!trimmed || htmlToText(body).length === 0) return
     const { error: saveError } = await supabase
       .from('comms_templates')
       .insert({ name: trimmed, subject: subject?.trim() || null, body })

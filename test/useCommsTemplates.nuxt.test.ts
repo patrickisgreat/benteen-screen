@@ -61,6 +61,8 @@ describe('useCommsTemplates', () => {
     const { saveTemplate } = useCommsTemplates()
     await saveTemplate('   ', null, '<p>hi</p>')
     await saveTemplate('Nudge', null, '  ')
+    // Markup with no text (an empty editor emits <p></p>) is still blank.
+    await saveTemplate('Nudge', null, '<p></p>')
     expect(calls.inserts).toHaveLength(0)
   })
 

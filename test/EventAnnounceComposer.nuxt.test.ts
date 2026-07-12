@@ -22,7 +22,8 @@ const RichTextEditorStub = defineComponent({
 })
 
 const templates = ref([
-  { id: 't1', name: 'Vote & bring list reminder', subject: 'Vote + bring list', body: '<p>Go <strong>vote</strong>!</p>' }
+  { id: 't1', name: 'Vote & bring list reminder', subject: 'Vote + bring list', body: '<p>Go <strong>vote</strong>!</p>' },
+  { id: 't2', name: 'Plain nudge', subject: null, body: '<p>Nudge</p>' }
 ])
 const saveTemplate = vi.fn(() => Promise.resolve())
 const removeTemplate = vi.fn(() => Promise.resolve())
@@ -87,6 +88,16 @@ describe('EventAnnounceComposer', () => {
     await w.find('form').trigger('submit')
     await flushPromises()
     expect(calls[0]?.body).toMatchObject({ message: '<p>Go <strong>vote</strong>!</p>', subject: 'Vote + bring list' })
+  })
+
+  it('applying a subject-less template clears a previously typed subject', async () => {
+    const w = await mountComposer()
+    const subjectInput = w.findAll('input').find(i => i.attributes('placeholder') === 'Movie night reminder')
+    await subjectInput?.setValue('My old draft subject')
+    const pill = w.findAll('button').find(b => b.text().includes('Plain nudge'))
+    await pill?.trigger('click')
+    expect((subjectInput?.element as HTMLInputElement).value).toBe('')
+    expect((w.find('textarea').element as HTMLTextAreaElement).value).toBe('<p>Nudge</p>')
   })
 
   it('saves the current draft as a named template', async () => {

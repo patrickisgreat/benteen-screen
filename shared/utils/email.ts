@@ -46,6 +46,8 @@ export function sanitizeEmailHtml(html: string): string {
       .replaceAll(`&lt;${tag}&gt;`, `<${tag}>`)
       .replaceAll(`&lt;/${tag}&gt;`, `</${tag}>`)
   }
+  // The loop restores <br>; this handles the self-closing <br/> form tiptap
+  // sometimes emits. Raw newlines (plain-text callers) become breaks too.
   return out.replaceAll('&lt;br/&gt;', '<br>').replace(/\n/g, '<br>')
 }
 
