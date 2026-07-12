@@ -1,11 +1,22 @@
 // @vitest-environment nuxt
-import { describe, expect, it } from 'vitest'
-import { mountSuspended } from '@nuxt/test-utils/runtime'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { computed, ref } from 'vue'
+import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import CommsLog from '../app/components/CommsLog.vue'
 import type { CommsLogEntry } from '../app/composables/useCommsLog'
 
+// The detail modal loads recipients; stub its composable so mounting the log
+// never touches Supabase.
+mockNuxtImport('useCommsRecipients', () => () => ({
+  recipients: ref([]),
+  stats: computed(() => ({ sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0 })),
+  error: ref(null),
+  refresh: () => Promise.resolve()
+}))
+
 const entry = (over: Partial<CommsLogEntry> = {}): CommsLogEntry => ({
   id: 'c1', kind: 'announcement', scope: 'going', subject: 'See you Friday',
+  body: '<p>Doors at 7</p>',
   recipientCount: 12, failedCount: 0, status: 'sent', error: null,
   sentByName: 'Pat', createdAt: '2026-06-20T18:00:00Z', ...over
 })
@@ -15,7 +26,18 @@ const entries: CommsLogEntry[] = [
   entry({ id: 'c2', kind: 'invite', scope: null, subject: 'E-vite — Movie Night', recipientCount: 30, sentByName: null, createdAt: '2026-06-19T18:00:00Z' })
 ]
 
+beforeEach(() => {
+  document.body.innerHTML = ''
+})
+
 describe('CommsLog', () => {
+  it('clicking an entry opens the detail modal with the sent message', async () => {
+    const w = await mountSuspended(CommsLog, { props: { entries } })
+    await w.find('[role="button"]').trigger('click')
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('Doors at 7')
+  })
+
   it('lists each sent communication with kind, scope, recipients, and sender', async () => {
     const w = await mountSuspended(CommsLog, { props: { entries } })
     expect(w.text()).toContain('See you Friday')

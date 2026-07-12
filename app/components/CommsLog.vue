@@ -14,6 +14,14 @@ const STATUS = {
   partial: { label: 'Partial', color: 'warning' },
   failed: { label: 'Failed', color: 'error' }
 } as const satisfies Record<CommsLogEntry['status'], { label: string, color: 'success' | 'warning' | 'error' }>
+
+const selected = ref<CommsLogEntry | null>(null)
+const detailOpen = ref(false)
+
+function openDetail(entry: CommsLogEntry): void {
+  selected.value = entry
+  detailOpen.value = true
+}
 </script>
 
 <template>
@@ -22,7 +30,16 @@ const STATUS = {
       Sent communications
     </h3>
     <div v-if="entries.length" class="space-y-2">
-      <UCard v-for="e in entries" :key="e.id" variant="subtle" :ui="{ body: 'p-3' }">
+      <UCard
+        v-for="e in entries"
+        :key="e.id"
+        variant="subtle"
+        :ui="{ body: 'p-3' }"
+        class="cursor-pointer hover:ring-primary transition"
+        role="button"
+        :aria-label="`View details for ${e.subject || KIND[e.kind].label}`"
+        @click="openDetail(e)"
+      >
         <div class="flex items-start gap-3">
           <UIcon :name="KIND[e.kind].icon" class="size-4 mt-0.5 text-muted shrink-0" />
           <div class="min-w-0 flex-1">
@@ -49,5 +66,7 @@ const STATUS = {
     <UCard v-else variant="subtle" class="text-center text-muted text-sm">
       Nothing sent yet for this event.
     </UCard>
+
+    <CommsLogDetailModal v-model:open="detailOpen" :entry="selected" />
   </div>
 </template>

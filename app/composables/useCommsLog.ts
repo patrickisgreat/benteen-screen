@@ -13,6 +13,8 @@ export interface CommsLogEntry {
   kind: CommsLogKind
   scope: string | null
   subject: string | null
+  /** The rich HTML that was sent (null for sends predating body recording). */
+  body: string | null
   /** Recipients the send reached (Resend accepted). */
   recipientCount: number
   /** Recipients Resend rejected (0 on a clean send). */
@@ -50,7 +52,7 @@ export function useCommsLog(eventId: MaybeRefOrGetter<string | null | undefined>
     load: async (id) => {
       const { data, error } = await supabase
         .from('comms_log')
-        .select('id, kind, scope, subject, recipient_count, failed_count, status, error, sent_by, created_at')
+        .select('id, kind, scope, subject, body, recipient_count, failed_count, status, error, sent_by, created_at')
         .eq('event_id', id)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -68,6 +70,7 @@ export function useCommsLog(eventId: MaybeRefOrGetter<string | null | undefined>
         kind: oneOf(KINDS, r.kind, 'announcement'),
         scope: r.scope,
         subject: r.subject,
+        body: r.body ?? null,
         recipientCount: r.recipient_count,
         failedCount: r.failed_count ?? 0,
         status: oneOf(STATUSES, r.status ?? 'sent', 'sent'),
