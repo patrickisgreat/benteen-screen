@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.17.4...v1.18.0) (2026-07-12)
+
+
+### Features
+
+* members can add custom bring-list items (and still claim admin ones) ([#174](https://github.com/patrickisgreat/benteen-screen/issues/174)) ([8f04797](https://github.com/patrickisgreat/benteen-screen/commit/8f0479713feb9e0a8ba802ef9c6629a7cd428721))
+
 ## [1.17.4](https://github.com/patrickisgreat/benteen-screen/compare/v1.17.3...v1.17.4) (2026-07-11)
 
 
