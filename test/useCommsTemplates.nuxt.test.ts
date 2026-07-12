@@ -5,6 +5,7 @@ import { flushPromises } from '@vue/test-utils'
 
 const calls = {
   inserts: [] as Array<Record<string, unknown>>,
+  updates: [] as Array<{ payload: Record<string, unknown>, filters: Record<string, unknown> }>,
   deletes: [] as Array<Record<string, unknown>>
 }
 const rows = [
@@ -19,6 +20,12 @@ const supabase = {
         calls.inserts.push(payload)
         return Promise.resolve({ error: null })
       },
+      update: (payload: Record<string, unknown>) => ({
+        eq: (col: string, val: unknown) => {
+          calls.updates.push({ payload, filters: { [col]: val } })
+          return Promise.resolve({ error: null })
+        }
+      }),
       delete: () => ({
         eq: (col: string, val: unknown) => {
           calls.deletes.push({ [col]: val })
@@ -33,6 +40,7 @@ mockNuxtImport('useSupabaseClient', () => () => supabase)
 
 beforeEach(() => {
   calls.inserts = []
+  calls.updates = []
   calls.deletes = []
 })
 
@@ -64,6 +72,25 @@ describe('useCommsTemplates', () => {
     // Markup with no text (an empty editor emits <p></p>) is still blank.
     await saveTemplate('Nudge', null, '<p></p>')
     expect(calls.inserts).toHaveLength(0)
+  })
+
+  it('updateTemplate updates the row by id with trimmed fields', async () => {
+    const { updateTemplate } = useCommsTemplates()
+    const template = { id: 't1', name: 'Old', subject: null, body: '<p>old</p>' }
+    await updateTemplate(template, { name: ' New name ', subject: '  ', body: '<p>new</p>' })
+    expect(calls.updates).toHaveLength(1)
+    expect(calls.updates[0]).toEqual({
+      payload: { name: 'New name', subject: null, body: '<p>new</p>' },
+      filters: { id: 't1' }
+    })
+  })
+
+  it('updateTemplate refuses a blank name or blank-markup body', async () => {
+    const { updateTemplate } = useCommsTemplates()
+    const template = { id: 't1', name: 'Old', subject: null, body: '<p>old</p>' }
+    await updateTemplate(template, { name: '  ', subject: null, body: '<p>new</p>' })
+    await updateTemplate(template, { name: 'New', subject: null, body: '<p></p>' })
+    expect(calls.updates).toHaveLength(0)
   })
 
   it('removeTemplate deletes by id', async () => {

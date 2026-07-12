@@ -12,6 +12,7 @@ export function useCommsTemplates(): {
   error: Ref<string | null>
   refresh: () => Promise<void>
   saveTemplate: (name: string, subject: string | null, body: string) => Promise<void>
+  updateTemplate: (template: CommsTemplate, fields: { name: string, subject: string | null, body: string }) => Promise<void>
   removeTemplate: (template: CommsTemplate) => Promise<void>
 } {
   const supabase = useSupabaseClient<Database>()
@@ -43,6 +44,18 @@ export function useCommsTemplates(): {
     await refresh()
   }
 
+  async function updateTemplate(template: CommsTemplate, fields: { name: string, subject: string | null, body: string }): Promise<void> {
+    const trimmed = fields.name.trim()
+    // htmlToText, not trim: an empty editor emits markup like <p></p>.
+    if (!trimmed || htmlToText(fields.body).length === 0) return
+    const { error: updateError } = await supabase
+      .from('comms_templates')
+      .update({ name: trimmed, subject: fields.subject?.trim() || null, body: fields.body })
+      .eq('id', template.id)
+    if (updateError) throw updateError
+    await refresh()
+  }
+
   async function removeTemplate(template: CommsTemplate): Promise<void> {
     const { error: removeError } = await supabase.from('comms_templates').delete().eq('id', template.id)
     if (removeError) throw removeError
@@ -51,5 +64,5 @@ export function useCommsTemplates(): {
 
   void refresh()
 
-  return { templates, error, refresh, saveTemplate, removeTemplate }
+  return { templates, error, refresh, saveTemplate, updateTemplate, removeTemplate }
 }

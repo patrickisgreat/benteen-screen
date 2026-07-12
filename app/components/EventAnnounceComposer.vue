@@ -12,9 +12,11 @@ const toast = useToast()
 const { run } = useToastAction()
 const sending = ref(false)
 
-const { templates, saveTemplate, removeTemplate } = useCommsTemplates()
+const { templates, saveTemplate, updateTemplate, removeTemplate } = useCommsTemplates()
 const savingTemplate = ref(false)
 const templateName = ref('')
+// The template last applied to the form — the target of "Update template".
+const appliedTemplate = ref<CommsTemplate | null>(null)
 
 const scopeOptions = [
   { label: 'Everyone invited', value: 'invited' as const },
@@ -41,6 +43,7 @@ const messageHasText = computed(() => htmlToText(state.message).length > 0)
 function applyTemplate(template: CommsTemplate): void {
   state.message = template.body
   state.subject = template.subject ?? ''
+  appliedTemplate.value = template
 }
 
 async function onSaveTemplate(): Promise<void> {
@@ -53,8 +56,17 @@ async function onSaveTemplate(): Promise<void> {
   }
 }
 
+async function onUpdateTemplate(): Promise<void> {
+  const template = appliedTemplate.value
+  if (!template || !messageHasText.value) return
+  if (await run(() => updateTemplate(template, { name: template.name, subject: state.subject || null, body: state.message }), 'Could not update the template')) {
+    toast.add({ title: `Updated “${template.name}”`, icon: 'i-lucide-check', color: 'success' })
+  }
+}
+
 async function onRemoveTemplate(template: CommsTemplate): Promise<void> {
   if (await run(() => removeTemplate(template), 'Could not delete the template')) {
+    if (appliedTemplate.value?.id === template.id) appliedTemplate.value = null
     toast.add({ title: 'Template deleted', icon: 'i-lucide-check', color: 'success' })
   }
 }
@@ -93,6 +105,7 @@ async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: stri
     if (res.count) {
       state.subject = ''
       state.message = ''
+      appliedTemplate.value = null
     }
   } catch (error) {
     toast.add({ title: 'Could not send the blast', description: messageOf(error), color: 'error' })
@@ -146,15 +159,25 @@ async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: stri
       </div>
 
       <div class="flex flex-wrap justify-between gap-2">
-        <UButton
-          v-if="!savingTemplate"
-          label="Save as template"
-          icon="i-lucide-bookmark-plus"
-          color="neutral"
-          variant="outline"
-          :disabled="!messageHasText"
-          @click="savingTemplate = true"
-        />
+        <div v-if="!savingTemplate" class="flex flex-wrap gap-2">
+          <UButton
+            label="Save as template"
+            icon="i-lucide-bookmark-plus"
+            color="neutral"
+            variant="outline"
+            :disabled="!messageHasText"
+            @click="savingTemplate = true"
+          />
+          <UButton
+            v-if="appliedTemplate"
+            :label="`Update “${appliedTemplate.name}”`"
+            icon="i-lucide-bookmark-check"
+            color="neutral"
+            variant="outline"
+            :disabled="!messageHasText"
+            @click="onUpdateTemplate"
+          />
+        </div>
         <UButton type="submit" label="Send blast" icon="i-lucide-megaphone" :loading="sending" :disabled="!eventId" class="ml-auto" />
       </div>
     </UForm>

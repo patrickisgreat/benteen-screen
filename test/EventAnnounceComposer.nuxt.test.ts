@@ -26,12 +26,14 @@ const templates = ref([
   { id: 't2', name: 'Plain nudge', subject: null, body: '<p>Nudge</p>' }
 ])
 const saveTemplate = vi.fn(() => Promise.resolve())
+const updateTemplate = vi.fn(() => Promise.resolve())
 const removeTemplate = vi.fn(() => Promise.resolve())
 mockNuxtImport('useCommsTemplates', () => () => ({
   templates,
   error: ref(null),
   refresh: () => Promise.resolve(),
   saveTemplate,
+  updateTemplate,
   removeTemplate
 }))
 
@@ -45,6 +47,7 @@ async function mountComposer() {
 beforeEach(() => {
   calls.length = 0
   saveTemplate.mockClear()
+  updateTemplate.mockClear()
   removeTemplate.mockClear()
   vi.stubGlobal('$fetch', (url: string, opts: { body: unknown }) => {
     calls.push({ url, body: opts.body })
@@ -111,6 +114,23 @@ describe('EventAnnounceComposer', () => {
     await saveBtn?.trigger('click')
     await flushPromises()
     expect(saveTemplate).toHaveBeenCalledWith('Weekly nudge', null, '<p>Weekly nudge body</p>')
+  })
+
+  it('updates the applied template with the edited draft', async () => {
+    const w = await mountComposer()
+    // No update button until a template has been applied.
+    expect(w.findAll('button').some(b => b.text().includes('Update'))).toBe(false)
+    const pill = w.findAll('button').find(b => b.text().includes('Vote & bring list reminder'))
+    await pill?.trigger('click')
+    await w.find('textarea').setValue('<p>Edited body</p>')
+    const updateBtn = w.findAll('button').find(b => b.text().includes('Update “Vote & bring list reminder”'))
+    await updateBtn?.trigger('click')
+    await flushPromises()
+    expect(updateTemplate).toHaveBeenCalledWith(templates.value[0], {
+      name: 'Vote & bring list reminder',
+      subject: 'Vote + bring list',
+      body: '<p>Edited body</p>'
+    })
   })
 
   it('deletes a template from its pill', async () => {

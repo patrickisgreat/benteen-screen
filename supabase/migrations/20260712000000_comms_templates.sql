@@ -16,7 +16,7 @@ create table public.comms_templates (
 );
 
 alter table public.comms_templates enable row level security;
-grant select, insert, delete on public.comms_templates to authenticated;
+grant select, insert, update, delete on public.comms_templates to authenticated;
 
 -- Admin-only in both directions: templates are an admin tool and can reveal
 -- upcoming comms before they're sent.
@@ -24,6 +24,8 @@ create policy "comms_templates: admin read" on public.comms_templates
   for select to authenticated using (public.is_admin());
 create policy "comms_templates: admin insert" on public.comms_templates
   for insert to authenticated with check (public.is_admin());
+create policy "comms_templates: admin update" on public.comms_templates
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "comms_templates: admin delete" on public.comms_templates
   for delete to authenticated using (public.is_admin());
 
