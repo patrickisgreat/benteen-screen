@@ -36,25 +36,36 @@ export default defineEventHandler(async (event) => {
   if (!column || !emailId) return { ok: true } // event we don't track — ack it anyway
 
   const admin = serverSupabaseServiceRole<Database>(event)
+  const stamp = new Date().toISOString()
+  // A Resend id belongs to exactly one send, which lives in either table:
+  // e-vites/reminders on event_invites, announcement blasts on comms_recipients.
+  // Stamp both — the non-matching table is a cheap indexed no-op.
   // `column` is a fixed key from RESEND_EVENT_COLUMN, but a computed key widens to
   // an index signature — cast to the row Update type at this validated boundary.
-  const patch = { [column]: new Date().toISOString() } as Database['public']['Tables']['event_invites']['Update']
-  const { count, error } = await admin
-    .from('event_invites')
-    .update(patch, { count: 'exact' })
-    .eq('resend_id', emailId)
+  const [invites, recipients] = await Promise.all([
+    admin
+      .from('event_invites')
+      .update({ [column]: stamp } as Database['public']['Tables']['event_invites']['Update'], { count: 'exact' })
+      .eq('resend_id', emailId),
+    admin
+      .from('comms_recipients')
+      .update({ [column]: stamp } as Database['public']['Tables']['comms_recipients']['Update'], { count: 'exact' })
+      .eq('resend_id', emailId)
+  ])
 
   // Always 200 so Resend doesn't retry forever, but never silently — a swallowed
   // miss here is exactly why "Resend shows opens, the app shows none" is so hard to
-  // diagnose. Logs land in the function logs and distinguish the two failure modes.
-  if (error) {
-    console.error(`[webhooks/resend] failed to stamp ${column} for email_id ${emailId} -`, error.message)
-  } else if (!count) {
-    // Verified + parsed, but no invite carries this Resend id: the row was sent
+  // diagnose. Logs land in the function logs and distinguish the failure modes.
+  for (const [table, res] of [['event_invites', invites], ['comms_recipients', recipients]] as const) {
+    if (res.error) console.error(`[webhooks/resend] failed to stamp ${column} on ${table} for email_id ${emailId} -`, res.error.message)
+  }
+  const stamped = (invites.count ?? 0) + (recipients.count ?? 0)
+  if (!stamped && !invites.error && !recipients.error) {
+    // Verified + parsed, but nothing carries this Resend id: the row was sent
     // before resend_id was stored, or sent from a different route/sender.
-    console.warn(`[webhooks/resend] ${payload.type} matched no invite (email_id ${emailId})`)
-  } else {
-    console.info(`[webhooks/resend] stamped ${column} on ${count} invite(s) (email_id ${emailId})`)
+    console.warn(`[webhooks/resend] ${payload.type} matched no invite or announcement recipient (email_id ${emailId})`)
+  } else if (stamped) {
+    console.info(`[webhooks/resend] stamped ${column} on ${stamped} row(s) (email_id ${emailId})`)
   }
   return { ok: true }
 })
