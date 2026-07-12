@@ -65,6 +65,12 @@ export interface Database {
         Update: { id?: string, event_id?: string | null, kind?: string, scope?: string | null, subject?: string | null, recipient_count?: number, failed_count?: number, status?: string, error?: string | null, sent_by?: string | null, created_at?: string }
         Relationships: []
       }
+      comms_templates: {
+        Row: { id: string, name: string, subject: string | null, body: string, created_by: string | null, created_at: string }
+        Insert: { id?: string, name: string, subject?: string | null, body: string, created_by?: string | null, created_at?: string }
+        Update: { id?: string, name?: string, subject?: string | null, body?: string, created_by?: string | null, created_at?: string }
+        Relationships: []
+      }
       vote_refund_acks: {
         Row: { user_id: string, suggestion_id: string, created_at: string }
         Insert: { user_id: string, suggestion_id: string, created_at?: string }
