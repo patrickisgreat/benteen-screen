@@ -9,6 +9,7 @@ import {
   escapeHtml,
   formatEmailDate,
   htmlToText,
+  sanitizeEmailHtml,
   uniqueEmails
 } from '../shared/utils/email'
 
@@ -183,9 +184,32 @@ describe('email utils', () => {
     expect(m.html).toContain('&lt;img')
   })
 
+  it('buildAnnounceEmail preserves the editor\'s rich formatting', () => {
+    const message = '<p>Two things:</p><ul><li><strong>Vote</strong> for the movie</li><li>Check the <em>bring list</em></li></ul>'
+    const m = buildAnnounceEmail({ eventTitle: 'Movie', eventDate: null, message, link: 'https://x/overview' })
+    expect(m.html).toContain('<ul><li><strong>Vote</strong> for the movie</li>')
+    expect(m.html).toContain('<em>bring list</em>')
+    // The plain-text alternative strips the markup but keeps the content.
+    expect(m.text).toContain('Vote for the movie')
+    expect(m.text).not.toContain('<li>')
+  })
+
+  it('buildAnnounceEmail still renders plain-text messages with line breaks', () => {
+    const m = buildAnnounceEmail({ eventTitle: 'Movie', eventDate: null, message: 'Doors at 7\nFirst film at 7:30', link: 'l' })
+    expect(m.html).toContain('Doors at 7<br>First film at 7:30')
+  })
+
   it('buildAnnounceEmail honors a custom subject', () => {
     const m = buildAnnounceEmail({ eventTitle: 'Movie', eventDate: null, message: 'hi', link: 'l', subject: 'Reminder!' })
     expect(m.subject).toBe('Reminder!')
+  })
+
+  it('sanitizeEmailHtml keeps only exact attribute-less editor tags', () => {
+    expect(sanitizeEmailHtml('<p>hi</p><h2>head</h2>')).toBe('<p>hi</p><h2>head</h2>')
+    // A tag with any attribute is not the exact literal form — it stays escaped.
+    expect(sanitizeEmailHtml('<p onclick="x()">hi</p>')).toBe('&lt;p onclick=&quot;x()&quot;&gt;hi</p>')
+    expect(sanitizeEmailHtml('<script>alert(1)</script>')).toBe('&lt;script&gt;alert(1)&lt;/script&gt;')
+    expect(sanitizeEmailHtml('<a href="https://evil">x</a>')).not.toContain('<a')
   })
 
   it('uniqueEmails lowercases, trims, and de-duplicates', () => {
