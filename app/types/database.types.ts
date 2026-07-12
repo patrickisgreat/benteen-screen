@@ -60,9 +60,15 @@ export interface Database {
         Relationships: []
       }
       comms_log: {
-        Row: { id: string, event_id: string | null, kind: string, scope: string | null, subject: string | null, recipient_count: number, failed_count: number, status: string, error: string | null, sent_by: string | null, created_at: string }
-        Insert: { id?: string, event_id?: string | null, kind: string, scope?: string | null, subject?: string | null, recipient_count?: number, failed_count?: number, status?: string, error?: string | null, sent_by?: string | null, created_at?: string }
-        Update: { id?: string, event_id?: string | null, kind?: string, scope?: string | null, subject?: string | null, recipient_count?: number, failed_count?: number, status?: string, error?: string | null, sent_by?: string | null, created_at?: string }
+        Row: { id: string, event_id: string | null, kind: string, scope: string | null, subject: string | null, body: string | null, recipient_count: number, failed_count: number, status: string, error: string | null, sent_by: string | null, created_at: string }
+        Insert: { id?: string, event_id?: string | null, kind: string, scope?: string | null, subject?: string | null, body?: string | null, recipient_count?: number, failed_count?: number, status?: string, error?: string | null, sent_by?: string | null, created_at?: string }
+        Update: { id?: string, event_id?: string | null, kind?: string, scope?: string | null, subject?: string | null, body?: string | null, recipient_count?: number, failed_count?: number, status?: string, error?: string | null, sent_by?: string | null, created_at?: string }
+        Relationships: []
+      }
+      comms_recipients: {
+        Row: { id: string, comms_log_id: string, email: string, resend_id: string | null, sent_at: string, delivered_at: string | null, opened_at: string | null, clicked_at: string | null, bounced_at: string | null }
+        Insert: { id?: string, comms_log_id: string, email: string, resend_id?: string | null, sent_at?: string, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null }
+        Update: { id?: string, comms_log_id?: string, email?: string, resend_id?: string | null, sent_at?: string, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null }
         Relationships: []
       }
       comms_templates: {
