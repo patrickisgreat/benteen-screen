@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import type { CommsTemplate } from '#shared/types/comms-template'
 
 // Admin event blast composer → POST /api/events/announce (admin-gated server-side).
+// The message is rich text (tiptap); the server sanitizes it to a strict tag
+// allowlist before it goes into the email. Templates let a recurring blast
+// (e.g. the vote + bring-list nudge) be applied, tweaked, and re-sent later.
 const props = defineProps<{ eventId: string | undefined }>()
 const toast = useToast()
+const { run } = useToastAction()
 const sending = ref(false)
+
+const { templates, saveTemplate, removeTemplate } = useCommsTemplates()
+const savingTemplate = ref(false)
+const templateName = ref('')
 
 const scopeOptions = [
   { label: 'Everyone invited', value: 'invited' as const },
@@ -16,7 +25,7 @@ type Scope = (typeof scopeOptions)[number]['value']
 
 const schema = z.object({
   subject: z.string().trim().max(200).optional(),
-  message: z.string().trim().min(1, 'Write a message'),
+  message: z.string().max(10000).refine(m => htmlToText(m).length > 0, 'Write a message'),
   scope: z.enum(['invited', 'members', 'going'])
 })
 const state = reactive<{ subject: string, message: string, scope: Scope }>({
@@ -24,6 +33,27 @@ const state = reactive<{ subject: string, message: string, scope: Scope }>({
   message: '',
   scope: 'members'
 })
+
+const messageHasText = computed(() => htmlToText(state.message).length > 0)
+
+function applyTemplate(template: CommsTemplate): void {
+  state.message = template.body
+  if (template.subject) state.subject = template.subject
+}
+
+async function onSaveTemplate(): Promise<void> {
+  const name = templateName.value.trim()
+  if (!name || !messageHasText.value) return
+  if (await run(() => saveTemplate(name, state.subject || null, state.message), 'Could not save the template')) {
+    toast.add({ title: 'Template saved', icon: 'i-lucide-check', color: 'success' })
+    savingTemplate.value = false
+    templateName.value = ''
+  }
+}
+
+async function onRemoveTemplate(template: CommsTemplate): Promise<void> {
+  await run(() => removeTemplate(template), 'Could not delete the template')
+}
 
 function messageOf(error: unknown): string | undefined {
   if (error && typeof error === 'object' && 'statusMessage' in error) {
@@ -69,24 +99,60 @@ async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: stri
 </script>
 
 <template>
-  <UForm :schema="schema" :state="state" class="space-y-3" @submit="onSubmit">
-    <UFormField label="Audience" name="scope">
-      <USelectMenu
-        v-model="state.scope"
-        :items="scopeOptions"
-        value-key="value"
-        :search-input="false"
-        class="w-full sm:max-w-xs"
-      />
-    </UFormField>
-    <UFormField label="Subject" name="subject" hint="Optional">
-      <UInput v-model="state.subject" placeholder="Movie night reminder" class="w-full" />
-    </UFormField>
-    <UFormField label="Message" name="message" required>
-      <UTextarea v-model="state.message" :rows="5" placeholder="Doors at 7, first film at 7:30…" class="w-full" />
-    </UFormField>
-    <div class="flex justify-end">
-      <UButton type="submit" label="Send blast" icon="i-lucide-megaphone" :loading="sending" :disabled="!eventId" />
+  <div class="space-y-3">
+    <div v-if="templates.length" class="space-y-1.5">
+      <p class="text-xs font-medium text-muted">
+        Templates
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <UButtonGroup v-for="tpl in templates" :key="tpl.id" size="xs">
+          <UButton :label="tpl.name" icon="i-lucide-file-text" color="neutral" variant="outline" @click="applyTemplate(tpl)" />
+          <UButton
+            icon="i-lucide-x"
+            color="neutral"
+            variant="outline"
+            :aria-label="`Delete template ${tpl.name}`"
+            @click="onRemoveTemplate(tpl)"
+          />
+        </UButtonGroup>
+      </div>
     </div>
-  </UForm>
+
+    <UForm :schema="schema" :state="state" class="space-y-3" @submit="onSubmit">
+      <UFormField label="Audience" name="scope">
+        <USelectMenu
+          v-model="state.scope"
+          :items="scopeOptions"
+          value-key="value"
+          :search-input="false"
+          class="w-full sm:max-w-xs"
+        />
+      </UFormField>
+      <UFormField label="Subject" name="subject" hint="Optional">
+        <UInput v-model="state.subject" placeholder="Movie night reminder" class="w-full" />
+      </UFormField>
+      <UFormField label="Message" name="message" required>
+        <RichTextEditor v-model="state.message" />
+      </UFormField>
+
+      <div v-if="savingTemplate" class="flex gap-2">
+        <UInput v-model="templateName" placeholder="Template name" class="flex-1" @keydown.enter.prevent="onSaveTemplate" />
+        <UButton label="Save" :disabled="!templateName.trim()" @click="onSaveTemplate" />
+        <UButton label="Cancel" color="neutral" variant="ghost" @click="savingTemplate = false" />
+      </div>
+
+      <div class="flex flex-wrap justify-between gap-2">
+        <UButton
+          v-if="!savingTemplate"
+          label="Save as template"
+          icon="i-lucide-bookmark-plus"
+          color="neutral"
+          variant="outline"
+          :disabled="!messageHasText"
+          @click="savingTemplate = true"
+        />
+        <UButton type="submit" label="Send blast" icon="i-lucide-megaphone" :loading="sending" :disabled="!eventId" class="ml-auto" />
+      </div>
+    </UForm>
+  </div>
 </template>
