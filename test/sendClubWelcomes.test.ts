@@ -10,7 +10,7 @@ vi.mock('resend', () => ({
   }
 }))
 
-const mail = { subject: "You're in the club", html: '<p>hi</p>', text: 'hi' }
+const mail = { subject: 'You\'re in the club', html: '<p>hi</p>', text: 'hi' }
 const ok = (n: number) => ({ data: { data: Array.from({ length: n }, (_, i) => ({ id: `id-${i}` })) }, error: null })
 
 const send = (recipients: string[], batchSize = 2) =>
@@ -58,7 +58,7 @@ describe('sendClubWelcomes', () => {
     expect(result).toEqual({ sent: 2, failed: 2, error: 'rate limited' })
   })
 
-  it("sets the admin's address as reply-to so replies reach a human", async () => {
+  it('sets the admin\'s address as reply-to so replies reach a human', async () => {
     batchSend.mockResolvedValue(ok(1))
     await sendClubWelcomes({ apiKey: 'k', from: 'a@b.com', recipients: ['a@x.com'], mail, replyTo: 'admin@x.com', interBatchMs: 0 })
     expect(batchSend.mock.calls[0]![0][0].replyTo).toBe('admin@x.com')

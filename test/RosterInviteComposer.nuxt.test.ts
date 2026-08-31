@@ -27,7 +27,7 @@ mockNuxtImport('useRoster', () => () => ({
     return result
   }
 }))
-mockNuxtImport('useToast', () => () => ({ add: (t: { title?: string, description?: string }) => { toasts.push(t) } }))
+mockNuxtImport('useToast', () => () => ({ add: (t: { title?: string, description?: string }) => toasts.push(t) }))
 
 async function typeEmails(wrapper: Awaited<ReturnType<typeof mountSuspended>>, value: string): Promise<void> {
   const box = wrapper.find('[data-testid="roster-emails"]')
@@ -76,7 +76,7 @@ describe('RosterInviteComposer', () => {
   it('warns about fragments that are not addresses', async () => {
     const wrapper = await mountSuspended(RosterInviteComposer)
     await typeEmails(wrapper, 'good@x.com\nnot-an-email')
-    expect(wrapper.text()).toContain("couldn't be read as an email")
+    expect(wrapper.text()).toContain('couldn\'t be read as an email')
     expect(wrapper.text()).toContain('not-an-email')
   })
 
