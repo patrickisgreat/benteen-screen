@@ -378,3 +378,52 @@ export async function sendEventReminders(
   }
   return { sent, failed: opts.invites.length - sent, error: firstError }
 }
+
+/**
+ * Blast the club-welcome mail to everyone newly added to the roster in idle mode.
+ * Same batching as the e-vite blast (one Resend request per 100, paced under the
+ * rate limit), but there's nothing per-recipient to stamp — the roster row already
+ * exists, and a repeat paste never reaches here because the caller only passes rows
+ * the insert actually created. A failed batch is reported, never swallowed: the
+ * people are on the roster either way, and the admin needs to know the welcome
+ * didn't go out.
+ */
+export async function sendClubWelcomes(opts: {
+  readonly apiKey: string
+  readonly from: string
+  readonly recipients: readonly string[]
+  readonly mail: { subject: string, html: string, text: string }
+  readonly replyTo?: string
+  readonly batchSize?: number
+  readonly interBatchMs?: number
+}): Promise<{ sent: number, failed: number, error: string | null }> {
+  const batchSize = opts.batchSize ?? INVITE_BATCH_SIZE
+  const interBatchMs = opts.interBatchMs ?? INVITE_INTER_BATCH_MS
+
+  let sent = 0
+  const failures: string[] = []
+  const batches = chunk(opts.recipients, batchSize)
+  for (let b = 0; b < batches.length; b++) {
+    if (b > 0) await sleep(interBatchMs)
+    const group = batches[b]!
+    try {
+      await sendBatch(
+        opts.apiKey,
+        opts.from,
+        group.map(email => ({
+          to: email,
+          subject: opts.mail.subject,
+          html: opts.mail.html,
+          text: opts.mail.text,
+          replyTo: opts.replyTo
+        }))
+      )
+      sent += group.length
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Unknown error'
+      failures.push(message)
+      console.error('[invites/roster] batch failed -', message)
+    }
+  }
+  return { sent, failed: opts.recipients.length - sent, error: failures[0] ?? null }
+}
