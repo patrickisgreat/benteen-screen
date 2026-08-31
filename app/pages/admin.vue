@@ -40,6 +40,10 @@ const { entries: commsLog } = useCommsLog(selectedEventId)
 
 // Upcoming events first (soonest first), then past events descending (oldest last).
 const sortedEvents = computed(() => sortEventsForAdmin(events.value))
+
+// Idle mode: nothing scheduled today or later, so the Invites tab has no event to
+// build a guest list for and offers club-roster seeding instead.
+const idle = computed(() => isIdle(events.value))
 const selectedEvent = computed(() => sortedEvents.value.find(e => e.id === selectedEventId.value) ?? null)
 
 const eventOptions = computed(() =>
@@ -474,15 +478,20 @@ function onSelectEvent(event: MovieEvent): void {
 
       <!-- COMMS -->
       <template #invites>
-        <p class="text-sm text-muted mb-4">
-          Curate the guest list for an event and send Evite-style invitations with
-          one-click RSVP. A new event's list auto-fills from the last movie night.
-        </p>
-        <EventPicker v-model="selectedEventId" :items="eventOptions" />
-        <EventInviteManager v-if="selectedEventId" :key="selectedEventId" :event-id="selectedEventId" :event="selectedEvent" />
-        <UCard v-else variant="subtle" class="text-center text-muted">
-          Select an event to manage its guest list.
-        </UCard>
+        <!-- Idle (no night scheduled today or later): there's no guest list to
+             curate, so seed the club roster instead. -->
+        <RosterInviteComposer v-if="idle" />
+        <template v-else>
+          <p class="text-sm text-muted mb-4">
+            Curate the guest list for an event and send Evite-style invitations with
+            one-click RSVP. A new event's list auto-fills from the last movie night.
+          </p>
+          <EventPicker v-model="selectedEventId" :items="eventOptions" />
+          <EventInviteManager v-if="selectedEventId" :key="selectedEventId" :event-id="selectedEventId" :event="selectedEvent" />
+          <UCard v-else variant="subtle" class="text-center text-muted">
+            Select an event to manage its guest list.
+          </UCard>
+        </template>
       </template>
 
       <template #comms>

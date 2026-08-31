@@ -231,7 +231,7 @@ describe('email utils', () => {
 describe('buildClubWelcomeEmail', () => {
   it('tells the newcomer they are on the list and will hear about the next night', () => {
     const m = buildClubWelcomeEmail({ inviterName: 'Sam', link: 'https://x/login' })
-    expect(m.subject).toContain("You're in the club")
+    expect(m.subject).toContain('You\'re in the club')
     expect(m.html).toContain('Sam')
     expect(m.html).toContain('https://x/login')
     expect(m.text).toContain('When the next movie night gets scheduled')
