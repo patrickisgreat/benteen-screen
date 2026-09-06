@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.19.0...v1.20.0) (2026-09-06)
+
+
+### Features
+
+* seed the club roster with welcome emails when no movie night is scheduled ([#187](https://github.com/patrickisgreat/benteen-screen/issues/187)) ([9b83cf5](https://github.com/patrickisgreat/benteen-screen/commit/9b83cf57a90dcc86bb555b3777ce506885fc9239))
+
 ## [1.19.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.18.0...v1.19.0) (2026-07-12)
 
 
