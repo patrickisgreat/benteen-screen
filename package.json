@@ -28,7 +28,7 @@
     "@tiptap/pm": "^3.27.3",
     "@tiptap/starter-kit": "^3.27.3",
     "@tiptap/vue-3": "^3.26.1",
-    "dompurify": "^3.4.11",
+    "dompurify": "^3.4.12",
     "nuxt": "^4.4.8",
     "resend": "^6.14.0",
     "tailwindcss": "^4.3.2",
