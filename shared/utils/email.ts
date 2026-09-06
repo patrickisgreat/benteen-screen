@@ -338,3 +338,28 @@ export function buildEventInviteEmail(opts: {
   ].filter(Boolean)
   return { subject, html, text: textParts.join('\n\n') }
 }
+
+/**
+ * Welcome mail for someone added to the club roster while no movie night is
+ * scheduled (idle mode). Deliberately makes no promise about a date — the point
+ * is "you're on the list, we'll tell you when the next one lands" — unlike
+ * buildInviteEmail, which leads with the upcoming event.
+ */
+export function buildClubWelcomeEmail(opts: {
+  inviterName: string | null
+  link: string
+}): BuiltEmail {
+  const inviter = opts.inviterName ? escapeHtml(opts.inviterName) : 'An organizer'
+  const subject = `You're in the club — Benteen Screen On The Green`
+  const html = shell(
+    `<h1 style="font-size:20px;margin:0 0 12px">You're in the club 🎬</h1>`
+    + `<p>${inviter} added you to <strong>Benteen Screen On The Green</strong>, our group movie night. It Really Whips the Movie's Ass.</p>`
+    + `<p>There's no screening on the calendar right now — but you're on the list. When the next movie night gets scheduled, you'll get an invite with the date, and you can suggest a film and vote on everyone else's.</p>`
+    + `<p style="margin:20px 0">${ctaButton('Sign in and look around', opts.link)}</p>`
+    + `<p style="font-size:13px;color:#6b7280">Sign in with the email this was sent to. If you weren't expecting this, you can ignore it.</p>`
+  )
+  const text = `${opts.inviterName ?? 'An organizer'} added you to Benteen Screen On The Green, our group movie night.`
+    + `\n\nThere's no screening on the calendar right now — but you're on the list. When the next movie night gets scheduled, you'll get an invite with the date, and you can suggest a film and vote on everyone else's.`
+    + `\n\nSign in and look around: ${opts.link}`
+  return { subject, html, text }
+}

@@ -3,6 +3,7 @@ import type { InviteOptions } from '../shared/types/invite-options'
 import {
   buildAdminReminderDigestEmail,
   buildAnnounceEmail,
+  buildClubWelcomeEmail,
   buildEventInviteEmail,
   buildEventReminderEmail,
   buildInviteEmail,
@@ -224,5 +225,32 @@ describe('email utils', () => {
   it('htmlToText strips tags and decodes entities', () => {
     expect(htmlToText('<p>Hello</p><p>World &amp; co</p>')).toBe('Hello\nWorld & co')
     expect(htmlToText('a<br>b')).toBe('a\nb')
+  })
+})
+
+describe('buildClubWelcomeEmail', () => {
+  it('tells the newcomer they are on the list and will hear about the next night', () => {
+    const m = buildClubWelcomeEmail({ inviterName: 'Sam', link: 'https://x/login' })
+    expect(m.subject).toContain('You\'re in the club')
+    expect(m.html).toContain('Sam')
+    expect(m.html).toContain('https://x/login')
+    expect(m.text).toContain('When the next movie night gets scheduled')
+  })
+
+  it('promises no date, since idle mode has no event to name', () => {
+    const m = buildClubWelcomeEmail({ inviterName: 'Sam', link: 'https://x/login' })
+    expect(m.html).toContain('no screening on the calendar right now')
+  })
+
+  it('falls back to "An organizer" without an inviter name', () => {
+    const m = buildClubWelcomeEmail({ inviterName: null, link: 'https://x/login' })
+    expect(m.html).toContain('An organizer')
+    expect(m.text).toContain('An organizer')
+  })
+
+  it('escapes an inviter name so a crafted display name cannot inject markup', () => {
+    const m = buildClubWelcomeEmail({ inviterName: '<script>alert(1)</script>', link: 'https://x/login' })
+    expect(m.html).not.toContain('<script>')
+    expect(m.html).toContain('&lt;script&gt;')
   })
 })
