@@ -50,7 +50,7 @@ mockNuxtImport('useToast', () => () => ({ add: (t: Toast) => toasts.push(t) }))
 mockNuxtImport('useGuestDirectory', () => () => ({
   candidates: ref([{ email: 'zed@x.com', display_name: 'Zed', source: 'past-guest' }]),
   pending: ref(false),
-  refresh: async () => {}
+  error: ref(null)
 }))
 mockNuxtImport('useInviteOptions', () => () => ({ save: saveOptionsFn }))
 mockNuxtImport('useEventReminders', () => () => ({ setEnabled: async () => {} }))
