@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { z } from 'zod'
 import type { EventInvite } from '#shared/types/event-invite'
 import type { MovieEvent } from '#shared/types/event'
 import { INVITE_ACCENTS, INVITE_THEMES, type InviteAccent, type InviteOptions, type InviteTheme } from '#shared/types/invite-options'
 
 // Admin guest-list manager + Evite tracker + e-vite editor for one event. Lets
 // admins customize the invite (theme/accent/message/toggles with a live preview),
-// add/remove guests, pull last event's list in on demand, send tokenized e-vites,
-// and shows live RSVP / open / click tracking.
+// add guests (live-searching the club directory via GuestPicker) / remove them,
+// pull last event's list in on demand, send tokenized e-vites, and shows live
+// RSVP / open / click tracking.
 const props = defineProps<{ eventId: string, event?: MovieEvent | null }>()
 const toast = useToast()
 const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders } = useEventInvites(() => props.eventId)
@@ -34,13 +34,10 @@ async function onToggleReminders(value: boolean): Promise<void> {
 // reconciled headcounts the admin actually plans around.
 const { roster } = useEventRsvps(() => props.eventId)
 
-const newEmail = ref('')
-const newName = ref('')
 const sending = ref(false)
 const seeding = ref(false)
 const deleting = ref(false)
 const reminding = ref(false)
-const emailSchema = z.string().email()
 
 // People who were e-vited but haven't RSVP'd — the manual "remind now" audience.
 const remindable = computed(() => invites.value.filter(i => !i.rsvp && i.sent_at).length)
@@ -168,16 +165,12 @@ async function onDeleteSelected(): Promise<void> {
   }
 }
 
-async function onAdd(): Promise<void> {
-  const email = newEmail.value.trim()
-  if (!emailSchema.safeParse(email).success) {
-    toast.add({ title: 'Enter a valid email', color: 'warning' })
-    return
-  }
+// Emails already on the list — the picker hides these from its matches.
+const listedEmails = computed(() => invites.value.map(i => i.email))
+
+async function onAdd(email: string, name?: string): Promise<void> {
   try {
-    await addInvite(email, newName.value.trim() || undefined)
-    newEmail.value = ''
-    newName.value = ''
+    await addInvite(email, name)
   } catch {
     toast.add({ title: 'Could not add them', color: 'error' })
   }
@@ -385,16 +378,8 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
       </template>
     </UCollapsible>
 
-    <!-- Add + actions -->
-    <div class="flex flex-wrap items-end gap-2">
-      <UFormField label="Add guest email" class="flex-1 min-w-48">
-        <UInput v-model="newEmail" type="email" placeholder="friend@example.com" class="w-full" @keydown.enter="onAdd" />
-      </UFormField>
-      <UFormField label="Name" hint="optional" class="min-w-32">
-        <UInput v-model="newName" placeholder="Jordan" class="w-full" @keydown.enter="onAdd" />
-      </UFormField>
-      <UButton label="Add" icon="i-lucide-plus" @click="onAdd" />
-    </div>
+    <!-- Add (live directory search or a new email) + actions -->
+    <GuestPicker :exclude="listedEmails" @add="onAdd" />
     <div class="flex flex-wrap items-center gap-2">
       <UButton label="Pull from last event" icon="i-lucide-history" color="neutral" variant="outline" size="sm" :loading="seeding" @click="onSeed" />
       <UButton
@@ -487,7 +472,7 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
       </li>
     </ul>
     <p v-else class="text-sm text-muted">
-      No guests yet — add emails above, or pull in last event's list.
+      No guests yet — search for people above, or pull in last event's list.
     </p>
   </div>
 </template>

@@ -56,6 +56,7 @@ const stubs = {
   PeopleList: true,
   BringList: true,
   InviteFriendModal: true,
+  InviteToEventModal: true,
   InviteLimitSetting: true,
   ParticipationLimitsSetting: true,
   ReminderCheckpointsSetting: true,

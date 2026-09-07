@@ -2,7 +2,8 @@ import { serverSupabaseClient } from '#supabase/server'
 import type { Database } from '~/types/database.types'
 
 /**
- * Sends (or re-sends) the tokenized e-vites for an event's guest list. Admin-only.
+ * Sends the tokenized e-vites for an event's guest list — everyone not yet sent,
+ * or only the guests named in an optional `{ emails }` body filter. Admin-only.
  * Runs under the caller's own session (RLS) — every table here has an admin policy
  * (`event_invites: admin all`, `invites: create` as self with the cap trigger
  * exempting admins), so the service role isn't needed and a misconfigured
@@ -28,11 +29,22 @@ export default defineEventHandler(async (event) => {
   if (!ev) throw createError({ statusCode: 404, statusMessage: 'Event not found' })
   const inviteOptions = normalizeInviteOptions(ev.invite_options)
 
-  const { data: invites, error: queueError } = await db
+  let targets: string[] | null
+  try {
+    targets = parseInviteTargets(await readBody(event))
+  } catch {
+    throw createError({ statusCode: 400, statusMessage: 'Invalid recipient list' })
+  }
+
+  let queueQuery = db
     .from('event_invites')
     .select('id, email, display_name, token')
     .eq('event_id', eventId)
     .is('sent_at', null)
+  // Exact match is safe: `event_invites.email` is lowercased + trimmed by a
+  // trigger on insert, and `parseInviteTargets` normalizes the filter the same way.
+  if (targets) queueQuery = queueQuery.in('email', targets)
+  const { data: invites, error: queueError } = await queueQuery
   if (queueError) {
     throw createError({ statusCode: 500, statusMessage: 'Could not load the guest list', data: { cause: queueError.message, code: queueError.code } })
   }

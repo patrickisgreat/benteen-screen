@@ -97,6 +97,23 @@ describe('PeopleList', () => {
     expect(w.emitted('setAdmin')?.[0]).toEqual([people[0], true])
   })
 
+  it('emits invite with the member\'s email and name', async () => {
+    const w = await mountSuspended(PeopleList, { props: { people, pending } })
+    await w.get('[aria-label="Invite Alice to an event"]').trigger('click')
+    expect(w.emitted('invite')?.[0]).toEqual([{ email: 'alice@x.com', display_name: 'Alice' }])
+  })
+
+  it('lets a pending roster member be invited to an event too', async () => {
+    const w = await mountSuspended(PeopleList, { props: { people, pending } })
+    await w.get('[aria-label="Invite Pat to an event"]').trigger('click')
+    expect(w.emitted('invite')?.[0]).toEqual([{ email: 'pat@x.com', display_name: 'Pat' }])
+  })
+
+  it('offers no invite for a banned member', async () => {
+    const w = await mountSuspended(PeopleList, { props: { people } })
+    expect(w.find('[aria-label="Invite Bob to an event"]').exists()).toBe(false)
+  })
+
   it('hides the admin toggle on your own row', async () => {
     // Carol (u3) is "me" and an admin — no Make/Remove admin button on her row.
     const w = await mountSuspended(PeopleList, { props: { people } })

@@ -32,3 +32,7 @@ export interface InviteStats {
   no: number
   noReply: number
 }
+
+/** Just enough to put someone on a guest list — what the People tab hands to the
+ *  "invite to an event" flow and what the invite picker emits. */
+export type EventGuest = Pick<EventInvite, 'email' | 'display_name'>

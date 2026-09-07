@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Profile } from '#shared/types/user'
 import type { Invite } from '#shared/types/invite'
+import type { EventGuest } from '#shared/types/event-invite'
 
 const props = withDefaults(
   defineProps<{ people: Profile[], pending?: Invite[] }>(),
@@ -12,6 +13,7 @@ const emit = defineEmits<{
   revoke: [invite: Invite]
   select: [person: Profile]
   setAdmin: [person: Profile, value: boolean]
+  invite: [guest: EventGuest]
 }>()
 
 // To hide the admin toggle on your own row (you can't change your own admin).
@@ -53,6 +55,15 @@ const filtered = computed(() => {
   if (!q) return rows.value
   return rows.value.filter(r => r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q))
 })
+
+// Anyone with an email who isn't banned can be put on an event's guest list.
+function invitable(row: Row): boolean {
+  if (!row.email) return false
+  return row.kind === 'pending' || !row.profile.blocked
+}
+function guestOf(row: Row): EventGuest {
+  return { email: row.email, display_name: row.kind === 'member' ? row.profile.display_name : row.invite.display_name }
+}
 
 function initials(name: string, email: string): string {
   return (name || email || '?').slice(0, 2).toUpperCase()
@@ -102,6 +113,17 @@ function initials(name: string, email: string): string {
             {{ row.email || '—' }}
           </p>
         </component>
+
+        <UButton
+          v-if="invitable(row)"
+          icon="i-lucide-mail-plus"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          class="shrink-0"
+          :aria-label="`Invite ${row.name} to an event`"
+          @click="emit('invite', guestOf(row))"
+        />
 
         <!-- Member actions: admin toggle + ban/unban (admins can't be banned from the UI). -->
         <template v-if="row.kind === 'member'">
