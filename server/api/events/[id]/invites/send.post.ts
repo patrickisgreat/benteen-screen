@@ -41,6 +41,8 @@ export default defineEventHandler(async (event) => {
     .select('id, email, display_name, token')
     .eq('event_id', eventId)
     .is('sent_at', null)
+  // Exact match is safe: `event_invites.email` is lowercased + trimmed by a
+  // trigger on insert, and `parseInviteTargets` normalizes the filter the same way.
   if (targets) queueQuery = queueQuery.in('email', targets)
   const { data: invites, error: queueError } = await queueQuery
   if (queueError) {
