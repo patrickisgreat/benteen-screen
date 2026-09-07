@@ -10,7 +10,7 @@ const props = withDefaults(defineProps<{ exclude?: readonly string[] }>(), { exc
 const emit = defineEmits<{ add: [email: string, name?: string] }>()
 
 const toast = useToast()
-const { candidates, pending } = useGuestDirectory()
+const { candidates, pending, error } = useGuestDirectory()
 const emailSchema = z.string().email()
 
 const query = ref('')
@@ -18,6 +18,8 @@ const newName = ref('')
 
 const matches = computed(() => searchGuestCandidates(candidates.value, query.value, props.exclude))
 const queryIsEmail = computed(() => emailSchema.safeParse(query.value.trim()).success)
+// A typed email that's already in the directory — adding them should keep their name.
+const exactMatch = computed(() => matches.value.find(c => c.email === query.value.trim().toLowerCase()) ?? null)
 
 function pick(candidate: GuestCandidate): void {
   emit('add', candidate.email, candidate.display_name ?? undefined)
@@ -36,9 +38,11 @@ function addTyped(): void {
   newName.value = ''
 }
 
-// Enter adds the typed email, or picks the only match when there is exactly one.
+// Enter picks the directory entry when the text is exactly their email or the
+// only match; otherwise it adds the typed email as someone new.
 function onEnter(): void {
-  if (matches.value.length === 1 && !queryIsEmail.value) pick(matches.value[0]!)
+  const match = exactMatch.value ?? (matches.value.length === 1 && !queryIsEmail.value ? matches.value[0]! : null)
+  if (match) pick(match)
   else addTyped()
 }
 </script>
@@ -63,6 +67,15 @@ function onEnter(): void {
       <UButton label="Add" icon="i-lucide-plus" :disabled="!queryIsEmail" @click="addTyped" />
     </div>
 
+    <UAlert
+      v-if="error"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-circle-alert"
+      title="Couldn't load the directory"
+      :description="error"
+    />
+
     <!-- Live matches from the directory -->
     <ul v-if="matches.length" class="divide-y divide-default rounded-lg ring ring-default overflow-hidden" aria-label="Matching people">
       <li v-for="c in matches" :key="c.email">
@@ -85,7 +98,10 @@ function onEnter(): void {
         </button>
       </li>
     </ul>
-    <p v-else-if="query.trim() && !queryIsEmail" class="text-xs text-muted px-1">
+    <p v-else-if="queryIsEmail" class="text-xs text-muted px-1">
+      Not in the directory yet — hit Add to invite them.
+    </p>
+    <p v-else-if="query.trim()" class="text-xs text-muted px-1">
       No one matches — finish typing an email to add someone new.
     </p>
   </div>

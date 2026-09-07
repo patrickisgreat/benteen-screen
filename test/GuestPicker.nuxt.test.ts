@@ -12,13 +12,15 @@ const candidates = ref<GuestCandidate[]>([
   { email: 'bo@x.com', display_name: 'Bo', source: 'past-guest' },
   { email: 'cy@x.com', display_name: null, source: 'roster' }
 ])
-mockNuxtImport('useGuestDirectory', () => () => ({ candidates, pending: ref(false), refresh: async () => {} }))
+const directoryError = ref<string | null>(null)
+mockNuxtImport('useGuestDirectory', () => () => ({ candidates, pending: ref(false), error: directoryError }))
 mockNuxtImport('useToast', () => () => ({ add: (t: Toast) => toasts.push(t) }))
 
 const searchBox = (w: Awaited<ReturnType<typeof mountSuspended>>) => w.get('[aria-label="Search people or enter an email"]')
 
 beforeEach(() => {
   toasts.length = 0
+  directoryError.value = null
 })
 
 describe('GuestPicker', () => {
@@ -68,6 +70,26 @@ describe('GuestPicker', () => {
     expect(w.emitted('add')).toBeUndefined()
     expect(toasts.at(-1)?.color).toBe('warning')
     expect(w.text()).toContain('No one matches')
+  })
+
+  it('keeps the directory name when Enter is pressed on an exact email', async () => {
+    const w = await mountSuspended(GuestPicker)
+    await searchBox(w).setValue('ADA@x.com')
+    await searchBox(w).trigger('keydown', { key: 'Enter' })
+    expect(w.emitted('add')?.[0]).toEqual(['ada@x.com', 'Ada Lovelace'])
+  })
+
+  it('tells the admin a valid unknown email can be added', async () => {
+    const w = await mountSuspended(GuestPicker)
+    await searchBox(w).setValue('new@example.com')
+    expect(w.text()).toContain('Not in the directory yet')
+  })
+
+  it('shows the load error instead of pretending nobody matches', async () => {
+    directoryError.value = 'profiles unavailable'
+    const w = await mountSuspended(GuestPicker)
+    expect(w.text()).toContain('Couldn\'t load the directory')
+    expect(w.text()).toContain('profiles unavailable')
   })
 
   it('picks the only match on Enter', async () => {
