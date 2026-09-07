@@ -16,6 +16,7 @@ const sendFn = vi.fn<() => Promise<SendResult>>(async () => ({ sent: 0, failed: 
 const remindFn = vi.fn<() => Promise<SendResult>>(async () => ({ sent: 0, failed: 0, error: null }))
 const removeMany = vi.fn(async () => {})
 const seedFn = vi.fn(async () => 0)
+const addFn = vi.fn(async (_email: string, _name?: string) => {})
 const saveOptionsFn = vi.fn(async () => {})
 const toasts: Toast[] = []
 
@@ -38,7 +39,7 @@ mockNuxtImport('useEventInvites', () => () => ({
   pending: ref(false),
   stats: computed(() => ({ invited: 2, sent: 1, opened: 0, clicked: 0, going: 1, maybe: 0, no: 0, noReply: 1 })),
   refresh: async () => {},
-  addInvite: async () => {},
+  addInvite: addFn,
   removeInvite: async () => {},
   removeInvites: removeMany,
   seedFromLastEvent: seedFn,
@@ -46,6 +47,11 @@ mockNuxtImport('useEventInvites', () => () => ({
   remindNonResponders: remindFn
 }))
 mockNuxtImport('useToast', () => () => ({ add: (t: Toast) => toasts.push(t) }))
+mockNuxtImport('useGuestDirectory', () => () => ({
+  candidates: ref([{ email: 'zed@x.com', display_name: 'Zed', source: 'past-guest' }]),
+  pending: ref(false),
+  refresh: async () => {}
+}))
 mockNuxtImport('useInviteOptions', () => () => ({ save: saveOptionsFn }))
 mockNuxtImport('useEventReminders', () => () => ({ setEnabled: async () => {} }))
 mockNuxtImport('useEventRsvps', () => () => ({
@@ -101,6 +107,15 @@ describe('EventInviteManager', () => {
     const del = w.findAll('button').find(b => b.text().includes('Delete'))
     await del!.trigger('click')
     expect(removeMany).toHaveBeenCalledWith(['b'])
+  })
+
+  it('adds a guest picked from the directory search', async () => {
+    addFn.mockClear()
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e' } })
+    await w.get('[aria-label="Search people or enter an email"]').setValue('zed')
+    await w.get('[aria-label="Add Zed"]').trigger('click')
+    await flushPromises()
+    expect(addFn).toHaveBeenCalledWith('zed@x.com', 'Zed')
   })
 
   it('does not auto-pull from the last event on load, even when the list is empty', async () => {
