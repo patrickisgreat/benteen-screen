@@ -3,6 +3,7 @@ import type { MovieEvent } from '#shared/types/event'
 import type { BringItem } from '#shared/types/bring'
 import type { Profile } from '#shared/types/user'
 import type { Invite } from '#shared/types/invite'
+import type { EventGuest } from '#shared/types/event-invite'
 import type { PosterDisplay } from '#shared/utils/posterDisplay'
 
 definePageMeta({ middleware: 'admin' })
@@ -18,6 +19,10 @@ const modalOpen = ref(false)
 const inviteOpen = ref(false)
 const editingEvent = ref<MovieEvent | null>(null)
 const eventPendingDelete = ref<MovieEvent | null>(null)
+
+// People → "invite to an event": the person being invited, and the upcoming nights to pick from.
+const inviteGuest = ref<EventGuest | null>(null)
+const inviteToEventOpen = ref(false)
 
 // People drill-down: the member whose activity stats are open.
 const statsPerson = ref<Profile | null>(null)
@@ -44,6 +49,7 @@ const sortedEvents = computed(() => sortEventsForAdmin(events.value))
 // Idle mode: nothing scheduled today or later, so the Invites tab has no event to
 // build a guest list for and offers club-roster seeding instead.
 const idle = computed(() => isIdle(events.value))
+const upcomingEvents = computed(() => sortedEvents.value.filter(e => isUpcoming(e.event_date)))
 const selectedEvent = computed(() => sortedEvents.value.find(e => e.id === selectedEventId.value) ?? null)
 
 const eventOptions = computed(() =>
@@ -207,6 +213,10 @@ async function onRevoke(invite: Invite): Promise<void> {
   if (await run(() => revokeInvite(invite.email), 'Could not revoke invite')) {
     toast.add({ title: `Invite to ${invite.email} revoked`, color: 'neutral' })
   }
+}
+function onInvite(guest: EventGuest): void {
+  inviteGuest.value = guest
+  inviteToEventOpen.value = true
 }
 function onSelectPerson(person: Profile): void {
   statsPerson.value = person
@@ -403,6 +413,7 @@ function onSelectEvent(event: MovieEvent): void {
             @revoke="onRevoke"
             @select="onSelectPerson"
             @set-admin="onSetAdmin"
+            @invite="onInvite"
           />
         </div>
       </template>
@@ -532,6 +543,9 @@ function onSelectEvent(event: MovieEvent): void {
 
     <!-- Admin invite a friend -->
     <InviteFriendModal v-model:open="inviteOpen" />
+
+    <!-- People → invite one person to an upcoming movie night -->
+    <InviteToEventModal v-model:open="inviteToEventOpen" :guest="inviteGuest" :events="upcomingEvents" />
 
     <UserStatsModal v-model:open="statsOpen" :person="statsPerson" />
 
