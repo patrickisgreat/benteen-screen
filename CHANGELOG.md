@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.20.0...v1.21.0) (2026-09-07)
+
+
+### Features
+
+* readable admin tabs on mobile, directory search for invites, invite-to-event from People ([#190](https://github.com/patrickisgreat/benteen-screen/issues/190)) ([a4b6878](https://github.com/patrickisgreat/benteen-screen/commit/a4b6878b1c80889a48bc84caacebe55eec2c6b4a))
+
 ## [1.20.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.19.0...v1.20.0) (2026-09-06)
 
 
