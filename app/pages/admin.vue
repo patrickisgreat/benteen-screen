@@ -239,7 +239,13 @@ function onSelectEvent(event: MovieEvent): void {
       <UButton label="Add movie night" icon="i-lucide-plus" class="w-full sm:w-auto justify-center" @click="openCreate" />
     </div>
 
-    <UTabs :items="tabs" class="w-full" :ui="{ content: 'pt-6' }">
+    <!-- Eight tabs don't fit a phone: let the strip scroll sideways at full size
+         (labels + icons stay readable) instead of squeezing every tab to fit. -->
+    <UTabs
+      :items="tabs"
+      class="w-full"
+      :ui="{ list: 'overflow-x-auto [scrollbar-width:none]', trigger: 'shrink-0', content: 'pt-6' }"
+    >
       <!-- OVERVIEW -->
       <template #overview>
         <div class="space-y-6">
