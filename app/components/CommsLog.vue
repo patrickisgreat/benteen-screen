@@ -6,7 +6,8 @@ defineProps<{ entries: CommsLogEntry[] }>()
 const KIND = {
   announcement: { icon: 'i-lucide-megaphone', label: 'Announcement' },
   invite: { icon: 'i-lucide-mail-plus', label: 'E-vite' },
-  reminder: { icon: 'i-lucide-alarm-clock', label: 'Reminder' }
+  reminder: { icon: 'i-lucide-alarm-clock', label: 'Reminder' },
+  rsvp_confirmation: { icon: 'i-lucide-mail-check', label: 'RSVP confirmation' }
 } as const
 
 const STATUS = {
