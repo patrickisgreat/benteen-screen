@@ -31,7 +31,7 @@
     "dompurify": "^3.4.11",
     "nuxt": "^4.4.8",
     "resend": "^6.14.0",
-    "tailwindcss": "^4.3.2",
+    "tailwindcss": "^4.3.3",
     "zod": "^4.0.0"
   },
   "devDependencies": {
