@@ -513,6 +513,11 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
       No guests yet — search for people above, or pull in last event's list.
     </p>
 
-    <GuestRsvpModal v-model:open="rsvpOpen" :invite="rsvpFor" :counts="rosterCounts" @set="onSetRsvp" />
+    <GuestRsvpModal
+      v-model:open="rsvpOpen"
+      :invite="rsvpFor"
+      :counts="rosterCounts"
+      @set="onSetRsvp"
+    />
   </div>
 </template>

@@ -39,15 +39,30 @@ function onGuests(count: number): void {
     :description="invite?.display_name ? invite.email : undefined"
   >
     <template #body>
-      <div v-if="invite" class="space-y-3">
-        <RsvpControl :my-status="status" :my-plus-ones="plusOnes" :counts="counts" @set="onSet" @guests="onGuests" />
+      <div
+        v-if="invite"
+        class="space-y-3"
+      >
+        <RsvpControl
+          :my-status="status"
+          :my-plus-ones="plusOnes"
+          :counts="counts"
+          @set="onSet"
+          @guests="onGuests"
+        />
         <p class="text-xs text-muted">
           Saves as you tap. Tap their highlighted answer again to clear it.
         </p>
       </div>
     </template>
     <template #footer>
-      <UButton label="Done" color="neutral" variant="ghost" class="w-full justify-center sm:w-auto sm:ml-auto" @click="open = false" />
+      <UButton
+        label="Done"
+        color="neutral"
+        variant="ghost"
+        class="w-full justify-center sm:w-auto sm:ml-auto"
+        @click="open = false"
+      />
     </template>
   </UModal>
 </template>
