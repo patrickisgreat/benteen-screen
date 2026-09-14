@@ -10,6 +10,8 @@ export interface EventInvite {
   token: string
   rsvp: RsvpStatus | null
   rsvp_at: string | null
+  /** Additional guests they're bringing (their "+1"s); only meaningful when going. */
+  plus_ones: number
   invited_by: string | null
   resend_id: string | null
   sent_at: string | null
