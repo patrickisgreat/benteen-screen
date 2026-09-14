@@ -6,13 +6,17 @@ import type { RsvpStatus } from '#shared/types/rsvp'
 // buttons and guest stepper a member sees in-app, applied on their behalf (for
 // the person who told the host in person and will never open the e-vite). Each
 // tap saves right away, like the in-app control; tapping the highlighted answer
-// again clears their reply. The write lives in the parent (useEventInvites.setRsvp).
+// again clears their reply. "Email them" sends a confirmation of whatever is
+// saved, with links to change it. Both writes live in the parent
+// (useEventInvites.setRsvp / notifyRsvp).
 const open = defineModel<boolean>('open', { default: false })
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   invite: EventInvite | null
   counts: { going: number, maybe: number, no: number, guests?: number }
-}>()
-const emit = defineEmits<{ set: [status: RsvpStatus | null, plusOnes: number] }>()
+  /** True while the confirmation email is being sent. */
+  notifying?: boolean
+}>(), { notifying: false })
+const emit = defineEmits<{ set: [status: RsvpStatus | null, plusOnes: number], notify: [] }>()
 
 const guestName = computed(() => props.invite?.display_name || props.invite?.email || '')
 const status = computed<RsvpStatus | null>(() => props.invite?.rsvp ?? null)
@@ -52,17 +56,30 @@ function onGuests(count: number): void {
         />
         <p class="text-xs text-muted">
           Saves as you tap. Tap their highlighted answer again to clear it.
+          "Email them" tells them what you recorded, with links to change it.
         </p>
       </div>
     </template>
     <template #footer>
-      <UButton
-        label="Done"
-        color="neutral"
-        variant="ghost"
-        class="w-full justify-center sm:w-auto sm:ml-auto"
-        @click="open = false"
-      />
+      <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full">
+        <UButton
+          label="Done"
+          color="neutral"
+          variant="ghost"
+          class="justify-center"
+          @click="open = false"
+        />
+        <UButton
+          label="Email them"
+          icon="i-lucide-mail-check"
+          color="neutral"
+          variant="outline"
+          class="justify-center"
+          :disabled="!status"
+          :loading="notifying"
+          @click="emit('notify')"
+        />
+      </div>
     </template>
   </UModal>
 </template>

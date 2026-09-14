@@ -78,4 +78,20 @@ describe('GuestRsvpModal', () => {
     await flushPromises()
     expect(w.emitted('update:open')?.at(-1)).toEqual([false])
   })
+
+  it('cannot email a confirmation until they have an answer on file', async () => {
+    await mountSuspended(GuestRsvpModal, { props: { open: true, invite: base, counts } })
+    await flushPromises()
+    expect(buttonNamed('Email them')!.disabled).toBe(true)
+  })
+
+  it('emits notify to email them their recorded answer', async () => {
+    const w = await mountSuspended(GuestRsvpModal, { props: { open: true, invite: { ...base, rsvp: 'going' }, counts } })
+    await flushPromises()
+    const email = buttonNamed('Email them')!
+    expect(email.disabled).toBe(false)
+    email.click()
+    await flushPromises()
+    expect(w.emitted('notify')).toHaveLength(1)
+  })
 })
