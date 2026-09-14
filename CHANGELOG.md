@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.21.0...v1.22.0) (2026-09-14)
+
+
+### Features
+
+* admins can RSVP (and +1) on a guest's behalf ([#192](https://github.com/patrickisgreat/benteen-screen/issues/192)) ([9b5f045](https://github.com/patrickisgreat/benteen-screen/commit/9b5f045a9ef189d40c836d6bb5c15878b12c71ea))
+
 ## [1.21.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.20.0...v1.21.0) (2026-09-07)
 
 
