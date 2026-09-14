@@ -9,8 +9,8 @@ interface SendResult { sent: number, failed: number, error: string | null }
 interface Toast { title?: string, description?: string, color?: string }
 
 const invites = ref([
-  { id: 'a', event_id: 'e', email: 'pat@x.com', display_name: 'Pat', token: '1', rsvp: 'going', rsvp_at: null, invited_by: null, resend_id: null, sent_at: 't', delivered_at: null, opened_at: null, clicked_at: null, bounced_at: null, created_at: '' },
-  { id: 'b', event_id: 'e', email: 'sam@x.com', display_name: 'Sam', token: '2', rsvp: null, rsvp_at: null, invited_by: null, resend_id: null, sent_at: null, delivered_at: null, opened_at: null, clicked_at: null, bounced_at: null, created_at: '' }
+  { id: 'a', event_id: 'e', email: 'pat@x.com', display_name: 'Pat', token: '1', rsvp: 'going', rsvp_at: null, plus_ones: 0, invited_by: null, resend_id: null, sent_at: 't', delivered_at: null, opened_at: null, clicked_at: null, bounced_at: null, created_at: '' },
+  { id: 'b', event_id: 'e', email: 'sam@x.com', display_name: 'Sam', token: '2', rsvp: null, rsvp_at: null, plus_ones: 0, invited_by: null, resend_id: null, sent_at: null, delivered_at: null, opened_at: null, clicked_at: null, bounced_at: null, created_at: '' }
 ])
 const sendFn = vi.fn<() => Promise<SendResult>>(async () => ({ sent: 0, failed: 0, error: null }))
 const remindFn = vi.fn<() => Promise<SendResult>>(async () => ({ sent: 0, failed: 0, error: null }))
@@ -18,6 +18,8 @@ const removeMany = vi.fn(async () => {})
 const seedFn = vi.fn(async () => 0)
 const addFn = vi.fn(async (_email: string, _name?: string) => {})
 const saveOptionsFn = vi.fn(async () => {})
+const setRsvpFn = vi.fn(async (_inviteId: string, _status: string | null, _plusOnes: number) => {})
+const notifyRsvpFn = vi.fn<(inviteId: string) => Promise<SendResult>>(async () => ({ sent: 1, failed: 0, error: null }))
 const toasts: Toast[] = []
 
 const eventObj = {
@@ -44,7 +46,9 @@ mockNuxtImport('useEventInvites', () => () => ({
   removeInvites: removeMany,
   seedFromLastEvent: seedFn,
   sendInvites: sendFn,
-  remindNonResponders: remindFn
+  remindNonResponders: remindFn,
+  setRsvp: setRsvpFn,
+  notifyRsvp: notifyRsvpFn
 }))
 mockNuxtImport('useToast', () => () => ({ add: (t: Toast) => toasts.push(t) }))
 mockNuxtImport('useGuestDirectory', () => () => ({
@@ -74,7 +78,11 @@ const clickSend = async (w: { findAll: (s: string) => Array<{ text: () => string
 }
 
 beforeEach(() => {
+  document.body.innerHTML = ''
   toasts.length = 0
+  setRsvpFn.mockReset()
+  notifyRsvpFn.mockReset()
+  notifyRsvpFn.mockResolvedValue({ sent: 1, failed: 0, error: null })
   sendFn.mockReset()
   sendFn.mockResolvedValue({ sent: 0, failed: 0, error: null })
   remindFn.mockReset()
@@ -232,5 +240,61 @@ describe('EventInviteManager', () => {
     remindFn.mockResolvedValueOnce({ sent: 0, failed: 2, error: 'Unverified domain' })
     await clickRemind()
     expect(toasts.at(-1)).toMatchObject({ title: 'Could not send reminders', description: 'Unverified domain', color: 'error' })
+  })
+
+  // The modal teleports to <body>; find its buttons there.
+  function bodyButton(text: string): HTMLButtonElement | undefined {
+    return [...document.querySelectorAll('button')].find(b => b.textContent?.includes(text))
+  }
+
+  it('shows the guest count on a going badge', async () => {
+    const prev = invites.value
+    invites.value = [{ ...prev[0]!, plus_ones: 2 }]
+    try {
+      const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e' } })
+      expect(w.text()).toContain('Going +2')
+    } finally {
+      invites.value = prev
+    }
+  })
+
+  it('opens the RSVP-for-them modal from a guest row and saves the tapped answer', async () => {
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e' } })
+    await w.get('[aria-label="RSVP for Sam"]').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('RSVP for Sam')
+    bodyButton('Maybe')!.click()
+    await flushPromises()
+    expect(setRsvpFn).toHaveBeenCalledWith('b', 'maybe', 0)
+  })
+
+  it('surfaces a failed on-behalf RSVP as an error toast', async () => {
+    setRsvpFn.mockRejectedValueOnce(new Error('Admins only'))
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e' } })
+    await w.get('[aria-label="RSVP for Sam"]').trigger('click')
+    await flushPromises()
+    bodyButton('Going')!.click()
+    await flushPromises()
+    expect(toasts.at(-1)).toMatchObject({ title: 'Could not save Sam\'s RSVP', description: 'Admins only', color: 'error' })
+  })
+
+  it('emails the guest a confirmation of their recorded answer', async () => {
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e' } })
+    await w.get('[aria-label="RSVP for Pat"]').trigger('click') // Pat is already going
+    await flushPromises()
+    bodyButton('Email them')!.click()
+    await flushPromises()
+    expect(notifyRsvpFn).toHaveBeenCalledWith('a')
+    expect(toasts.at(-1)).toMatchObject({ title: 'Confirmation emailed to Pat', color: 'success' })
+  })
+
+  it('shows why a confirmation email failed instead of a fake success', async () => {
+    notifyRsvpFn.mockResolvedValueOnce({ sent: 0, failed: 1, error: 'Domain not verified' })
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e' } })
+    await w.get('[aria-label="RSVP for Pat"]').trigger('click')
+    await flushPromises()
+    bodyButton('Email them')!.click()
+    await flushPromises()
+    expect(toasts.at(-1)).toMatchObject({ title: 'Could not email Pat', description: 'Domain not verified', color: 'error' })
   })
 })

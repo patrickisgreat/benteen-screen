@@ -1,6 +1,7 @@
 import type { MaybeRefOrGetter } from 'vue'
 import type { Database } from '~/types/database.types'
 import type { EventInvite, InviteStats } from '#shared/types/event-invite'
+import type { RsvpStatus } from '#shared/types/rsvp'
 
 /**
  * Admin-only per-event guest list (public.event_invites). Loads the invitees for
@@ -152,6 +153,28 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     return { sent: result.sent, failed: result.failed, error: result.error }
   }
 
+  /** RSVP on a guest's behalf (admin-only route): sets their reply + guest count,
+   *  or clears it with a null status. Mirrors into the member's in-app RSVP when
+   *  the email belongs to a member. */
+  async function setRsvp(inviteId: string, status: RsvpStatus | null, plusOnes: number): Promise<void> {
+    const id = toValue(eventId)
+    if (!id) return
+    await $fetch(`/api/events/${id}/invites/${inviteId}/rsvp`, { method: 'POST', body: { status, plusOnes } })
+    await refresh()
+  }
+
+  /** Email a guest that the admin recorded their RSVP, with links to change it.
+   *  Returns sent/failed + the failure reason so the UI can show why. */
+  async function notifyRsvp(inviteId: string): Promise<{ sent: number, failed: number, error: string | null }> {
+    const id = toValue(eventId)
+    if (!id) return { sent: 0, failed: 0, error: null }
+    const result = await $fetch<{ ok: boolean, sent: number, failed: number, error: string | null }>(
+      `/api/events/${id}/invites/${inviteId}/rsvp-confirmation`,
+      { method: 'POST' }
+    )
+    return { sent: result.sent, failed: result.failed, error: result.error }
+  }
+
   // Live updates as RSVPs / opens land (event_invites is in the realtime publication).
   let channel: ReturnType<typeof supabase.channel> | null = null
   watch(() => toValue(eventId), (id) => {
@@ -173,5 +196,5 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     if (channel) supabase.removeChannel(channel)
   })
 
-  return { invites, pending, stats, refresh, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders }
+  return { invites, pending, stats, refresh, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders, setRsvp, notifyRsvp }
 }

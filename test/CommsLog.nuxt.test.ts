@@ -63,4 +63,9 @@ describe('CommsLog', () => {
     const w = await mountSuspended(CommsLog, { props: { entries: [] } })
     expect(w.text()).toContain('Nothing sent yet')
   })
+
+  it('labels an RSVP confirmation send', async () => {
+    const w = await mountSuspended(CommsLog, { props: { entries: [entry({ kind: 'rsvp_confirmation', subject: null })] } })
+    expect(w.text()).toContain('RSVP confirmation')
+  })
 })

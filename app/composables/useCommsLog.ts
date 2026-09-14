@@ -2,12 +2,12 @@ import type { MaybeRefOrGetter } from 'vue'
 import type { CommsStatus } from '#shared/utils/comms'
 import type { Database } from '~/types/database.types'
 
-export type CommsLogKind = 'announcement' | 'invite' | 'reminder'
+export type CommsLogKind = 'announcement' | 'invite' | 'reminder' | 'rsvp_confirmation'
 
-const KINDS: readonly CommsLogKind[] = ['announcement', 'invite', 'reminder']
+const KINDS: readonly CommsLogKind[] = ['announcement', 'invite', 'reminder', 'rsvp_confirmation']
 const STATUSES: readonly CommsStatus[] = ['sent', 'partial', 'failed']
 
-/** One sent communication (announcement, invite blast, or reminder) for an event. */
+/** One sent communication (announcement, invite blast, reminder, or RSVP confirmation) for an event. */
 export interface CommsLogEntry {
   id: string
   kind: CommsLogKind

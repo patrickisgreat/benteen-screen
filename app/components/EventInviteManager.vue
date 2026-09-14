@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import type { EventInvite } from '#shared/types/event-invite'
 import type { MovieEvent } from '#shared/types/event'
+import type { RsvpStatus } from '#shared/types/rsvp'
 import { INVITE_ACCENTS, INVITE_THEMES, type InviteAccent, type InviteOptions, type InviteTheme } from '#shared/types/invite-options'
 
 // Admin guest-list manager + Evite tracker + e-vite editor for one event. Lets
 // admins customize the invite (theme/accent/message/toggles with a live preview),
 // add guests (live-searching the club directory via GuestPicker) / remove them,
-// pull last event's list in on demand, send tokenized e-vites, and shows live
-// RSVP / open / click tracking.
+// pull last event's list in on demand, send tokenized e-vites, RSVP (and +1) on
+// a guest's behalf, and shows live RSVP / open / click tracking.
 const props = defineProps<{ eventId: string, event?: MovieEvent | null }>()
 const toast = useToast()
-const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders } = useEventInvites(() => props.eventId)
+const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders, setRsvp, notifyRsvp } = useEventInvites(() => props.eventId)
 const { save: saveInviteOptions } = useInviteOptions(() => props.eventId)
 const { setEnabled: setRemindersEnabled } = useEventReminders(() => props.eventId)
 
@@ -33,6 +34,51 @@ async function onToggleReminders(value: boolean): Promise<void> {
 // `stats.*` above is the email funnel only (invited/opened/clicked); these are the
 // reconciled headcounts the admin actually plans around.
 const { roster } = useEventRsvps(() => props.eventId)
+
+// --- RSVP on a guest's behalf ---------------------------------------------
+// Tracks which row is being answered for; the modal reads the live invite so it
+// reflects each save (realtime / refresh) without local copies.
+const rsvpForId = ref<string | null>(null)
+const rsvpOpen = ref(false)
+const notifying = ref(false)
+const rsvpFor = computed(() => invites.value.find(i => i.id === rsvpForId.value) ?? null)
+const rosterCounts = computed(() => ({
+  going: roster.value.going.length,
+  maybe: roster.value.maybe.length,
+  no: roster.value.no.length,
+  guests: Math.max(0, roster.value.headcount - roster.value.going.length)
+}))
+
+function openRsvpFor(invite: EventInvite): void {
+  rsvpForId.value = invite.id
+  rsvpOpen.value = true
+}
+
+async function onSetRsvp(status: RsvpStatus | null, plusOnes: number): Promise<void> {
+  const invite = rsvpFor.value
+  if (!invite) return
+  try {
+    await setRsvp(invite.id, status, plusOnes)
+  } catch (error) {
+    toast.add({ title: `Could not save ${invite.display_name || invite.email}'s RSVP`, description: error instanceof Error ? error.message : undefined, color: 'error' })
+  }
+}
+
+async function onNotifyRsvp(): Promise<void> {
+  const invite = rsvpFor.value
+  if (!invite) return
+  const name = invite.display_name || invite.email
+  notifying.value = true
+  try {
+    const { sent, error } = await notifyRsvp(invite.id)
+    if (sent) toast.add({ title: `Confirmation emailed to ${name}`, icon: 'i-lucide-mail-check', color: 'success' })
+    else toast.add({ title: `Could not email ${name}`, description: error ?? undefined, color: 'error' })
+  } catch (error) {
+    toast.add({ title: `Could not email ${name}`, description: error instanceof Error ? error.message : undefined, color: 'error' })
+  } finally {
+    notifying.value = false
+  }
+}
 
 const sending = ref(false)
 const seeding = ref(false)
@@ -220,7 +266,7 @@ async function onSend(): Promise<void> {
 const unsent = computed(() => invites.value.filter(i => !i.sent_at).length)
 
 function statusBadge(invite: EventInvite): { label: string, color: 'success' | 'warning' | 'neutral' | 'info' } {
-  if (invite.rsvp === 'going') return { label: 'Going', color: 'success' }
+  if (invite.rsvp === 'going') return { label: invite.plus_ones > 0 ? `Going +${invite.plus_ones}` : 'Going', color: 'success' }
   if (invite.rsvp === 'maybe') return { label: 'Maybe', color: 'warning' }
   if (invite.rsvp === 'no') return { label: 'Can\'t make it', color: 'neutral' }
   // Nudged but still no reply — so admins can see who's been reminded (and not double-send).
@@ -452,6 +498,15 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
         </div>
         <UBadge :label="statusBadge(invite).label" :color="statusBadge(invite).color" variant="subtle" size="sm" class="shrink-0" />
         <UButton
+          icon="i-lucide-user-check"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          :aria-label="`RSVP for ${invite.display_name || invite.email}`"
+          class="shrink-0"
+          @click="openRsvpFor(invite)"
+        />
+        <UButton
           icon="i-lucide-link"
           color="neutral"
           variant="ghost"
@@ -474,5 +529,14 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
     <p v-else class="text-sm text-muted">
       No guests yet — search for people above, or pull in last event's list.
     </p>
+
+    <GuestRsvpModal
+      v-model:open="rsvpOpen"
+      :invite="rsvpFor"
+      :counts="rosterCounts"
+      :notifying="notifying"
+      @set="onSetRsvp"
+      @notify="onNotifyRsvp"
+    />
   </div>
 </template>
