@@ -11,7 +11,7 @@ import { INVITE_ACCENTS, INVITE_THEMES, type InviteAccent, type InviteOptions, t
 // a guest's behalf, and shows live RSVP / open / click tracking.
 const props = defineProps<{ eventId: string, event?: MovieEvent | null }>()
 const toast = useToast()
-const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders, setRsvp } = useEventInvites(() => props.eventId)
+const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders, setRsvp, notifyRsvp } = useEventInvites(() => props.eventId)
 const { save: saveInviteOptions } = useInviteOptions(() => props.eventId)
 const { setEnabled: setRemindersEnabled } = useEventReminders(() => props.eventId)
 
@@ -40,6 +40,7 @@ const { roster } = useEventRsvps(() => props.eventId)
 // reflects each save (realtime / refresh) without local copies.
 const rsvpForId = ref<string | null>(null)
 const rsvpOpen = ref(false)
+const notifying = ref(false)
 const rsvpFor = computed(() => invites.value.find(i => i.id === rsvpForId.value) ?? null)
 const rosterCounts = computed(() => ({
   going: roster.value.going.length,
@@ -60,6 +61,22 @@ async function onSetRsvp(status: RsvpStatus | null, plusOnes: number): Promise<v
     await setRsvp(invite.id, status, plusOnes)
   } catch (error) {
     toast.add({ title: `Could not save ${invite.display_name || invite.email}'s RSVP`, description: error instanceof Error ? error.message : undefined, color: 'error' })
+  }
+}
+
+async function onNotifyRsvp(): Promise<void> {
+  const invite = rsvpFor.value
+  if (!invite) return
+  const name = invite.display_name || invite.email
+  notifying.value = true
+  try {
+    const { sent, error } = await notifyRsvp(invite.id)
+    if (sent) toast.add({ title: `Confirmation emailed to ${name}`, icon: 'i-lucide-mail-check', color: 'success' })
+    else toast.add({ title: `Could not email ${name}`, description: error ?? undefined, color: 'error' })
+  } catch (error) {
+    toast.add({ title: `Could not email ${name}`, description: error instanceof Error ? error.message : undefined, color: 'error' })
+  } finally {
+    notifying.value = false
   }
 }
 
@@ -517,7 +534,9 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
       v-model:open="rsvpOpen"
       :invite="rsvpFor"
       :counts="rosterCounts"
+      :notifying="notifying"
       @set="onSetRsvp"
+      @notify="onNotifyRsvp"
     />
   </div>
 </template>

@@ -19,6 +19,7 @@ const seedFn = vi.fn(async () => 0)
 const addFn = vi.fn(async (_email: string, _name?: string) => {})
 const saveOptionsFn = vi.fn(async () => {})
 const setRsvpFn = vi.fn(async (_inviteId: string, _status: string | null, _plusOnes: number) => {})
+const notifyRsvpFn = vi.fn<(inviteId: string) => Promise<SendResult>>(async () => ({ sent: 1, failed: 0, error: null }))
 const toasts: Toast[] = []
 
 const eventObj = {
@@ -46,7 +47,8 @@ mockNuxtImport('useEventInvites', () => () => ({
   seedFromLastEvent: seedFn,
   sendInvites: sendFn,
   remindNonResponders: remindFn,
-  setRsvp: setRsvpFn
+  setRsvp: setRsvpFn,
+  notifyRsvp: notifyRsvpFn
 }))
 mockNuxtImport('useToast', () => () => ({ add: (t: Toast) => toasts.push(t) }))
 mockNuxtImport('useGuestDirectory', () => () => ({
@@ -79,6 +81,8 @@ beforeEach(() => {
   document.body.innerHTML = ''
   toasts.length = 0
   setRsvpFn.mockReset()
+  notifyRsvpFn.mockReset()
+  notifyRsvpFn.mockResolvedValue({ sent: 1, failed: 0, error: null })
   sendFn.mockReset()
   sendFn.mockResolvedValue({ sent: 0, failed: 0, error: null })
   remindFn.mockReset()
@@ -272,5 +276,25 @@ describe('EventInviteManager', () => {
     bodyButton('Going')!.click()
     await flushPromises()
     expect(toasts.at(-1)).toMatchObject({ title: 'Could not save Sam\'s RSVP', description: 'Admins only', color: 'error' })
+  })
+
+  it('emails the guest a confirmation of their recorded answer', async () => {
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e' } })
+    await w.get('[aria-label="RSVP for Pat"]').trigger('click') // Pat is already going
+    await flushPromises()
+    bodyButton('Email them')!.click()
+    await flushPromises()
+    expect(notifyRsvpFn).toHaveBeenCalledWith('a')
+    expect(toasts.at(-1)).toMatchObject({ title: 'Confirmation emailed to Pat', color: 'success' })
+  })
+
+  it('shows why a confirmation email failed instead of a fake success', async () => {
+    notifyRsvpFn.mockResolvedValueOnce({ sent: 0, failed: 1, error: 'Domain not verified' })
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e' } })
+    await w.get('[aria-label="RSVP for Pat"]').trigger('click')
+    await flushPromises()
+    bodyButton('Email them')!.click()
+    await flushPromises()
+    expect(toasts.at(-1)).toMatchObject({ title: 'Could not email Pat', description: 'Domain not verified', color: 'error' })
   })
 })
