@@ -73,7 +73,7 @@ beforeEach(() => {
   fetches.length = 0
   vi.stubGlobal('$fetch', (url: string, opts: FetchCall['opts']) => {
     fetches.push({ url, opts })
-    return Promise.resolve({ ok: true, status: 'going', plusOnes: 0 })
+    return Promise.resolve({ ok: true, status: 'going', plusOnes: 0, sent: 1, failed: 0, error: null })
   })
   list = []
   eventsList = []
@@ -222,5 +222,13 @@ describe('useEventInvites', () => {
     await flushPromises()
     await setRsvp('inv-1', 'going', 0)
     expect(fetches).toHaveLength(0)
+  })
+
+  it('notifyRsvp posts to the confirmation route and returns the send result', async () => {
+    const { notifyRsvp } = useEventInvites(ref('e'))
+    await flushPromises()
+    const result = await notifyRsvp('inv-1')
+    expect(fetches[0]).toMatchObject({ url: '/api/events/e/invites/inv-1/rsvp-confirmation', opts: { method: 'POST' } })
+    expect(result).toEqual({ sent: 1, failed: 0, error: null })
   })
 })
