@@ -7,6 +7,7 @@ import {
   buildEventInviteEmail,
   buildEventReminderEmail,
   buildInviteEmail,
+  buildRsvpConfirmationEmail,
   escapeHtml,
   formatEmailDate,
   htmlToText,
@@ -106,6 +107,54 @@ describe('buildEventInviteEmail', () => {
     const m = buildEventInviteEmail({ eventTitle: 'Jaws', eventDate: null, inviterName: null, rsvpUrl: 'https://x/rsvp?token=abc', appUrl: 'https://x/overview', options: opts({}) })
     expect(m.html).toContain('https://x/overview')
     expect(m.text).toContain('https://x/overview')
+  })
+})
+
+describe('buildRsvpConfirmationEmail', () => {
+  const base = { eventTitle: 'Jaws', eventDate: 'Friday, July 4', hostName: 'Pat', rsvpUrl: 'https://x/rsvp?token=abc' }
+
+  it('tells them the host marked them going with their guest count', () => {
+    const m = buildRsvpConfirmationEmail({ ...base, status: 'going', plusOnes: 2 })
+    expect(m.subject).toBe('You\'re on the list for Jaws')
+    expect(m.html).toContain('Pat marked you as <strong>Going +2 guests</strong>')
+    expect(m.text).toContain('Pat marked you as Going +2 guests')
+  })
+
+  it('singularizes one guest and omits guests when none', () => {
+    expect(buildRsvpConfirmationEmail({ ...base, status: 'going', plusOnes: 1 }).text).toContain('Going +1 guest.')
+    expect(buildRsvpConfirmationEmail({ ...base, status: 'going', plusOnes: 0 }).text).toContain('marked you as Going.')
+  })
+
+  it('never mentions guests for maybe / no, and words the subject per answer', () => {
+    const maybe = buildRsvpConfirmationEmail({ ...base, status: 'maybe', plusOnes: 3 })
+    expect(maybe.subject).toBe('You\'re down as a maybe for Jaws')
+    expect(maybe.text).toContain('marked you as Maybe.')
+    const no = buildRsvpConfirmationEmail({ ...base, status: 'no', plusOnes: 3 })
+    expect(no.subject).toBe('We\'ve noted you can\'t make Jaws')
+    expect(no.text).toContain('marked you as Can\'t make it.')
+  })
+
+  it('includes the one-click links so they can change the answer without signing in', () => {
+    const m = buildRsvpConfirmationEmail({ ...base, status: 'going', plusOnes: 0 })
+    expect(m.html).toContain('https://x/rsvp?token=abc&amp;status=going')
+    expect(m.html).toContain('https://x/rsvp?token=abc&amp;status=no')
+    expect(m.text).toContain('Maybe: https://x/rsvp?token=abc&status=maybe')
+  })
+
+  it('points members at the app to change it there, and leaves that out for email-only guests', () => {
+    const member = buildRsvpConfirmationEmail({ ...base, status: 'going', plusOnes: 0, appUrl: 'https://x/overview' })
+    expect(member.html).toContain('https://x/overview')
+    expect(member.text).toContain('sign in to the app')
+    const guest = buildRsvpConfirmationEmail({ ...base, status: 'going', plusOnes: 0, appUrl: null })
+    expect(guest.html).not.toContain('sign in')
+    expect(guest.text).not.toContain('sign in')
+  })
+
+  it('falls back to "Your host" and escapes a crafted host name', () => {
+    expect(buildRsvpConfirmationEmail({ ...base, hostName: null, status: 'no', plusOnes: 0 }).html).toContain('Your host RSVP')
+    const m = buildRsvpConfirmationEmail({ ...base, hostName: '<img onerror=x>', status: 'no', plusOnes: 0 })
+    expect(m.html).not.toContain('<img')
+    expect(m.html).toContain('&lt;img')
   })
 })
 

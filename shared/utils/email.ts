@@ -1,4 +1,5 @@
 import { DEFAULT_INVITE_OPTIONS, type InviteAccent, type InviteOptions, type InviteTheme } from '#shared/types/invite-options'
+import type { RsvpStatus } from '#shared/types/rsvp'
 
 /** Escape user-supplied text before it goes into email HTML (no injection). */
 export function escapeHtml(input: string): string {
@@ -129,6 +130,18 @@ export function buildAnnounceEmail(opts: {
   return { subject, html, text }
 }
 
+/** The three one-click RSVP buttons (going / maybe / no) off a tokenized base link. */
+function oneClickRsvpButtons(rsvpUrl: string): string {
+  const button = (status: RsvpStatus, label: string, bg: string): string =>
+    `<a href="${escapeHtml(`${rsvpUrl}&status=${status}`)}" style="display:inline-block;background:${bg};color:#fff;text-decoration:none;padding:11px 18px;border-radius:8px;font-weight:600;font-size:15px;margin:0 8px 8px 0">${escapeHtml(label)}</a>`
+  return button('going', 'I\'m going', '#16a34a') + button('maybe', 'Maybe', '#6b7280') + button('no', 'Can\'t make it', '#374151')
+}
+
+/** Plain-text twin of `oneClickRsvpButtons`. */
+function oneClickRsvpText(rsvpUrl: string): string {
+  return `Going: ${rsvpUrl}&status=going\nMaybe: ${rsvpUrl}&status=maybe\nCan't make it: ${rsvpUrl}&status=no`
+}
+
 /** Nudge an invitee who hasn't RSVP'd yet. Same one-click RSVP buttons as the
  *  e-vite (token in the query — no sign-in); `daysLeft` drives the urgency copy. */
 export function buildEventReminderEmail(opts: {
@@ -143,9 +156,6 @@ export function buildEventReminderEmail(opts: {
   const heading = last ? 'Last call' : 'Don\'t forget to RSVP'
   const subject = last ? `Last call: RSVP for ${opts.eventTitle}` : `Reminder: RSVP for ${opts.eventTitle}`
 
-  const rsvp = (status: string, label: string, bg: string): string =>
-    `<a href="${escapeHtml(`${opts.rsvpUrl}&status=${status}`)}" style="display:inline-block;background:${bg};color:#fff;text-decoration:none;padding:11px 18px;border-radius:8px;font-weight:600;font-size:15px;margin:0 8px 8px 0">${escapeHtml(label)}</a>`
-
   const lineup = opts.appUrl
     ? `<p style="margin:20px 0 0;font-size:14px"><a href="${escapeHtml(opts.appUrl)}" style="color:#16a34a;font-weight:600;text-decoration:none">See the lineup &amp; vote →</a></p>`
     : ''
@@ -154,13 +164,67 @@ export function buildEventReminderEmail(opts: {
     `<h1 style="font-size:20px;margin:0 0 4px">${heading} 🎬</h1>`
     + `<p style="color:#6b7280;margin:0 0 16px"><strong>${escapeHtml(opts.eventTitle)}</strong>${opts.eventDate ? ` — ${escapeHtml(opts.eventDate)}` : ''}</p>`
     + `<p>Movie Night is ${when} and we haven't heard from you yet. Are you in?</p>`
-    + `<p style="margin:22px 0 4px">${rsvp('going', 'I\'m going', '#16a34a')}${rsvp('maybe', 'Maybe', '#6b7280')}${rsvp('no', 'Can\'t make it', '#374151')}</p>`
+    + `<p style="margin:22px 0 4px">${oneClickRsvpButtons(opts.rsvpUrl)}</p>`
     + lineup
   )
   const text = `${heading} — ${opts.eventTitle}${opts.eventDate ? ` (${opts.eventDate})` : ''}.`
     + `\n\nMovie Night is ${when} and we haven't heard from you yet.`
-    + `\n\nRSVP:\nGoing: ${opts.rsvpUrl}&status=going\nMaybe: ${opts.rsvpUrl}&status=maybe\nCan't make it: ${opts.rsvpUrl}&status=no`
+    + `\n\nRSVP:\n${oneClickRsvpText(opts.rsvpUrl)}`
     + (opts.appUrl ? `\n\nSee the lineup & vote: ${opts.appUrl}` : '')
+  return { subject, html, text }
+}
+
+const CONFIRMATION_SUBJECT: Record<RsvpStatus, (title: string) => string> = {
+  going: title => `You're on the list for ${title}`,
+  maybe: title => `You're down as a maybe for ${title}`,
+  no: title => `We've noted you can't make ${title}`
+}
+
+const CONFIRMATION_ANSWER: Record<RsvpStatus, string> = {
+  going: 'Going',
+  maybe: 'Maybe',
+  no: 'Can\'t make it'
+}
+
+/**
+ * Tells a guest that the host recorded an RSVP on their behalf (they said so in
+ * person, at a party, over text…) and how to change it: the same one-click links
+ * as the e-vite, plus the app when they're a member. `plusOnes` only shows for
+ * going; `appUrl` null means email-only guest (no sign-in to point at).
+ */
+export function buildRsvpConfirmationEmail(opts: {
+  eventTitle: string
+  eventDate: string | null
+  hostName: string | null
+  status: RsvpStatus
+  plusOnes: number
+  rsvpUrl: string // base: https://site/rsvp?token=abc
+  appUrl?: string | null
+}): BuiltEmail {
+  const host = opts.hostName ?? 'Your host'
+  const guests = opts.status === 'going' && opts.plusOnes > 0
+    ? ` +${opts.plusOnes} guest${opts.plusOnes === 1 ? '' : 's'}`
+    : ''
+  const answer = `${CONFIRMATION_ANSWER[opts.status]}${guests}`
+  const subject = CONFIRMATION_SUBJECT[opts.status](opts.eventTitle)
+  const when = opts.eventDate ? ` — ${escapeHtml(opts.eventDate)}` : ''
+
+  const app = opts.appUrl
+    ? `<p style="margin:20px 0 0;font-size:14px">Or <a href="${escapeHtml(opts.appUrl)}" style="color:#16a34a;font-weight:600;text-decoration:none">sign in to the app</a> to change it there, see the lineup and vote.</p>`
+    : ''
+
+  const html = shell(
+    `<h1 style="font-size:20px;margin:0 0 4px">${escapeHtml(host)} RSVP'd for you 🎬</h1>`
+    + `<p style="color:#6b7280;margin:0 0 16px"><strong>${escapeHtml(opts.eventTitle)}</strong>${when}</p>`
+    + `<p>${escapeHtml(host)} marked you as <strong>${escapeHtml(answer)}</strong>. If that's right, you're all set — nothing to do.</p>`
+    + `<p style="margin:18px 0 4px">Not right? Change it any time with one click:</p>`
+    + `<p style="margin:0 0 4px">${oneClickRsvpButtons(opts.rsvpUrl)}</p>`
+    + app
+  )
+  const text = `${host} RSVP'd for you — ${opts.eventTitle}${opts.eventDate ? ` (${opts.eventDate})` : ''}.`
+    + `\n\n${host} marked you as ${answer}. If that's right, you're all set.`
+    + `\n\nNot right? Change it any time:\n${oneClickRsvpText(opts.rsvpUrl)}`
+    + (opts.appUrl ? `\n\nOr sign in to the app to change it, see the lineup and vote: ${opts.appUrl}` : '')
   return { subject, html, text }
 }
 
