@@ -117,6 +117,47 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('event_invites').delete().eq('event_id', eventId)
   })
 
+  it('an admin can RSVP (and +1) on another member\'s behalf; a member cannot', async () => {
+    const adminClient = await signInAs(adminEmail)
+    const emailT = `rls_behalf_${stamp}@example.com`
+    const uidT = await makeUser(emailT)
+    await admin!.from('invites').insert({ email: emailT })
+    // Their e-vite row starts with no reply.
+    await admin!.from('event_invites').insert({ event_id: eventId, email: emailT })
+
+    // A member can't create anyone else's row.
+    const memberInsert = await memberClient.from('rsvps').insert({ event_id: eventId, user_id: uidT, status: 'going' })
+    expect(memberInsert.error, 'a member must not RSVP for someone else').toBeTruthy()
+
+    // The admin writes under their own session (RLS, not the service role).
+    const ins = await adminClient
+      .from('rsvps')
+      .upsert({ event_id: eventId, user_id: uidT, status: 'going', plus_ones: 2 }, { onConflict: 'event_id,user_id' })
+    expect(ins.error, 'an admin can record going +2 for a member').toBeNull()
+    // The e-vite mirror trigger fires exactly as on a self write.
+    const evite = await admin!.from('event_invites').select('rsvp').eq('event_id', eventId).eq('email', emailT).single()
+    expect(evite.data!.rsvp, 'the e-vite row mirrors the admin-recorded reply').toBe('going')
+
+    // A member can neither change nor remove it (RLS matches zero rows).
+    await memberClient.from('rsvps').update({ status: 'no' }).eq('event_id', eventId).eq('user_id', uidT)
+    await memberClient.from('rsvps').delete().eq('event_id', eventId).eq('user_id', uidT)
+    const still = await admin!.from('rsvps').select('status, plus_ones').eq('event_id', eventId).eq('user_id', uidT).single()
+    expect(still.data, 'a member write on someone else\'s row is a no-op').toEqual({ status: 'going', plus_ones: 2 })
+
+    // The admin can change it, then clear it back to "no reply".
+    const upd = await adminClient.from('rsvps').update({ status: 'maybe', plus_ones: 0 }).eq('event_id', eventId).eq('user_id', uidT)
+    expect(upd.error, 'an admin can change the reply').toBeNull()
+    const del = await adminClient.from('rsvps').delete().eq('event_id', eventId).eq('user_id', uidT)
+    expect(del.error, 'an admin can clear the reply').toBeNull()
+    const gone = await admin!.from('rsvps').select('status').eq('event_id', eventId).eq('user_id', uidT)
+    expect(gone.data ?? [], 'the row is gone').toHaveLength(0)
+    const cleared = await admin!.from('event_invites').select('rsvp').eq('event_id', eventId).eq('email', emailT).single()
+    expect(cleared.data!.rsvp, 'clearing puts the e-vite row back to no reply').toBeNull()
+
+    await admin!.from('event_invites').delete().eq('event_id', eventId).eq('email', emailT)
+    await admin!.from('invites').delete().eq('email', emailT)
+  })
+
   it('the total invite cap blocks an over-limit member invite but exempts admin/seed', async () => {
     const { count } = await admin!.from('invites').select('*', { count: 'exact', head: true })
     // Set the cap to the current size so the next member-issued invite is over-limit.
