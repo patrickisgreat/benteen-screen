@@ -31,7 +31,7 @@ const STATUS = {
               {{ e.subject || KIND[e.kind].label }}
             </p>
             <p class="text-xs text-muted">
-              {{ KIND[e.kind].label }}<span v-if="e.scope"> · {{ e.scope }}</span>
+              {{ KIND[e.kind].label }}<span v-if="e.scope"> · {{ announceScopeLabel(e.scope) }}</span>
               · {{ e.recipientCount }} recipient{{ e.recipientCount === 1 ? '' : 's' }}
               <span v-if="e.failedCount"> · {{ e.failedCount }} failed</span>
               <span v-if="e.sentByName"> · by {{ e.sentByName }}</span>

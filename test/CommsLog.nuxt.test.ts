@@ -20,11 +20,21 @@ describe('CommsLog', () => {
     const w = await mountSuspended(CommsLog, { props: { entries } })
     expect(w.text()).toContain('See you Friday')
     expect(w.text()).toContain('Announcement')
-    expect(w.text()).toContain('going')
+    expect(w.text()).toContain('Going')
     expect(w.text()).toContain('12 recipients')
     expect(w.text()).toContain('by Pat')
     expect(w.text()).toContain('E-vite — Movie Night')
     expect(w.text()).toContain('30 recipients')
+  })
+
+  it('reads a stored scope back in the words the composer used', async () => {
+    const w = await mountSuspended(CommsLog, { props: { entries: [entry({ scope: 'no_reply' })] } })
+    expect(w.text()).toContain('Haven\'t replied')
+  })
+
+  it('shows a retired scope\'s raw value rather than nothing at all', async () => {
+    const w = await mountSuspended(CommsLog, { props: { entries: [entry({ scope: 'some_old_scope' })] } })
+    expect(w.text()).toContain('some_old_scope')
   })
 
   it('singularizes one recipient', async () => {
