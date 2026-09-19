@@ -1,5 +1,6 @@
 import { serverSupabaseClient } from '#supabase/server'
 import { z } from 'zod'
+import { ANNOUNCE_SCOPE_VALUES } from '#shared/utils/announce'
 import type { Database } from '~/types/database.types'
 
 const bodySchema = z.object({
@@ -8,19 +9,22 @@ const bodySchema = z.object({
   // Rich HTML from the composer's editor (markup inflates length — hence 10k);
   // must have actual text, not just empty tags. Sanitized in buildAnnounceEmail.
   message: z.string().max(10000).refine(m => htmlToText(m).length > 0),
-  scope: z.enum(['members', 'going', 'invited'])
+  scope: z.enum(ANNOUNCE_SCOPE_VALUES),
+  // The addresses the admin left ticked in the composer's recipient list. Omitted
+  // means "everyone in the scope"; the server intersects it with the scope either
+  // way, so this can only narrow a blast (250 caps it above any plausible roster).
+  recipients: z.array(z.string().trim().email()).max(250).optional()
 })
 
 /**
- * Admin event blast: emails members about an event. Runs under the caller's own
+ * Admin event blast: emails an event's people about it. Runs under the caller's own
  * session (RLS): an admin is allowlisted, so they can read invites/rsvps/profiles
  * — no service role needed (a misconfigured service-role key can't break it).
  * Recipients are BCC'd so addresses aren't leaked. Resend key is server-only
  * (Invariant 2).
  *
- *  - invited: everyone on the allowlist (incl. not-yet-joined)
- *  - members: people who've actually signed in (accepted invites)
- *  - going:   people who RSVP'd "going" to this event
+ * The audience comes from `resolveAnnounceRecipients` — the same resolver behind
+ * the composer's preview — narrowed to whoever the admin left ticked.
  */
 export default defineEventHandler(async (event) => {
   const { user, userId } = await requireUser(event)
@@ -31,27 +35,13 @@ export default defineEventHandler(async (event) => {
 
   const parsed = bodySchema.safeParse(await readBody(event))
   if (!parsed.success) throw createError({ statusCode: 400, statusMessage: 'Invalid announcement' })
-  const { eventId, subject, message, scope } = parsed.data
+  const { eventId, subject, message, scope, recipients } = parsed.data
 
   const { data: ev } = await admin.from('events').select('title, event_date').eq('id', eventId).single()
   if (!ev) throw createError({ statusCode: 404, statusMessage: 'Event not found' })
 
-  let emails: string[] = []
-  if (scope === 'invited') {
-    const { data } = await admin.from('invites').select('email')
-    emails = uniqueEmails((data ?? []).map(row => row.email))
-  } else if (scope === 'members') {
-    const { data } = await admin.from('invites').select('email').not('accepted_at', 'is', null)
-    emails = uniqueEmails((data ?? []).map(row => row.email))
-  } else {
-    const { data: going } = await admin
-      .from('rsvps').select('user_id').eq('event_id', eventId).eq('status', 'going')
-    const ids = (going ?? []).map(row => row.user_id)
-    if (ids.length) {
-      const { data: profs } = await admin.from('profiles').select('email').in('id', ids)
-      emails = uniqueEmails((profs ?? []).map(profile => profile.email))
-    }
-  }
+  const audience = await resolveAnnounceRecipients(admin, eventId, scope)
+  const emails = selectRecipients(audience, recipients ?? null).map(person => person.email)
 
   if (!emails.length) return { ok: true, count: 0 }
 
