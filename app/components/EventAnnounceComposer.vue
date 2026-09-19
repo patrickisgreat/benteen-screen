@@ -2,11 +2,16 @@
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { CommsTemplate } from '#shared/types/comms-template'
+import { ANNOUNCE_SCOPES, ANNOUNCE_SCOPE_VALUES, isClubWideScope, type AnnounceScope } from '#shared/utils/announce'
 
 // Admin event blast composer → POST /api/events/announce (admin-gated server-side).
 // The message is rich text (tiptap); the server sanitizes it to a strict tag
 // allowlist before it goes into the email. Templates let a recurring blast
 // (e.g. the vote + bring-list nudge) be applied, tweaked, and re-sent later.
+//
+// Audience is two decisions, not one: the scope picks a pool (this event's guest
+// list, whoever's going, the whole club), then the named list below it lets the
+// admin untick individuals. Nothing sends until you can see exactly who gets it.
 const props = defineProps<{ eventId: string | undefined }>()
 const toast = useToast()
 const { run } = useToastAction()
@@ -16,25 +21,35 @@ const { templates, saveTemplate, removeTemplate } = useCommsTemplates()
 const savingTemplate = ref(false)
 const templateName = ref('')
 
-const scopeOptions = [
-  { label: 'Everyone invited', value: 'invited' as const },
-  { label: 'Members (joined)', value: 'members' as const },
-  { label: 'Going to this event', value: 'going' as const }
-]
-type Scope = (typeof scopeOptions)[number]['value']
+const scopeOptions = ANNOUNCE_SCOPES.map(s => ({ label: s.label, value: s.value }))
 
 const schema = z.object({
   subject: z.string().trim().max(200).optional(),
   message: z.string().max(10000).refine(m => htmlToText(m).length > 0, 'Write a message'),
-  scope: z.enum(['invited', 'members', 'going'])
+  scope: z.enum(ANNOUNCE_SCOPE_VALUES)
 })
-const state = reactive<{ subject: string, message: string, scope: Scope }>({
+const state = reactive<{ subject: string, message: string, scope: AnnounceScope }>({
   subject: '',
   message: '',
-  scope: 'members'
+  // This event's guest list — never the whole club by default.
+  scope: 'guests'
 })
 
+const {
+  recipients,
+  selected,
+  pending: loadingRecipients,
+  error: recipientError,
+  allSelected,
+  toggle,
+  toggleAll
+} = useAnnounceRecipients(() => props.eventId, () => state.scope)
+
+const scopeHint = computed(() => ANNOUNCE_SCOPES.find(s => s.value === state.scope)?.hint ?? '')
+const clubWide = computed(() => isClubWideScope(state.scope))
 const messageHasText = computed(() => htmlToText(state.message).length > 0)
+const sendLabel = computed(() =>
+  selected.value.length ? `Send to ${selected.value.length}` : 'Send blast')
 
 // The subject always mirrors the chosen template — including clearing it for a
 // subject-less template — so the form never shows a stale draft as "applied".
@@ -67,16 +82,28 @@ function messageOf(error: unknown): string | undefined {
   return error instanceof Error ? error.message : undefined
 }
 
-async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: string, scope: Scope }>): Promise<void> {
+async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: string, scope: AnnounceScope }>): Promise<void> {
   if (!props.eventId) {
     toast.add({ title: 'Pick an event first', color: 'warning' })
+    return
+  }
+  if (!selected.value.length) {
+    toast.add({ title: 'Nobody is selected', color: 'warning' })
     return
   }
   sending.value = true
   try {
     const res = await $fetch<{ ok: boolean, count: number, failed?: number, error?: string | null }>('/api/events/announce', {
       method: 'POST',
-      body: { eventId: props.eventId, subject: event.data.subject || undefined, message: event.data.message, scope: event.data.scope }
+      body: {
+        eventId: props.eventId,
+        subject: event.data.subject || undefined,
+        message: event.data.message,
+        scope: event.data.scope,
+        // Explicit: the blast goes to the names the admin just read, not to
+        // whatever the scope happens to resolve to a moment later.
+        recipients: [...selected.value]
+      }
     })
     const failed = res.failed ?? 0
     if (res.count && failed) {
@@ -123,7 +150,7 @@ async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: stri
     </div>
 
     <UForm :schema="schema" :state="state" class="space-y-3" @submit="onSubmit">
-      <UFormField label="Audience" name="scope">
+      <UFormField label="Audience" name="scope" :hint="scopeHint">
         <USelectMenu
           v-model="state.scope"
           :items="scopeOptions"
@@ -132,6 +159,52 @@ async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: stri
           class="w-full sm:max-w-xs"
         />
       </UFormField>
+
+      <UAlert
+        v-if="clubWide"
+        icon="i-lucide-triangle-alert"
+        color="warning"
+        variant="subtle"
+        title="Club-wide blast"
+        description="This goes to people who have nothing to do with this event. Untick anyone who shouldn't get it."
+      />
+
+      <!-- Who this actually reaches — named, counted, and editable before sending. -->
+      <div class="rounded-lg ring ring-default overflow-hidden">
+        <div class="flex items-center gap-3 p-3 bg-elevated/50">
+          <UCheckbox
+            :model-value="allSelected"
+            :disabled="!recipients.length"
+            aria-label="Select all recipients"
+            @update:model-value="toggleAll(!allSelected)"
+          />
+          <p class="text-sm font-medium">
+            <span v-if="loadingRecipients">Checking who this reaches…</span>
+            <span v-else-if="recipientError" class="text-error">{{ recipientError }}</span>
+            <span v-else-if="!recipients.length">Nobody matches this audience</span>
+            <span v-else>Sending to {{ selected.length }} of {{ recipients.length }}</span>
+          </p>
+        </div>
+        <ul v-if="recipients.length" class="divide-y divide-default max-h-64 overflow-y-auto">
+          <li v-for="person in recipients" :key="person.email" class="flex items-center gap-3 px-3 py-2">
+            <UCheckbox
+              :model-value="selected.includes(person.email)"
+              :aria-label="`Send to ${person.name || person.email}`"
+              class="shrink-0"
+              @update:model-value="toggle(person.email)"
+            />
+            <div class="min-w-0 flex-1">
+              <p class="text-sm truncate">
+                {{ person.name || person.email }}
+              </p>
+              <p v-if="person.name" class="text-xs text-muted truncate">
+                {{ person.email }}
+              </p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
       <UFormField label="Subject" name="subject" hint="Optional">
         <UInput v-model="state.subject" placeholder="Movie night reminder" class="w-full" />
       </UFormField>
@@ -155,7 +228,14 @@ async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: stri
           :disabled="!messageHasText"
           @click="savingTemplate = true"
         />
-        <UButton type="submit" label="Send blast" icon="i-lucide-megaphone" :loading="sending" :disabled="!eventId" class="ml-auto" />
+        <UButton
+          type="submit"
+          :label="sendLabel"
+          icon="i-lucide-megaphone"
+          :loading="sending"
+          :disabled="!eventId || !selected.length"
+          class="ml-auto"
+        />
       </div>
     </UForm>
   </div>

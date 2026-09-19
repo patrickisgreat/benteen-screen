@@ -1,6 +1,6 @@
 // @vitest-environment nuxt
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, ref } from 'vue'
+import { computed, defineComponent, h, ref } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import EventAnnounceComposer from '../app/components/EventAnnounceComposer.vue'
@@ -35,6 +35,35 @@ mockNuxtImport('useCommsTemplates', () => () => ({
   removeTemplate
 }))
 
+// Resolving the audience is the composable's job (covered in its own spec); here
+// it's a stand-in that records the scope it was asked for, so these tests can
+// assert what the composer requests and what it finally sends.
+const requestedScopes: string[] = []
+const recipients = ref([
+  { email: 'ada@example.com', name: 'Ada' },
+  { email: 'grace@example.com', name: 'Grace' }
+])
+const selected = ref<string[]>([])
+mockNuxtImport('useAnnounceRecipients', () => (_eventId: unknown, scope: unknown) => {
+  requestedScopes.push(String(typeof scope === 'function' ? scope() : scope))
+  return {
+    recipients,
+    selected,
+    pending: ref(false),
+    error: ref(null),
+    allSelected: computed(() => selected.value.length === recipients.value.length),
+    toggle: (email: string) => {
+      selected.value = selected.value.includes(email)
+        ? selected.value.filter(e => e !== email)
+        : [...selected.value, email]
+    },
+    toggleAll: (on: boolean) => {
+      selected.value = on ? recipients.value.map(r => r.email) : []
+    },
+    refresh: () => Promise.resolve()
+  }
+})
+
 async function mountComposer() {
   return await mountSuspended(EventAnnounceComposer, {
     props: { eventId: 'e1' },
@@ -42,25 +71,87 @@ async function mountComposer() {
   })
 }
 
+/** Click a checkbox by its aria-label (Nuxt UI renders its own control, so a
+ *  click is the honest interaction — setValue on the input never reaches it). */
+async function clickCheckbox(w: Awaited<ReturnType<typeof mountComposer>>, label: string): Promise<void> {
+  await w.get(`[aria-label="${label}"]`).trigger('click')
+}
+
 beforeEach(() => {
   calls.length = 0
+  requestedScopes.length = 0
+  recipients.value = [
+    { email: 'ada@example.com', name: 'Ada' },
+    { email: 'grace@example.com', name: 'Grace' }
+  ]
+  selected.value = recipients.value.map(r => r.email)
   saveTemplate.mockClear()
   removeTemplate.mockClear()
   vi.stubGlobal('$fetch', (url: string, opts: { body: unknown }) => {
     calls.push({ url, body: opts.body })
-    return Promise.resolve({ ok: true, count: 3 })
+    return Promise.resolve({ ok: true, count: 2 })
   })
 })
 afterEach(() => vi.unstubAllGlobals())
 
 describe('EventAnnounceComposer', () => {
+  it('defaults to this event\'s guest list, not the whole club', async () => {
+    const w = await mountComposer()
+    expect(requestedScopes[0]).toBe('guests')
+    await w.find('textarea').setValue('Doors at 7')
+    await w.find('form').trigger('submit')
+    await flushPromises()
+    expect(calls[0]?.body).toMatchObject({ scope: 'guests' })
+  })
+
   it('posts the announcement for the selected event', async () => {
     const w = await mountComposer()
     await w.find('textarea').setValue('Doors at 7')
     await w.find('form').trigger('submit')
     await flushPromises()
     expect(calls[0]?.url).toBe('/api/events/announce')
-    expect(calls[0]?.body).toMatchObject({ eventId: 'e1', message: 'Doors at 7', scope: 'members' })
+    expect(calls[0]?.body).toMatchObject({ eventId: 'e1', message: 'Doors at 7' })
+  })
+
+  it('sends to exactly the people still ticked', async () => {
+    const w = await mountComposer()
+    await clickCheckbox(w, 'Send to Ada')
+    await w.find('textarea').setValue('Doors at 7')
+    await w.find('form').trigger('submit')
+    await flushPromises()
+    expect(calls[0]?.body).toMatchObject({ recipients: ['grace@example.com'] })
+  })
+
+  it('shows how many of the audience the blast will reach', async () => {
+    const w = await mountComposer()
+    expect(w.text()).toContain('Sending to 2 of 2')
+    await clickCheckbox(w, 'Send to Ada')
+    expect(w.text()).toContain('Sending to 1 of 2')
+    expect(w.text()).toContain('Send to 1')
+  })
+
+  it('names every recipient so the audience is never a mystery', async () => {
+    const w = await mountComposer()
+    expect(w.text()).toContain('Ada')
+    expect(w.text()).toContain('ada@example.com')
+    expect(w.text()).toContain('Grace')
+  })
+
+  it('will not send with nobody ticked', async () => {
+    const w = await mountComposer()
+    await clickCheckbox(w, 'Select all recipients')
+    await w.find('textarea').setValue('Doors at 7')
+    await w.find('form').trigger('submit')
+    await flushPromises()
+    expect(calls).toHaveLength(0)
+  })
+
+  it('says so when no one matches the audience', async () => {
+    const w = await mountComposer()
+    recipients.value = []
+    selected.value = []
+    await flushPromises()
+    expect(w.text()).toContain('Nobody matches this audience')
   })
 
   it('does not post an empty message', async () => {
