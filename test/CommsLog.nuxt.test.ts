@@ -32,6 +32,11 @@ describe('CommsLog', () => {
     expect(w.text()).toContain('Haven\'t replied')
   })
 
+  it('marks a hand-picked audience as such', async () => {
+    const w = await mountSuspended(CommsLog, { props: { entries: [entry({ scope: 'custom' })] } })
+    expect(w.text()).toContain('Hand-picked')
+  })
+
   it('shows a retired scope\'s raw value rather than nothing at all', async () => {
     const w = await mountSuspended(CommsLog, { props: { entries: [entry({ scope: 'some_old_scope' })] } })
     expect(w.text()).toContain('some_old_scope')

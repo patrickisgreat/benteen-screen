@@ -4,6 +4,13 @@ import { computed, defineComponent, h, ref } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import EventAnnounceComposer from '../app/components/EventAnnounceComposer.vue'
+import {
+  ANNOUNCE_PRESETS,
+  announcePresetMembers,
+  describeAnnounceSelection,
+  type AnnouncePerson,
+  type AnnouncePreset
+} from '../shared/utils/announce'
 
 const calls: Array<{ url: string, body: unknown }> = []
 mockNuxtImport('useToast', () => () => ({ add: () => {} }))
@@ -35,30 +42,54 @@ mockNuxtImport('useCommsTemplates', () => () => ({
   removeTemplate
 }))
 
-// Resolving the audience is the composable's job (covered in its own spec); here
-// it's a stand-in that records the scope it was asked for, so these tests can
-// assert what the composer requests and what it finally sends.
-const requestedScopes: string[] = []
-const recipients = ref([
-  { email: 'ada@example.com', name: 'Ada' },
-  { email: 'grace@example.com', name: 'Grace' }
-])
+const person = (over: Partial<AnnouncePerson> & { email: string }): AnnouncePerson => ({
+  name: null, rsvp: null, onGuestList: true, joined: true, onRoster: true, ...over
+})
+
+const DIRECTORY: AnnouncePerson[] = [
+  person({ email: 'ada@example.com', name: 'Ada', rsvp: 'maybe' }),
+  person({ email: 'alan@example.com', name: 'Alan', rsvp: 'no' }),
+  person({ email: 'grace@example.com', name: 'Grace', rsvp: 'going' }),
+  person({ email: 'hedy@example.com', name: 'Hedy', rsvp: null }),
+  person({ email: 'newcomer@example.com', name: 'Newcomer', onGuestList: false, joined: false })
+]
+
+// Fetching the directory is the composable's job (covered in its own spec). This
+// stand-in keeps the real preset logic so the composer is tested against the
+// selection behavior it actually ships with.
+const people = ref<AnnouncePerson[]>([])
 const selected = ref<string[]>([])
-mockNuxtImport('useAnnounceRecipients', () => (_eventId: unknown, scope: unknown) => {
-  requestedScopes.push(String(typeof scope === 'function' ? scope() : scope))
+const search = ref('')
+mockNuxtImport('useAnnounceRecipients', () => () => {
+  const visible = computed(() => {
+    const term = search.value.trim().toLowerCase()
+    if (!term) return people.value
+    return people.value.filter(p => p.email.includes(term) || (p.name ?? '').toLowerCase().includes(term))
+  })
   return {
-    recipients,
+    people,
     selected,
+    visible,
+    search,
     pending: ref(false),
     error: ref(null),
-    allSelected: computed(() => selected.value.length === recipients.value.length),
+    counts: computed(() => Object.fromEntries(
+      ANNOUNCE_PRESETS.map(preset => [preset.id, people.value.filter(preset.includes).length]))),
+    activeScope: computed(() => describeAnnounceSelection(people.value, selected.value)),
+    allVisibleSelected: computed(() =>
+      visible.value.length > 0 && visible.value.every(p => selected.value.includes(p.email))),
+    applyPreset: (id: AnnouncePreset) => {
+      selected.value = announcePresetMembers(people.value, id)
+    },
     toggle: (email: string) => {
       selected.value = selected.value.includes(email)
         ? selected.value.filter(e => e !== email)
         : [...selected.value, email]
     },
-    toggleAll: (on: boolean) => {
-      selected.value = on ? recipients.value.map(r => r.email) : []
+    setVisible: (on: boolean) => {
+      const shown = new Set(visible.value.map(p => p.email))
+      const rest = selected.value.filter(e => !shown.has(e))
+      selected.value = on ? [...rest, ...shown] : rest
     },
     refresh: () => Promise.resolve()
   }
@@ -71,87 +102,144 @@ async function mountComposer() {
   })
 }
 
-/** Click a checkbox by its aria-label (Nuxt UI renders its own control, so a
+type Composer = Awaited<ReturnType<typeof mountComposer>>
+
+/** Click a control by its aria-label (Nuxt UI renders its own checkbox, so a
  *  click is the honest interaction — setValue on the input never reaches it). */
-async function clickCheckbox(w: Awaited<ReturnType<typeof mountComposer>>, label: string): Promise<void> {
+async function clickLabelled(w: Composer, label: string): Promise<void> {
   await w.get(`[aria-label="${label}"]`).trigger('click')
+}
+
+async function clickButton(w: Composer, text: string): Promise<void> {
+  const button = w.findAll('button').find(b => b.text().includes(text))
+  if (!button) throw new Error(`no button matching "${text}"`)
+  await button.trigger('click')
 }
 
 beforeEach(() => {
   calls.length = 0
-  requestedScopes.length = 0
-  recipients.value = [
-    { email: 'ada@example.com', name: 'Ada' },
-    { email: 'grace@example.com', name: 'Grace' }
-  ]
-  selected.value = recipients.value.map(r => r.email)
+  people.value = [...DIRECTORY]
+  selected.value = announcePresetMembers(DIRECTORY, 'going')
+  search.value = ''
   saveTemplate.mockClear()
   removeTemplate.mockClear()
   vi.stubGlobal('$fetch', (url: string, opts: { body: unknown }) => {
     calls.push({ url, body: opts.body })
-    return Promise.resolve({ ok: true, count: 2 })
+    return Promise.resolve({ ok: true, count: selected.value.length })
   })
 })
 afterEach(() => vi.unstubAllGlobals())
 
 describe('EventAnnounceComposer', () => {
-  it('defaults to this event\'s guest list, not the whole club', async () => {
+  it('opens on the people going and says that is the default', async () => {
     const w = await mountComposer()
-    expect(requestedScopes[0]).toBe('guests')
-    await w.find('textarea').setValue('Doors at 7')
-    await w.find('form').trigger('submit')
-    await flushPromises()
-    expect(calls[0]?.body).toMatchObject({ scope: 'guests' })
+    expect(w.text()).toContain('Sending to 1 person')
+    expect(w.text()).toContain('Going')
+    expect(w.text()).toContain('Default')
+    expect(w.text()).toContain('Everyone who has RSVP\'d yes to this event')
   })
 
-  it('posts the announcement for the selected event', async () => {
+  it('sends to exactly the people ticked', async () => {
     const w = await mountComposer()
     await w.find('textarea').setValue('Doors at 7')
     await w.find('form').trigger('submit')
     await flushPromises()
     expect(calls[0]?.url).toBe('/api/events/announce')
-    expect(calls[0]?.body).toMatchObject({ eventId: 'e1', message: 'Doors at 7' })
+    expect(calls[0]?.body).toMatchObject({ eventId: 'e1', message: 'Doors at 7', recipients: ['grace@example.com'] })
   })
 
-  it('sends to exactly the people still ticked', async () => {
+  it('re-picks the list from a group, counts and all', async () => {
     const w = await mountComposer()
-    await clickCheckbox(w, 'Send to Ada')
+    await clickButton(w, 'Whole guest list (4)')
+    expect(w.text()).toContain('Sending to 4 people')
     await w.find('textarea').setValue('Doors at 7')
     await w.find('form').trigger('submit')
     await flushPromises()
-    expect(calls[0]?.body).toMatchObject({ recipients: ['grace@example.com'] })
+    expect(calls[0]?.body).toMatchObject({
+      recipients: ['ada@example.com', 'alan@example.com', 'grace@example.com', 'hedy@example.com']
+    })
   })
 
-  it('shows how many of the audience the blast will reach', async () => {
+  it('adds one person to the default without leaving it', async () => {
     const w = await mountComposer()
-    expect(w.text()).toContain('Sending to 2 of 2')
-    await clickCheckbox(w, 'Send to Ada')
-    expect(w.text()).toContain('Sending to 1 of 2')
-    expect(w.text()).toContain('Send to 1')
+    await clickLabelled(w, 'Send to Hedy')
+    expect(w.text()).toContain('Sending to 2 people')
+    expect(w.text()).toContain('Hand-picked')
+    await w.find('textarea').setValue('Doors at 7')
+    await w.find('form').trigger('submit')
+    await flushPromises()
+    expect(calls[0]?.body).toMatchObject({ recipients: ['grace@example.com', 'hedy@example.com'] })
   })
 
-  it('names every recipient so the audience is never a mystery', async () => {
+  it('offers a way back to the default once the list is edited', async () => {
+    const w = await mountComposer()
+    await clickLabelled(w, 'Send to Hedy')
+    await clickButton(w, 'Reset to Going')
+    expect(selected.value).toEqual(['grace@example.com'])
+    expect(w.text()).toContain('Sending to 1 person')
+  })
+
+  it('shows each person\'s reply beside their name', async () => {
     const w = await mountComposer()
     expect(w.text()).toContain('Ada')
     expect(w.text()).toContain('ada@example.com')
-    expect(w.text()).toContain('Grace')
+    expect(w.text()).toContain('Maybe')
+    expect(w.text()).toContain('No reply')
+    expect(w.text()).toContain('Can\'t make it')
+  })
+
+  it('marks someone who is not actually invited to this event', async () => {
+    const w = await mountComposer()
+    expect(w.text()).toContain('newcomer@example.com · not on the guest list')
+    expect(w.text()).not.toContain('ada@example.com · not on the guest list')
+  })
+
+  it('warns when a group reaches past this event', async () => {
+    const w = await mountComposer()
+    expect(w.text()).not.toContain('Club-wide blast')
+    await clickButton(w, 'Everyone on the roster (5)')
+    expect(w.text()).toContain('Club-wide blast')
+  })
+
+  it('narrows the list by search without changing who is ticked', async () => {
+    const w = await mountComposer()
+    search.value = 'hedy'
+    await flushPromises()
+    expect(w.text()).toContain('Hedy')
+    expect(w.text()).not.toContain('ada@example.com')
+    expect(w.text()).toContain('Sending to 1 person')
+  })
+
+  it('ticks everyone the search shows', async () => {
+    const w = await mountComposer()
+    search.value = 'ada'
+    await flushPromises()
+    await clickLabelled(w, 'Select everyone shown')
+    expect(selected.value.sort()).toEqual(['ada@example.com', 'grace@example.com'])
+  })
+
+  it('says so when a search matches nobody', async () => {
+    const w = await mountComposer()
+    search.value = 'zzz'
+    await flushPromises()
+    expect(w.text()).toContain('Nobody matches that search')
   })
 
   it('will not send with nobody ticked', async () => {
     const w = await mountComposer()
-    await clickCheckbox(w, 'Select all recipients')
+    await clickLabelled(w, 'Send to Grace')
     await w.find('textarea').setValue('Doors at 7')
     await w.find('form').trigger('submit')
     await flushPromises()
     expect(calls).toHaveLength(0)
   })
 
-  it('says so when no one matches the audience', async () => {
+  it('says so when the event has nobody to email at all', async () => {
     const w = await mountComposer()
-    recipients.value = []
+    people.value = []
     selected.value = []
     await flushPromises()
-    expect(w.text()).toContain('Nobody matches this audience')
+    expect(w.text()).toContain('Nobody to email for this event yet')
   })
 
   it('does not post an empty message', async () => {
@@ -171,8 +259,7 @@ describe('EventAnnounceComposer', () => {
 
   it('applying a template fills the message and subject, then sends it', async () => {
     const w = await mountComposer()
-    const pill = w.findAll('button').find(b => b.text().includes('Vote & bring list reminder'))
-    await pill?.trigger('click')
+    await clickButton(w, 'Vote & bring list reminder')
     expect((w.find('textarea').element as HTMLTextAreaElement).value).toBe('<p>Go <strong>vote</strong>!</p>')
     const subjectInput = w.findAll('input').find(i => i.attributes('placeholder') === 'Movie night reminder')
     expect((subjectInput?.element as HTMLInputElement).value).toBe('Vote + bring list')
@@ -185,8 +272,7 @@ describe('EventAnnounceComposer', () => {
     const w = await mountComposer()
     const subjectInput = w.findAll('input').find(i => i.attributes('placeholder') === 'Movie night reminder')
     await subjectInput?.setValue('My old draft subject')
-    const pill = w.findAll('button').find(b => b.text().includes('Plain nudge'))
-    await pill?.trigger('click')
+    await clickButton(w, 'Plain nudge')
     expect((subjectInput?.element as HTMLInputElement).value).toBe('')
     expect((w.find('textarea').element as HTMLTextAreaElement).value).toBe('<p>Nudge</p>')
   })
@@ -194,8 +280,7 @@ describe('EventAnnounceComposer', () => {
   it('saves the current draft as a named template', async () => {
     const w = await mountComposer()
     await w.find('textarea').setValue('<p>Weekly nudge body</p>')
-    const openBtn = w.findAll('button').find(b => b.text().includes('Save as template'))
-    await openBtn?.trigger('click')
+    await clickButton(w, 'Save as template')
     const nameInput = w.findAll('input').find(i => i.attributes('placeholder') === 'Template name')
     await nameInput?.setValue('Weekly nudge')
     const saveBtn = w.findAll('button').find(b => b.text().trim() === 'Save')
