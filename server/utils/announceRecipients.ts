@@ -1,52 +1,57 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { AnnounceRecipient, AnnounceScope } from '#shared/utils/announce'
-import { toRsvpStatus, type RsvpStatus } from '#shared/types/rsvp'
+import type { AnnouncePerson } from '#shared/utils/announce'
+import { toRsvpStatus } from '#shared/types/rsvp'
 import type { Database } from '~/types/database.types'
 
 type Db = SupabaseClient<Database>
-
-/** Someone this event knows about, with whatever reply we have for them. Only a
- *  guest-list entry can have a null reply — an in-app RSVP always says something. */
-interface Attendee {
-  email: string
-  name: string | null
-  rsvp: RsvpStatus | null
-}
 
 function normalize(email: string | null | undefined): string {
   return email?.trim().toLowerCase() ?? ''
 }
 
-function sortByName(people: AnnounceRecipient[]): AnnounceRecipient[] {
-  return people.sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email))
-}
+const blank = (email: string): AnnouncePerson => ({
+  email,
+  name: null,
+  rsvp: null,
+  onGuestList: false,
+  joined: false,
+  onRoster: false
+})
 
 /**
- * Everyone this event knows about, keyed by email: the curated guest list
- * (`event_invites`) merged with members who RSVP'd in the app.
+ * Everyone this event could mail, keyed by email — the composer's address book.
  *
- * Both sources are needed. A trigger mirrors a member's in-app RSVP onto their
- * e-vite row, but only when they're already on the guest list — a member who
- * RSVP'd without being invited exists solely in `rsvps`, and a plain-email guest
- * exists solely in `event_invites`. Reading one table alone silently drops one of
- * those groups from every audience.
+ * Three sources, because no single table knows everybody. `event_invites` holds
+ * the curated guest list, including plain-email guests who never sign in.
+ * `rsvps` holds in-app replies; a trigger mirrors those onto the e-vite row, but
+ * only for people already on the guest list, so a member who RSVP'd without an
+ * invite lives there alone. `invites` is the club allowlist, which is how the
+ * club-wide presets reach someone this event never invited.
+ *
+ * Reading fewer than all three drops a whole category of person from the picker,
+ * which is how an audience ends up quietly wrong.
  */
-async function loadAttendees(db: Db, eventId: string): Promise<Attendee[]> {
-  const [guestList, inApp] = await Promise.all([
+export async function loadAnnounceDirectory(db: Db, eventId: string): Promise<AnnouncePerson[]> {
+  const [guestList, inApp, roster] = await Promise.all([
     db.from('event_invites').select('email, display_name, rsvp').eq('event_id', eventId),
-    db.from('rsvps').select('user_id, status').eq('event_id', eventId)
+    db.from('rsvps').select('user_id, status').eq('event_id', eventId),
+    db.from('invites').select('email, display_name, accepted_at')
   ])
 
-  const byEmail = new Map<string, Attendee>()
+  const byEmail = new Map<string, AnnouncePerson>()
+  const upsert = (email: string, patch: Partial<AnnouncePerson>): void => {
+    const existing = byEmail.get(email) ?? blank(email)
+    byEmail.set(email, { ...existing, ...patch, name: existing.name ?? patch.name ?? null })
+  }
+
   for (const row of guestList.data ?? []) {
     const email = normalize(row.email)
-    if (email) {
-      byEmail.set(email, {
-        email,
-        name: row.display_name,
-        rsvp: row.rsvp === null ? null : toRsvpStatus(row.rsvp)
-      })
-    }
+    if (!email) continue
+    upsert(email, {
+      name: row.display_name,
+      rsvp: row.rsvp === null ? null : toRsvpStatus(row.rsvp),
+      onGuestList: true
+    })
   }
 
   const responders = inApp.data ?? []
@@ -61,75 +66,32 @@ async function loadAttendees(db: Db, eventId: string): Promise<Attendee[]> {
       const profile = profileById.get(rsvp.user_id)
       const email = normalize(profile?.email)
       if (!email) continue
-      const existing = byEmail.get(email)
-      byEmail.set(email, {
-        email,
-        name: existing?.name ?? profile?.display_name ?? null,
-        // The in-app reply is the fresher of the two when the guest row is silent.
-        rsvp: existing?.rsvp ?? toRsvpStatus(rsvp.status)
-      })
+      // The e-vite row wins when it has a reply: the trigger keeps it current,
+      // and an admin can record a reply there for someone who never signs in.
+      const known = byEmail.get(email)?.rsvp ?? null
+      upsert(email, { name: profile?.display_name ?? null, rsvp: known ?? toRsvpStatus(rsvp.status) })
     }
   }
 
-  return [...byEmail.values()]
-}
-
-/** Everyone on the club allowlist, optionally only those who've actually joined. */
-async function loadRoster(db: Db, joinedOnly: boolean): Promise<AnnounceRecipient[]> {
-  let query = db.from('invites').select('email, display_name')
-  if (joinedOnly) query = query.not('accepted_at', 'is', null)
-  const { data } = await query
-  const byEmail = new Map<string, AnnounceRecipient>()
-  for (const row of data ?? []) {
+  for (const row of roster.data ?? []) {
     const email = normalize(row.email)
-    if (email && !byEmail.has(email)) byEmail.set(email, { email, name: row.display_name })
-  }
-  return [...byEmail.values()]
-}
-
-function toRecipients(attendees: Attendee[]): AnnounceRecipient[] {
-  return attendees.map(({ email, name }) => ({ email, name }))
-}
-
-/**
- * Resolve a blast's audience: who `scope` means for this event, deduped by email
- * and sorted by name. The single source of truth for recipients — the preview the
- * admin sees and the list the send actually uses both come from here, so the
- * count on the button can't disagree with what leaves the building.
- */
-export async function resolveAnnounceRecipients(
-  db: Db,
-  eventId: string,
-  scope: AnnounceScope
-): Promise<AnnounceRecipient[]> {
-  if (scope === 'invited' || scope === 'members') {
-    return sortByName(await loadRoster(db, scope === 'members'))
+    if (!email) continue
+    upsert(email, { name: row.display_name, onRoster: true, joined: row.accepted_at !== null })
   }
 
-  const attendees = await loadAttendees(db, eventId)
-  switch (scope) {
-    case 'guests':
-      return sortByName(toRecipients(attendees))
-    case 'going':
-      return sortByName(toRecipients(attendees.filter(a => a.rsvp === 'going')))
-    case 'going_maybe':
-      return sortByName(toRecipients(attendees.filter(a => a.rsvp === 'going' || a.rsvp === 'maybe')))
-    case 'no_reply':
-      // Silence can only come from the guest list — an in-app RSVP is a reply.
-      return sortByName(toRecipients(attendees.filter(a => a.rsvp === null)))
-  }
+  return [...byEmail.values()].sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email))
 }
 
 /**
- * Narrow a resolved audience to the addresses the admin actually ticked. An
- * unknown address is dropped rather than emailed: the picker can only ever
- * subtract from the scope, never smuggle someone new into the blast.
+ * Narrow the directory to the addresses the admin actually ticked. An address
+ * nobody in the directory answers to is dropped rather than emailed — the
+ * composer can only ever pick from this event's address book, never type a
+ * stranger into a blast.
  */
 export function selectRecipients(
-  audience: readonly AnnounceRecipient[],
-  selected: readonly string[] | null
-): AnnounceRecipient[] {
-  if (!selected) return [...audience]
+  directory: readonly AnnouncePerson[],
+  selected: readonly string[]
+): AnnouncePerson[] {
   const wanted = new Set(selected.map(normalize))
-  return audience.filter(person => wanted.has(person.email))
+  return directory.filter(person => wanted.has(person.email))
 }
