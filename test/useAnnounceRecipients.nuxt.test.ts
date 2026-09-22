@@ -3,114 +3,161 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 import { useAnnounceRecipients } from '../app/composables/useAnnounceRecipients'
-import type { AnnounceScope } from '../shared/utils/announce'
+import type { AnnouncePerson } from '../shared/utils/announce'
 
-const AUDIENCES: Record<string, Array<{ email: string, name: string | null }>> = {
-  guests: [
-    { email: 'ada@example.com', name: 'Ada' },
-    { email: 'grace@example.com', name: 'Grace' }
-  ],
-  going: [{ email: 'grace@example.com', name: 'Grace' }]
-}
+const person = (over: Partial<AnnouncePerson> & { email: string }): AnnouncePerson => ({
+  name: null, rsvp: null, onGuestList: true, joined: true, onRoster: true, ...over
+})
 
-const requests: Array<{ url: string, scope: unknown }> = []
-let respond: (scope: string) => Promise<{ count: number, recipients: Array<{ email: string, name: string | null }> }>
+const DIRECTORY: AnnouncePerson[] = [
+  person({ email: 'ada@example.com', name: 'Ada', rsvp: 'maybe' }),
+  person({ email: 'grace@example.com', name: 'Grace', rsvp: 'going' }),
+  person({ email: 'hedy@example.com', name: 'Hedy', rsvp: null }),
+  person({ email: 'new@example.com', name: 'Newcomer', onGuestList: false, joined: false })
+]
+
+const requests: string[] = []
+let respond: () => Promise<{ people: AnnouncePerson[] }>
 
 beforeEach(() => {
   requests.length = 0
-  respond = (scope: string) => {
-    const recipients = AUDIENCES[scope] ?? []
-    return Promise.resolve({ count: recipients.length, recipients })
-  }
-  vi.stubGlobal('$fetch', (url: string, opts: { query: { scope: string } }) => {
-    requests.push({ url, scope: opts.query.scope })
-    return respond(opts.query.scope)
+  respond = () => Promise.resolve({ people: DIRECTORY })
+  vi.stubGlobal('$fetch', (url: string) => {
+    requests.push(url)
+    return respond()
   })
 })
 afterEach(() => vi.unstubAllGlobals())
 
 describe('useAnnounceRecipients', () => {
-  it('loads the audience for the event and scope, everyone ticked', async () => {
-    const { recipients, selected, allSelected } = useAnnounceRecipients('e1', 'guests')
+  it('opens on the people who have RSVP\'d yes', async () => {
+    const { people, selected, activeScope } = useAnnounceRecipients('e1')
     await flushPromises()
-    expect(requests[0]).toEqual({ url: '/api/events/e1/announce-recipients', scope: 'guests' })
-    expect(recipients.value).toHaveLength(2)
-    expect(selected.value).toEqual(['ada@example.com', 'grace@example.com'])
-    expect(allSelected.value).toBe(true)
+    expect(requests).toEqual(['/api/events/e1/announce-recipients'])
+    expect(people.value).toHaveLength(4)
+    expect(selected.value).toEqual(['grace@example.com'])
+    expect(activeScope.value).toBe('going')
   })
 
   it('asks for nobody until an event is chosen', async () => {
-    const { recipients } = useAnnounceRecipients(ref(undefined), 'guests')
+    const { people } = useAnnounceRecipients(ref(undefined))
     await flushPromises()
     expect(requests).toHaveLength(0)
-    expect(recipients.value).toEqual([])
+    expect(people.value).toEqual([])
   })
 
-  it('reloads and re-ticks everyone when the scope changes', async () => {
-    const scope = ref<AnnounceScope>('guests')
-    const { selected } = useAnnounceRecipients('e1', scope)
+  it('reloads and returns to the default when the event changes', async () => {
+    const eventId = ref('e1')
+    const { selected, toggle } = useAnnounceRecipients(eventId)
     await flushPromises()
-    scope.value = 'going'
+    toggle('ada@example.com')
+    eventId.value = 'e2'
     await flushPromises()
-    expect(requests.map(r => r.scope)).toEqual(['guests', 'going'])
+    expect(requests).toEqual(['/api/events/e1/announce-recipients', '/api/events/e2/announce-recipients'])
     expect(selected.value).toEqual(['grace@example.com'])
   })
 
-  it('unticks and re-ticks one person', async () => {
-    const { selected, allSelected, toggle } = useAnnounceRecipients('e1', 'guests')
+  it('counts every group so the blast radius is visible before choosing', async () => {
+    const { counts } = useAnnounceRecipients('e1')
     await flushPromises()
-    toggle('ada@example.com')
-    expect(selected.value).toEqual(['grace@example.com'])
-    expect(allSelected.value).toBe(false)
-    toggle('ada@example.com')
-    expect(selected.value).toContain('ada@example.com')
-    expect(allSelected.value).toBe(true)
+    expect(counts.value).toMatchObject({
+      going: 1, going_maybe: 2, no_reply: 1, guests: 3, members: 3, invited: 4
+    })
   })
 
-  it('clears and restores the whole selection', async () => {
-    const { selected, toggleAll } = useAnnounceRecipients('e1', 'guests')
+  it('re-picks the whole list from a group', async () => {
+    const { selected, applyPreset, activeScope } = useAnnounceRecipients('e1')
     await flushPromises()
-    toggleAll(false)
-    expect(selected.value).toEqual([])
-    toggleAll(true)
-    expect(selected.value).toHaveLength(2)
+    applyPreset('guests')
+    expect(selected.value).toEqual(['ada@example.com', 'grace@example.com', 'hedy@example.com'])
+    expect(activeScope.value).toBe('guests')
   })
 
-  it('is not "all selected" when the audience is empty', async () => {
-    const { allSelected } = useAnnounceRecipients('e1', 'no_reply')
+  it('calls the audience hand-picked once it stops matching a group', async () => {
+    const { activeScope, toggle } = useAnnounceRecipients('e1')
     await flushPromises()
-    expect(allSelected.value).toBe(false)
+    toggle('hedy@example.com')
+    expect(activeScope.value).toBe('custom')
+  })
+
+  it('adds someone who is not in the current group', async () => {
+    const { selected, toggle } = useAnnounceRecipients('e1')
+    await flushPromises()
+    toggle('new@example.com')
+    expect(selected.value).toContain('new@example.com')
+    expect(selected.value).toContain('grace@example.com')
+  })
+
+  it('searches by name and by address', async () => {
+    const { visible, search } = useAnnounceRecipients('e1')
+    await flushPromises()
+    search.value = 'hedy'
+    expect(visible.value.map(p => p.email)).toEqual(['hedy@example.com'])
+    search.value = 'NEW@ex'
+    expect(visible.value.map(p => p.email)).toEqual(['new@example.com'])
+    search.value = ''
+    expect(visible.value).toHaveLength(4)
+  })
+
+  it('ticks only what the search shows, leaving the rest of the selection alone', async () => {
+    const { selected, search, setVisible, allVisibleSelected } = useAnnounceRecipients('e1')
+    await flushPromises()
+    search.value = 'ada'
+    expect(allVisibleSelected.value).toBe(false)
+    setVisible(true)
+    expect(selected.value.sort()).toEqual(['ada@example.com', 'grace@example.com'])
+    expect(allVisibleSelected.value).toBe(true)
+  })
+
+  it('unticks only what the search shows', async () => {
+    const { selected, search, applyPreset, setVisible } = useAnnounceRecipients('e1')
+    await flushPromises()
+    applyPreset('guests')
+    search.value = 'hedy'
+    setVisible(false)
+    expect(selected.value.sort()).toEqual(['ada@example.com', 'grace@example.com'])
+  })
+
+  it('clears the search when the event changes, so the picker is never secretly filtered', async () => {
+    const eventId = ref('e1')
+    const { search, visible } = useAnnounceRecipients(eventId)
+    await flushPromises()
+    search.value = 'hedy'
+    eventId.value = 'e2'
+    await flushPromises()
+    expect(search.value).toBe('')
+    expect(visible.value).toHaveLength(4)
   })
 
   it('reports a failed load and selects nobody rather than guessing', async () => {
     respond = () => Promise.reject(new Error('boom'))
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    const { error, selected, recipients } = useAnnounceRecipients('e1', 'guests')
+    const { error, selected, people } = useAnnounceRecipients('e1')
     await flushPromises()
     expect(error.value).toBe('Could not load the recipient list')
-    expect(recipients.value).toEqual([])
+    expect(people.value).toEqual([])
     expect(selected.value).toEqual([])
   })
 
-  it('ignores a slow earlier scope that answers after a later one', async () => {
+  it('ignores a slow response for an event the admin has already left', async () => {
     let releaseFirst: (() => void) | undefined
-    respond = (scope: string) => {
-      const recipients = AUDIENCES[scope] ?? []
-      const payload = { count: recipients.length, recipients }
-      if (scope === 'guests') {
+    let call = 0
+    respond = () => {
+      call += 1
+      if (call === 1) {
         return new Promise((resolve) => {
-          releaseFirst = () => resolve(payload)
+          releaseFirst = () => resolve({ people: DIRECTORY })
         })
       }
-      return Promise.resolve(payload)
+      return Promise.resolve({ people: [person({ email: 'only@example.com', rsvp: 'going' })] })
     }
-    const scope = ref<AnnounceScope>('guests')
-    const { selected } = useAnnounceRecipients('e1', scope)
+    const eventId = ref('e1')
+    const { selected } = useAnnounceRecipients(eventId)
     await flushPromises()
-    scope.value = 'going'
+    eventId.value = 'e2'
     await flushPromises()
     releaseFirst?.()
     await flushPromises()
-    expect(selected.value).toEqual(['grace@example.com'])
+    expect(selected.value).toEqual(['only@example.com'])
   })
 })
