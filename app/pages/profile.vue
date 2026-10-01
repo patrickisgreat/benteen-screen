@@ -83,7 +83,7 @@ async function onDelete(): Promise<void> {
           variant="outline"
           icon="i-lucide-trash-2"
           class="w-full sm:w-auto justify-center"
-          @click="confirmOpen = true"
+          @click="() => { confirmOpen = true }"
         />
       </div>
     </UCard>
@@ -95,7 +95,7 @@ async function onDelete(): Promise<void> {
     >
       <template #footer>
         <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full">
-          <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="confirmOpen = false" />
+          <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="() => { confirmOpen = false }" />
           <UButton label="Delete account" color="error" icon="i-lucide-trash-2" class="justify-center" :loading="deleting" @click="onDelete" />
         </div>
       </template>

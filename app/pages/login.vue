@@ -166,7 +166,7 @@ async function onForgotPassword(): Promise<void> {
             color="primary"
             class="px-0"
             :label="mode === 'signup' ? 'Have an account? Sign in' : 'New here? Create an account'"
-            @click="mode = mode === 'signup' ? 'signin' : 'signup'"
+            @click="() => { mode = mode === 'signup' ? 'signin' : 'signup' }"
           />
           <UButton
             v-if="mode === 'signin'"

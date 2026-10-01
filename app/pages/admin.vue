@@ -372,7 +372,7 @@ function onSelectEvent(event: MovieEvent): void {
                   variant="ghost"
                   size="sm"
                   aria-label="Delete event"
-                  @click="eventPendingDelete = event"
+                  @click="() => { eventPendingDelete = event }"
                 />
               </div>
             </div>
@@ -393,7 +393,7 @@ function onSelectEvent(event: MovieEvent): void {
                 · {{ pendingInvites.length }} pending
               </template>
             </p>
-            <UButton label="Invite someone" icon="i-lucide-user-plus" size="sm" @click="inviteOpen = true" />
+            <UButton label="Invite someone" icon="i-lucide-user-plus" size="sm" @click="() => { inviteOpen = true }" />
           </div>
 
           <UAlert
@@ -560,7 +560,7 @@ function onSelectEvent(event: MovieEvent): void {
     >
       <template #footer>
         <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full">
-          <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="eventPendingDelete = null" />
+          <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="() => { eventPendingDelete = null }" />
           <UButton label="Delete" color="error" icon="i-lucide-trash-2" class="justify-center" @click="confirmDelete" />
         </div>
       </template>
