@@ -35,11 +35,17 @@ const loading = ref(false)
 const previewError = ref<string | null>(null)
 const count = computed(() => recipients.value?.length ?? null)
 
+// Only the newest preview may land: a slow earlier request must not overwrite a
+// fresher audience after the admin has already switched.
+let previewSeq = 0
+
 async function loadPreview(): Promise<void> {
+  const mine = ++previewSeq
   const eventId = props.eventId
   if (!eventId || (scope.value === 'custom' && !emails.value.length)) {
     recipients.value = eventId ? [] : null
     previewError.value = null
+    loading.value = false
     emit('count', eventId ? 0 : null)
     return
   }
@@ -49,15 +55,17 @@ async function loadPreview(): Promise<void> {
       method: 'POST',
       body: { eventId, scope: scope.value, emails: scope.value === 'custom' ? emails.value : undefined, preview: true }
     })
+    if (mine !== previewSeq) return // a newer preview is in flight or has landed
     recipients.value = res.recipients
     previewError.value = null
     emit('count', res.count)
   } catch (error) {
+    if (mine !== previewSeq) return
     recipients.value = null
     previewError.value = error instanceof Error ? error.message : 'Could not count recipients'
     emit('count', null)
   } finally {
-    loading.value = false
+    if (mine === previewSeq) loading.value = false
   }
 }
 

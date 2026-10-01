@@ -74,6 +74,31 @@ describe('AnnounceAudiencePicker', () => {
     expect(w.emitted('update:scope')?.at(-1)).toEqual(['invited'])
   })
 
+  it('ignores a slow earlier preview that lands after a newer one', async () => {
+    // First request (guests) is held open; second (roster) resolves immediately.
+    let releaseFirst: (() => void) | null = null
+    let n = 0
+    vi.stubGlobal('$fetch', (_url: string, opts: { body: Body }) => {
+      calls.push(opts.body)
+      n += 1
+      if (n === 1) {
+        return new Promise((resolve) => {
+          releaseFirst = () => resolve({ ok: true, count: 1, recipients: [{ email: 'stale@x.com', name: 'Stale' }] })
+        })
+      }
+      return Promise.resolve({ ok: true, count: 50, recipients: [{ email: 'fresh@x.com', name: 'Fresh' }] })
+    })
+    const w = await mount()
+    await settle()
+    await radios(w)[4]!.trigger('click') // switch audiences while the first preview is still pending
+    await settle()
+    expect(w.emitted('count')?.at(-1)).toEqual([50])
+    releaseFirst!()
+    await settle()
+    expect(w.emitted('count')?.at(-1), 'the stale result must not overwrite the fresh one').toEqual([50])
+    expect(w.text()).not.toContain('Stale')
+  })
+
   it('says so when nobody matches, and reports zero', async () => {
     previewResult = { count: 0, recipients: [] }
     const w = await mount()
