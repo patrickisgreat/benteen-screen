@@ -55,7 +55,7 @@ function confirm(): void {
               color="neutral"
               variant="ghost"
               class="justify-center"
-              @click="selected = null"
+              @click="() => { selected = null }"
             />
           </div>
         </div>

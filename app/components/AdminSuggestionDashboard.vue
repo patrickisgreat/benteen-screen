@@ -151,7 +151,7 @@ function barPct(votes: number): number {
           :color="view === v.value ? 'primary' : 'neutral'"
           :variant="view === v.value ? 'solid' : 'outline'"
           :aria-pressed="view === v.value"
-          @click="view = v.value"
+          @click="() => { view = v.value }"
         />
       </div>
       <UInput

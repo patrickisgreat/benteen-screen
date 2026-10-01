@@ -282,7 +282,7 @@ async function onGuests(count: number): Promise<void> {
                   block
                   label="Suggest a movie"
                   icon="i-lucide-plus"
-                  @click="suggestOpen = true"
+                  @click="() => { suggestOpen = true }"
                 />
 
                 <!-- Movie finder (all sizes) -->
@@ -293,7 +293,7 @@ async function onGuests(count: number): Promise<void> {
                   variant="outline"
                   label="Help me find a movie"
                   icon="i-lucide-clapperboard"
-                  @click="finderOpen = true"
+                  @click="() => { finderOpen = true }"
                 />
               </template>
               <UAlert
@@ -407,7 +407,7 @@ async function onGuests(count: number): Promise<void> {
       </template>
       <template #footer>
         <div class="flex justify-end gap-2 w-full">
-          <UButton label="Stay going" color="neutral" variant="ghost" @click="confirmLeaveOpen = false" />
+          <UButton label="Stay going" color="neutral" variant="ghost" @click="() => { confirmLeaveOpen = false }" />
           <UButton label="Hide my stuff" color="warning" icon="i-lucide-eye-off" @click="confirmLeave" />
         </div>
       </template>

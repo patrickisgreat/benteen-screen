@@ -59,7 +59,7 @@ async function confirm(): Promise<void> {
           color="neutral"
           variant="outline"
           size="sm"
-          @click="pending = { kind: 'zero' }"
+          @click="() => { pending = { kind: 'zero' } }"
         />
         <div class="flex items-center gap-1.5">
           <span class="text-xs text-muted whitespace-nowrap">keep top</span>
@@ -69,7 +69,7 @@ async function confirm(): Promise<void> {
             icon="i-lucide-scissors"
             color="primary"
             size="sm"
-            @click="pending = { kind: 'top', keep: keepTopNum }"
+            @click="() => { pending = { kind: 'top', keep: keepTopNum } }"
           />
         </div>
       </div>
@@ -84,7 +84,7 @@ async function confirm(): Promise<void> {
     >
       <template #footer>
         <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full">
-          <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="pending = null" />
+          <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="() => { pending = null }" />
           <UButton label="Cut titles" color="primary" icon="i-lucide-scissors" class="justify-center" @click="confirm" />
         </div>
       </template>

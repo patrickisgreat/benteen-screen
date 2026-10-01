@@ -87,7 +87,7 @@ async function onConfirm(): Promise<void> {
     </template>
     <template #footer>
       <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full">
-        <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="open = false" />
+        <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="() => { open = false }" />
         <UButton
           :label="sendNow ? 'Send e-vite' : 'Add to guest list'"
           :icon="sendNow ? 'i-lucide-send' : 'i-lucide-user-plus'"
