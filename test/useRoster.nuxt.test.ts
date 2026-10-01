@@ -1,9 +1,9 @@
 // @vitest-environment nuxt
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
+import { fakeApi } from './utils/fakeApi'
 
-interface FetchCall { url: string, opts: { method?: string, body?: unknown } }
-const calls: FetchCall[] = []
+const api = fakeApi(['/api/invites/roster'], () => ({ ok: true, added: 1, skipped: 0, emailed: 1, failed: 0, invalid: [], error: null }))
 
 let rows: Array<Record<string, unknown>> = []
 let loadError: { message: string } | null = null
@@ -26,15 +26,10 @@ const person = (email: string, accepted: string | null) => ({
 })
 
 beforeEach(() => {
-  calls.length = 0
+  api.reset()
   loadError = null
   rows = [person('sam@x.com', '2026-01-02'), person('jo@x.com', null)]
-  vi.stubGlobal('$fetch', (url: string, opts: { method?: string, body?: unknown }) => {
-    calls.push({ url, opts })
-    return Promise.resolve({ ok: true, added: 1, skipped: 0, emailed: 1, failed: 0, invalid: [], error: null })
-  })
 })
-afterEach(() => vi.unstubAllGlobals())
 
 describe('useRoster', () => {
   it('loads the whole allowlist, joined and pending alike', async () => {
@@ -67,9 +62,10 @@ describe('useRoster', () => {
   it('POSTs the raw paste to the roster endpoint', async () => {
     const { addToRoster } = useRoster()
     const result = await addToRoster('a@x.com\nb@x.com')
-    expect(calls[0]).toMatchObject({
+    expect(api.calls[0]).toMatchObject({
       url: '/api/invites/roster',
-      opts: { method: 'POST', body: { text: 'a@x.com\nb@x.com' } }
+      method: 'POST',
+      body: { text: 'a@x.com\nb@x.com' }
     })
     expect(result.added).toBe(1)
   })
