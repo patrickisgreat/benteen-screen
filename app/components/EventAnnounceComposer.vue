@@ -34,11 +34,12 @@ const state = reactive<{ subject: string, message: string, scope: AnnounceScope,
   scope: DEFAULT_ANNOUNCE_SCOPE,
   emails: []
 })
-// How many people the chosen audience resolves to (null until previewed, or if
-// the preview failed — then we still allow sending and let the server decide).
+// How many people the chosen audience resolves to: null until the preview has
+// resolved (or if it failed). Sending waits for a real, non-zero count so the
+// number the admin saw is the number that goes out.
 const recipientCount = ref<number | null>(null)
 const sendLabel = computed(() => (recipientCount.value ? `Send to ${recipientCount.value}` : 'Send blast'))
-const canSend = computed(() => Boolean(props.eventId) && recipientCount.value !== 0)
+const canSend = computed(() => Boolean(props.eventId) && recipientCount.value !== null && recipientCount.value > 0)
 
 const messageHasText = computed(() => htmlToText(state.message).length > 0)
 

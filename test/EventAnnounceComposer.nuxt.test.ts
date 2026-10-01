@@ -162,6 +162,14 @@ describe('EventAnnounceComposer', () => {
     expect(send?.attributes('disabled')).toBeDefined()
   })
 
+  it('does not allow sending before the audience preview has resolved', async () => {
+    stubCount.value = null
+    const w = await mountComposer()
+    await flushPromises()
+    const send = w.findAll('button').find(b => b.text().includes('Send blast'))
+    expect(send?.attributes('disabled')).toBeDefined()
+  })
+
   it('sends the hand-picked emails with a custom audience', async () => {
     const w = await mountComposer()
     await w.get('[data-testid="pick-custom"]').trigger('click')
