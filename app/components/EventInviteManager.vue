@@ -368,7 +368,7 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
                   :color="options.theme === t ? 'primary' : 'neutral'"
                   :variant="options.theme === t ? 'solid' : 'outline'"
                   :aria-pressed="options.theme === t"
-                  @click="options.theme = t"
+                  @click="() => { options.theme = t }"
                 />
               </div>
             </div>

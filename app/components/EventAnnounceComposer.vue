@@ -154,7 +154,7 @@ async function onSubmit(event: FormSubmitEvent<FormData>): Promise<void> {
       <div v-if="savingTemplate" class="flex gap-2">
         <UInput v-model="templateName" placeholder="Template name" class="flex-1" @keydown.enter.prevent="onSaveTemplate" />
         <UButton label="Save" :disabled="!templateName.trim()" @click="onSaveTemplate" />
-        <UButton label="Cancel" color="neutral" variant="ghost" @click="savingTemplate = false" />
+        <UButton label="Cancel" color="neutral" variant="ghost" @click="() => { savingTemplate = false }" />
       </div>
 
       <div class="flex flex-wrap justify-between gap-2">
@@ -165,7 +165,7 @@ async function onSubmit(event: FormSubmitEvent<FormData>): Promise<void> {
           color="neutral"
           variant="outline"
           :disabled="!messageHasText"
-          @click="savingTemplate = true"
+          @click="() => { savingTemplate = true }"
         />
         <UButton
           type="submit"
