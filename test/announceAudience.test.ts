@@ -4,24 +4,29 @@ import { resolveAnnounceAudience } from '../server/utils/announceAudience'
 type Row = Record<string, unknown>
 
 // Chainable PostgREST-ish stub: `.from(table)` resolves to the fixture rows for
-// that table regardless of filters, except `event_invites` which honors the
-// `rsvp` filter so the "going" merge can be exercised.
+// that table, honoring the two filters the resolver relies on to narrow an
+// audience — `.eq('rsvp', …)` for the going merge and `.not('accepted_at', 'is', null)`
+// for members — so a regression dropping either filter fails here.
 function makeFakeDb(fixtures: Record<string, Row[]>, failOn?: string) {
   const from = (table: string) => {
-    const filters: Array<[string, unknown]> = []
+    const eqFilters: Array<[string, unknown]> = []
+    const notNull: string[] = []
     const chain: Record<string, unknown> = {
       select: () => chain,
-      not: () => chain,
       in: () => chain,
       eq: (col: string, val: unknown) => {
-        filters.push([col, val])
+        eqFilters.push([col, val])
+        return chain
+      },
+      not: (col: string, op: string, val: unknown) => {
+        if (op === 'is' && val === null) notNull.push(col)
         return chain
       },
       then: (resolve: (v: unknown) => void) => {
         if (failOn === table) return resolve({ data: null, error: { message: `${table} failed` } })
         let rows = fixtures[table] ?? []
-        const rsvp = filters.find(([c]) => c === 'rsvp')
-        if (rsvp) rows = rows.filter(r => r.rsvp === rsvp[1])
+        for (const [col, val] of eqFilters) rows = rows.filter(r => r[col] === val)
+        for (const col of notNull) rows = rows.filter(r => r[col] != null)
         resolve({ data: rows, error: null })
       }
     }
@@ -36,9 +41,9 @@ const eventId = 'evt-1'
 describe('resolveAnnounceAudience', () => {
   it('guests = this event\'s e-vite list, deduped case-insensitively', async () => {
     const db = makeFakeDb({ event_invites: [
-      { email: 'Ada@x.com', display_name: 'Ada', rsvp: null },
-      { email: 'ada@x.com', display_name: null, rsvp: 'going' },
-      { email: 'bo@x.com', display_name: null, rsvp: 'no' }
+      { email: 'Ada@x.com', display_name: 'Ada', rsvp: null, event_id: eventId },
+      { email: 'ada@x.com', display_name: null, rsvp: 'going', event_id: eventId },
+      { email: 'bo@x.com', display_name: null, rsvp: 'no', event_id: eventId }
     ] })
     const out = await resolveAnnounceAudience(db, eventId, 'guests', [])
     expect(out).toEqual([{ email: 'ada@x.com', name: 'Ada' }, { email: 'bo@x.com', name: null }])
@@ -46,12 +51,12 @@ describe('resolveAnnounceAudience', () => {
 
   it('going merges in-app going members with e-vite guests who replied going', async () => {
     const db = makeFakeDb({
-      rsvps: [{ user_id: 'u1' }],
+      rsvps: [{ user_id: 'u1', event_id: eventId, status: 'going' }],
       profiles: [{ email: 'member@x.com', display_name: 'Member' }],
       event_invites: [
-        { email: 'guest@x.com', display_name: 'Guest', rsvp: 'going' },
-        { email: 'nope@x.com', display_name: 'Nope', rsvp: 'no' },
-        { email: 'member@x.com', display_name: null, rsvp: 'going' } // same person as u1
+        { email: 'guest@x.com', display_name: 'Guest', rsvp: 'going', event_id: eventId },
+        { email: 'nope@x.com', display_name: 'Nope', rsvp: 'no', event_id: eventId },
+        { email: 'member@x.com', display_name: null, rsvp: 'going', event_id: eventId } // same person as u1
       ]
     })
     const out = await resolveAnnounceAudience(db, eventId, 'going', [])
@@ -60,14 +65,23 @@ describe('resolveAnnounceAudience', () => {
   })
 
   it('going with nobody RSVP\'d in-app still reaches e-vite going replies', async () => {
-    const db = makeFakeDb({ rsvps: [], event_invites: [{ email: 'guest@x.com', display_name: null, rsvp: 'going' }] })
+    const db = makeFakeDb({ rsvps: [], event_invites: [{ email: 'guest@x.com', display_name: null, rsvp: 'going', event_id: eventId }] })
     expect(await resolveAnnounceAudience(db, eventId, 'going', [])).toEqual([{ email: 'guest@x.com', name: null }])
   })
 
-  it('members and invited both read the club roster', async () => {
-    const db = makeFakeDb({ invites: [{ email: 'a@x.com', display_name: 'A' }, { email: 'b@x.com', display_name: null }] })
-    expect((await resolveAnnounceAudience(db, eventId, 'members', [])).map(r => r.email)).toEqual(['a@x.com', 'b@x.com'])
-    expect((await resolveAnnounceAudience(db, eventId, 'invited', [])).map(r => r.email)).toEqual(['a@x.com', 'b@x.com'])
+  const roster = [
+    { email: 'joined@x.com', display_name: 'Joined', accepted_at: '2026-06-01T00:00:00Z' },
+    { email: 'pending@x.com', display_name: null, accepted_at: null }
+  ]
+
+  it('members = only roster entries who have accepted (signed in)', async () => {
+    const out = await resolveAnnounceAudience(makeFakeDb({ invites: roster }), eventId, 'members', [])
+    expect(out.map(r => r.email)).toEqual(['joined@x.com'])
+  })
+
+  it('invited = the whole roster, joined or not', async () => {
+    const out = await resolveAnnounceAudience(makeFakeDb({ invites: roster }), eventId, 'invited', [])
+    expect(out.map(r => r.email)).toEqual(['joined@x.com', 'pending@x.com'])
   })
 
   it('custom returns exactly the picked emails, naming the ones who are members', async () => {
