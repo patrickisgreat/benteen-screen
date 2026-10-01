@@ -2,11 +2,15 @@
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { CommsTemplate } from '#shared/types/comms-template'
+import { ANNOUNCE_SCOPES, DEFAULT_ANNOUNCE_SCOPE, type AnnounceScope } from '#shared/utils/announce'
 
 // Admin event blast composer → POST /api/events/announce (admin-gated server-side).
-// The message is rich text (tiptap); the server sanitizes it to a strict tag
-// allowlist before it goes into the email. Templates let a recurring blast
-// (e.g. the vote + bring-list nudge) be applied, tweaked, and re-sent later.
+// The audience is chosen in AnnounceAudiencePicker, which also previews exactly
+// who (and how many) will get it — the send button carries that count, and an
+// empty audience can't be sent. The message is rich text (tiptap); the server
+// sanitizes it to a strict tag allowlist before it goes into the email. Templates
+// let a recurring blast (e.g. the vote + bring-list nudge) be applied, tweaked,
+// and re-sent later.
 const props = defineProps<{ eventId: string | undefined }>()
 const toast = useToast()
 const { run } = useToastAction()
@@ -16,23 +20,25 @@ const { templates, saveTemplate, removeTemplate } = useCommsTemplates()
 const savingTemplate = ref(false)
 const templateName = ref('')
 
-const scopeOptions = [
-  { label: 'Everyone invited', value: 'invited' as const },
-  { label: 'Members (joined)', value: 'members' as const },
-  { label: 'Going to this event', value: 'going' as const }
-]
-type Scope = (typeof scopeOptions)[number]['value']
-
 const schema = z.object({
   subject: z.string().trim().max(200).optional(),
   message: z.string().max(10000).refine(m => htmlToText(m).length > 0, 'Write a message'),
-  scope: z.enum(['invited', 'members', 'going'])
-})
-const state = reactive<{ subject: string, message: string, scope: Scope }>({
+  scope: z.enum(ANNOUNCE_SCOPES),
+  emails: z.array(z.string())
+}).refine(d => d.scope !== 'custom' || d.emails.length > 0, { message: 'Pick at least one person', path: ['emails'] })
+type FormData = z.output<typeof schema>
+
+const state = reactive<{ subject: string, message: string, scope: AnnounceScope, emails: string[] }>({
   subject: '',
   message: '',
-  scope: 'members'
+  scope: DEFAULT_ANNOUNCE_SCOPE,
+  emails: []
 })
+// How many people the chosen audience resolves to (null until previewed, or if
+// the preview failed — then we still allow sending and let the server decide).
+const recipientCount = ref<number | null>(null)
+const sendLabel = computed(() => (recipientCount.value ? `Send to ${recipientCount.value}` : 'Send blast'))
+const canSend = computed(() => Boolean(props.eventId) && recipientCount.value !== 0)
 
 const messageHasText = computed(() => htmlToText(state.message).length > 0)
 
@@ -67,7 +73,7 @@ function messageOf(error: unknown): string | undefined {
   return error instanceof Error ? error.message : undefined
 }
 
-async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: string, scope: Scope }>): Promise<void> {
+async function onSubmit(event: FormSubmitEvent<FormData>): Promise<void> {
   if (!props.eventId) {
     toast.add({ title: 'Pick an event first', color: 'warning' })
     return
@@ -76,7 +82,13 @@ async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: stri
   try {
     const res = await $fetch<{ ok: boolean, count: number, failed?: number, error?: string | null }>('/api/events/announce', {
       method: 'POST',
-      body: { eventId: props.eventId, subject: event.data.subject || undefined, message: event.data.message, scope: event.data.scope }
+      body: {
+        eventId: props.eventId,
+        subject: event.data.subject || undefined,
+        message: event.data.message,
+        scope: event.data.scope,
+        emails: event.data.scope === 'custom' ? event.data.emails : undefined
+      }
     })
     const failed = res.failed ?? 0
     if (res.count && failed) {
@@ -123,13 +135,12 @@ async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: stri
     </div>
 
     <UForm :schema="schema" :state="state" class="space-y-3" @submit="onSubmit">
-      <UFormField label="Audience" name="scope">
-        <USelectMenu
-          v-model="state.scope"
-          :items="scopeOptions"
-          value-key="value"
-          :search-input="false"
-          class="w-full sm:max-w-xs"
+      <UFormField name="scope">
+        <AnnounceAudiencePicker
+          v-model:scope="state.scope"
+          v-model:emails="state.emails"
+          :event-id="eventId"
+          @count="recipientCount = $event"
         />
       </UFormField>
       <UFormField label="Subject" name="subject" hint="Optional">
@@ -155,7 +166,14 @@ async function onSubmit(event: FormSubmitEvent<{ subject?: string, message: stri
           :disabled="!messageHasText"
           @click="savingTemplate = true"
         />
-        <UButton type="submit" label="Send blast" icon="i-lucide-megaphone" :loading="sending" :disabled="!eventId" class="ml-auto" />
+        <UButton
+          type="submit"
+          :label="sendLabel"
+          icon="i-lucide-megaphone"
+          :loading="sending"
+          :disabled="!canSend"
+          class="ml-auto"
+        />
       </div>
     </UForm>
   </div>
