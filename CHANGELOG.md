@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.22.0...v1.23.0) (2026-10-01)
+
+
+### Features
+
+* choose exactly who a comms blast goes to, with a live recipient count ([#194](https://github.com/patrickisgreat/benteen-screen/issues/194)) ([882694a](https://github.com/patrickisgreat/benteen-screen/commit/882694a08cf436d4653a71be800983304e921fd7))
+
 ## [1.22.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.21.0...v1.22.0) (2026-09-14)
 
 
