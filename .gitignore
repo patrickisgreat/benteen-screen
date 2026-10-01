@@ -41,3 +41,5 @@ supabase/.branches
 
 # Aider (legacy)
 .aider*
+# Claude Code agent worktrees
+.claude/worktrees/

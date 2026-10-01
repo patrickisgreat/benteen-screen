@@ -1,67 +1,44 @@
 import { serverSupabaseClient } from '#supabase/server'
-import { z } from 'zod'
 import type { Database } from '~/types/database.types'
 
-const bodySchema = z.object({
-  eventId: z.string().uuid(),
-  subject: z.string().trim().max(200).optional(),
-  // Rich HTML from the composer's editor (markup inflates length — hence 10k);
-  // must have actual text, not just empty tags. Sanitized in buildAnnounceEmail.
-  message: z.string().max(10000).refine(m => htmlToText(m).length > 0),
-  scope: z.enum(['members', 'going', 'invited'])
-})
-
 /**
- * Admin event blast: emails members about an event. Runs under the caller's own
- * session (RLS): an admin is allowlisted, so they can read invites/rsvps/profiles
- * — no service role needed (a misconfigured service-role key can't break it).
- * Recipients are BCC'd so addresses aren't leaked. Resend key is server-only
- * (Invariant 2).
+ * Admin event blast: emails a chosen audience about an event, or with
+ * `preview: true` just reports who that audience is (count + names) so the
+ * composer can show "will email N people" before anything goes out. Runs under
+ * the caller's own session (RLS): an admin is allowlisted, so they can read
+ * invites/rsvps/profiles/event_invites — no service role needed. Recipients are
+ * BCC'd so addresses aren't leaked. Resend key is server-only (Invariant 2).
  *
- *  - invited: everyone on the allowlist (incl. not-yet-joined)
- *  - members: people who've actually signed in (accepted invites)
- *  - going:   people who RSVP'd "going" to this event
+ * Audiences (see shared/utils/announce.ts): this night's guest list, those going,
+ * hand-picked people, all members, or the whole club roster.
  */
 export default defineEventHandler(async (event) => {
   const { user, userId } = await requireUser(event)
 
   // RLS-scoped client: runs as the signed-in user via their session cookie.
-  const admin = await serverSupabaseClient<Database>(event)
-  await requireAdmin(admin, userId)
+  const db = await serverSupabaseClient<Database>(event)
+  await requireAdmin(db, userId)
 
-  const parsed = bodySchema.safeParse(await readBody(event))
-  if (!parsed.success) throw createError({ statusCode: 400, statusMessage: 'Invalid announcement' })
-  const { eventId, subject, message, scope } = parsed.data
+  const parsed = parseAnnounceRequest(await readBody(event))
+  if (!parsed.ok) throw createError({ statusCode: 400, statusMessage: parsed.error })
+  const request = parsed.value
 
-  const { data: ev } = await admin.from('events').select('title, event_date').eq('id', eventId).single()
+  const { data: ev } = await db.from('events').select('title, event_date').eq('id', request.eventId).single()
   if (!ev) throw createError({ statusCode: 404, statusMessage: 'Event not found' })
 
-  let emails: string[] = []
-  if (scope === 'invited') {
-    const { data } = await admin.from('invites').select('email')
-    emails = uniqueEmails((data ?? []).map(row => row.email))
-  } else if (scope === 'members') {
-    const { data } = await admin.from('invites').select('email').not('accepted_at', 'is', null)
-    emails = uniqueEmails((data ?? []).map(row => row.email))
-  } else {
-    const { data: going } = await admin
-      .from('rsvps').select('user_id').eq('event_id', eventId).eq('status', 'going')
-    const ids = (going ?? []).map(row => row.user_id)
-    if (ids.length) {
-      const { data: profs } = await admin.from('profiles').select('email').in('id', ids)
-      emails = uniqueEmails((profs ?? []).map(profile => profile.email))
-    }
-  }
+  const recipients = await resolveAnnounceAudience(db, request.eventId, request.scope, request.emails)
+  if (request.preview) return { ok: true, count: recipients.length, recipients }
 
-  if (!emails.length) return { ok: true, count: 0 }
+  const emails = recipients.map(r => r.email)
+  if (!emails.length) return { ok: true, count: 0, failed: 0, error: null }
 
   const { resendApiKey, resendFrom } = requireEmailConfig(event)
 
   const mail = buildAnnounceEmail({
     eventTitle: ev.title,
     eventDate: ev.event_date ? formatEmailDate(ev.event_date) : null,
-    message,
-    subject,
+    message: request.message,
+    subject: request.subject,
     link: `${resolveOrigin(event)}/overview`
   })
 
@@ -78,10 +55,10 @@ export default defineEventHandler(async (event) => {
   // Record what actually went out (best-effort — a logging failure must not fail
   // the request; surface it in logs instead).
   if (sent > 0) {
-    const { error: logError } = await admin.from('comms_log').insert({
-      event_id: eventId,
+    const { error: logError } = await db.from('comms_log').insert({
+      event_id: request.eventId,
       kind: 'announcement',
-      scope,
+      scope: request.scope,
       subject: mail.subject,
       recipient_count: sent,
       sent_by: userId

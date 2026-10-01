@@ -1,12 +1,35 @@
 // @vitest-environment nuxt
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, ref, watch } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import EventAnnounceComposer from '../app/components/EventAnnounceComposer.vue'
 
-const calls: Array<{ url: string, body: unknown }> = []
+interface AnnounceBody { preview?: boolean, scope?: string, emails?: string[], message?: string, subject?: string, eventId?: string }
+const calls: Array<{ url: string, body: AnnounceBody }> = []
+// The audience picker previews the audience on mount; the real blast is the
+// non-preview call.
+const sends = () => calls.filter(c => !c.body.preview)
 mockNuxtImport('useToast', () => () => ({ add: () => {} }))
+
+// The audience picker has its own test; here it's a stub that reports whatever
+// count the test wants and exposes a button to switch to a custom audience.
+const stubCount = ref<number | null>(3)
+const AnnounceAudiencePickerStub = defineComponent({
+  props: { scope: { type: String, required: true }, emails: { type: Array, default: () => [] }, eventId: { type: String, default: undefined } },
+  emits: ['update:scope', 'update:emails', 'count'],
+  setup(props, { emit }) {
+    watch(stubCount, c => emit('count', c), { immediate: true })
+    return () => h('button', {
+      'type': 'button',
+      'data-testid': 'pick-custom',
+      'onClick': () => {
+        emit('update:scope', 'custom')
+        emit('update:emails', ['ada@x.com'])
+      }
+    }, props.scope)
+  }
+})
 
 // The tiptap editor needs a real DOM selection model; stub it with a textarea
 // that honors the same v-model contract so tests drive the message like text.
@@ -38,16 +61,18 @@ mockNuxtImport('useCommsTemplates', () => () => ({
 async function mountComposer() {
   return await mountSuspended(EventAnnounceComposer, {
     props: { eventId: 'e1' },
-    global: { stubs: { RichTextEditor: RichTextEditorStub } }
+    global: { stubs: { RichTextEditor: RichTextEditorStub, AnnounceAudiencePicker: AnnounceAudiencePickerStub } }
   })
 }
 
 beforeEach(() => {
   calls.length = 0
+  stubCount.value = 3
   saveTemplate.mockClear()
   removeTemplate.mockClear()
-  vi.stubGlobal('$fetch', (url: string, opts: { body: unknown }) => {
+  vi.stubGlobal('$fetch', (url: string, opts: { body: AnnounceBody }) => {
     calls.push({ url, body: opts.body })
+    if (opts.body.preview) return Promise.resolve({ ok: true, count: 3, recipients: [{ email: 'a@x', name: 'A' }, { email: 'b@x', name: null }, { email: 'c@x', name: 'C' }] })
     return Promise.resolve({ ok: true, count: 3 })
   })
 })
@@ -59,15 +84,17 @@ describe('EventAnnounceComposer', () => {
     await w.find('textarea').setValue('Doors at 7')
     await w.find('form').trigger('submit')
     await flushPromises()
-    expect(calls[0]?.url).toBe('/api/events/announce')
-    expect(calls[0]?.body).toMatchObject({ eventId: 'e1', message: 'Doors at 7', scope: 'members' })
+    expect(sends()[0]?.url).toBe('/api/events/announce')
+    // Defaults to this night's guest list — never the whole club by accident.
+    expect(sends()[0]?.body).toMatchObject({ eventId: 'e1', message: 'Doors at 7', scope: 'guests' })
+    expect(sends()[0]?.body.emails).toBeUndefined()
   })
 
   it('does not post an empty message', async () => {
     const w = await mountComposer()
     await w.find('form').trigger('submit')
     await flushPromises()
-    expect(calls).toHaveLength(0)
+    expect(sends()).toHaveLength(0)
   })
 
   it('does not post markup with no text (an empty editor emits <p></p>)', async () => {
@@ -75,7 +102,7 @@ describe('EventAnnounceComposer', () => {
     await w.find('textarea').setValue('<p></p>')
     await w.find('form').trigger('submit')
     await flushPromises()
-    expect(calls).toHaveLength(0)
+    expect(sends()).toHaveLength(0)
   })
 
   it('applying a template fills the message and subject, then sends it', async () => {
@@ -87,7 +114,7 @@ describe('EventAnnounceComposer', () => {
     expect((subjectInput?.element as HTMLInputElement).value).toBe('Vote + bring list')
     await w.find('form').trigger('submit')
     await flushPromises()
-    expect(calls[0]?.body).toMatchObject({ message: '<p>Go <strong>vote</strong>!</p>', subject: 'Vote + bring list' })
+    expect(sends()[0]?.body).toMatchObject({ message: '<p>Go <strong>vote</strong>!</p>', subject: 'Vote + bring list' })
   })
 
   it('applying a subject-less template clears a previously typed subject', async () => {
@@ -119,5 +146,36 @@ describe('EventAnnounceComposer', () => {
     await delBtn?.trigger('click')
     await flushPromises()
     expect(removeTemplate).toHaveBeenCalledWith(templates.value[0])
+  })
+
+  it('labels the send button with the previewed recipient count', async () => {
+    const w = await mountComposer()
+    await flushPromises()
+    expect(w.findAll('button').some(b => b.text().includes('Send to 3'))).toBe(true)
+  })
+
+  it('refuses to send to an empty audience', async () => {
+    stubCount.value = 0
+    const w = await mountComposer()
+    await flushPromises()
+    const send = w.findAll('button').find(b => b.text().includes('Send blast'))
+    expect(send?.attributes('disabled')).toBeDefined()
+  })
+
+  it('does not allow sending before the audience preview has resolved', async () => {
+    stubCount.value = null
+    const w = await mountComposer()
+    await flushPromises()
+    const send = w.findAll('button').find(b => b.text().includes('Send blast'))
+    expect(send?.attributes('disabled')).toBeDefined()
+  })
+
+  it('sends the hand-picked emails with a custom audience', async () => {
+    const w = await mountComposer()
+    await w.get('[data-testid="pick-custom"]').trigger('click')
+    await w.find('textarea').setValue('Just you two')
+    await w.find('form').trigger('submit')
+    await flushPromises()
+    expect(sends()[0]?.body).toMatchObject({ scope: 'custom', emails: ['ada@x.com'], message: 'Just you two' })
   })
 })
