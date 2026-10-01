@@ -143,7 +143,7 @@ function submit(): void {
                 label="Remove"
                 color="neutral"
                 variant="ghost"
-                @click="posterUrl = null"
+                @click="() => { posterUrl = null }"
               />
             </div>
             <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFileChange">
@@ -159,7 +159,7 @@ function submit(): void {
 
     <template #footer>
       <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full">
-        <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="open = false" />
+        <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="() => { open = false }" />
         <UButton :label="isEdit ? 'Save changes' : 'Add event'" class="justify-center" :disabled="!canSave || uploading" @click="submit" />
       </div>
     </template>

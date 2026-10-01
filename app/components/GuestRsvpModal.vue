@@ -67,7 +67,7 @@ function onGuests(count: number): void {
           color="neutral"
           variant="ghost"
           class="justify-center"
-          @click="open = false"
+          @click="() => { open = false }"
         />
         <UButton
           label="Email them"

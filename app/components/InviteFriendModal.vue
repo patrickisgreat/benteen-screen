@@ -64,7 +64,7 @@ async function onSubmit(event: FormSubmitEvent<{ email: string, name?: string }>
           <UInput v-model="state.name" placeholder="Jordan" class="w-full" />
         </UFormField>
         <div class="flex justify-end gap-2 pt-1">
-          <UButton label="Cancel" color="neutral" variant="ghost" @click="open = false" />
+          <UButton label="Cancel" color="neutral" variant="ghost" @click="() => { open = false }" />
           <UButton type="submit" label="Send invite" icon="i-lucide-send" :loading="submitting" />
         </div>
       </UForm>
