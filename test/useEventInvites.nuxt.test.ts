@@ -1,8 +1,17 @@
 // @vitest-environment nuxt
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { ref } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
+import { fakeApi } from './utils/fakeApi'
+
+// Every server route the composable can call for event 'e'.
+const api = fakeApi([
+  '/api/events/e/invites/send',
+  '/api/events/e/reminders/send',
+  '/api/events/e/invites/inv-1/rsvp',
+  '/api/events/e/invites/inv-1/rsvp-confirmation'
+], () => ({ ok: true, status: 'going', plusOnes: 0, sent: 1, failed: 0, error: null }))
 
 let list: Array<Record<string, unknown>> = [] // current event's invites (refresh)
 let eventsList: Array<Record<string, unknown>> = [] // other events (seed)
@@ -66,15 +75,8 @@ const supabase = {
 }
 mockNuxtImport('useSupabaseClient', () => () => supabase)
 
-interface FetchCall { url: string, opts: { method?: string, body?: unknown } }
-const fetches: FetchCall[] = []
-
 beforeEach(() => {
-  fetches.length = 0
-  vi.stubGlobal('$fetch', (url: string, opts: FetchCall['opts']) => {
-    fetches.push({ url, opts })
-    return Promise.resolve({ ok: true, status: 'going', plusOnes: 0, sent: 1, failed: 0, error: null })
-  })
+  api.reset()
   list = []
   eventsList = []
   poolList = []
@@ -83,7 +85,6 @@ beforeEach(() => {
   ops.inserted = []
   ops.deleted = []
 })
-afterEach(() => vi.unstubAllGlobals())
 
 describe('useEventInvites', () => {
   it('loads invites and computes Evite tracking stats', async () => {
@@ -207,28 +208,28 @@ describe('useEventInvites', () => {
     const { setRsvp } = useEventInvites(ref('e'))
     await flushPromises()
     await setRsvp('inv-1', 'going', 2)
-    expect(fetches[0]).toEqual({ url: '/api/events/e/invites/inv-1/rsvp', opts: { method: 'POST', body: { status: 'going', plusOnes: 2 } } })
+    expect(api.calls[0]).toMatchObject({ url: '/api/events/e/invites/inv-1/rsvp', method: 'POST', body: { status: 'going', plusOnes: 2 } })
   })
 
   it('setRsvp with a null status clears the reply', async () => {
     const { setRsvp } = useEventInvites(ref('e'))
     await flushPromises()
     await setRsvp('inv-1', null, 0)
-    expect(fetches[0]!.opts.body).toEqual({ status: null, plusOnes: 0 })
+    expect(api.calls[0]!.body).toEqual({ status: null, plusOnes: 0 })
   })
 
   it('setRsvp is a no-op without an event', async () => {
     const { setRsvp } = useEventInvites(ref(null))
     await flushPromises()
     await setRsvp('inv-1', 'going', 0)
-    expect(fetches).toHaveLength(0)
+    expect(api.calls).toHaveLength(0)
   })
 
   it('notifyRsvp posts to the confirmation route and returns the send result', async () => {
     const { notifyRsvp } = useEventInvites(ref('e'))
     await flushPromises()
     const result = await notifyRsvp('inv-1')
-    expect(fetches[0]).toMatchObject({ url: '/api/events/e/invites/inv-1/rsvp-confirmation', opts: { method: 'POST' } })
+    expect(api.calls[0]).toMatchObject({ url: '/api/events/e/invites/inv-1/rsvp-confirmation', method: 'POST' })
     expect(result).toEqual({ sent: 1, failed: 0, error: null })
   })
 })

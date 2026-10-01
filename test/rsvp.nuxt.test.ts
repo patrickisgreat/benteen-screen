@@ -1,27 +1,20 @@
 // @vitest-environment nuxt
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import RsvpPage from '../app/pages/rsvp.vue'
+import { fakeApi } from './utils/fakeApi'
 
-const calls: Array<{ url: string, body: unknown }> = []
+const api = fakeApi(['/api/rsvp'], () => ({ ok: true, status: 'going' }))
 
 mockNuxtImport('useRoute', () => () => ({ query: { token: 'abc', status: 'going' } }))
 
-beforeEach(() => {
-  calls.length = 0
-  vi.stubGlobal('$fetch', (url: string, opts: { body: unknown }) => {
-    calls.push({ url, body: opts.body })
-    return Promise.resolve({ ok: true, status: 'going' })
-  })
-})
-afterEach(() => vi.unstubAllGlobals())
+beforeEach(() => api.reset())
 
 describe('rsvp page', () => {
   it('records the RSVP from the email link on mount and confirms', async () => {
     const w = await mountSuspended(RsvpPage)
-    await flushPromises()
-    expect(calls[0]).toMatchObject({ url: '/api/rsvp', body: { token: 'abc', status: 'going' } })
-    expect(w.text()).toContain('You\'re going')
+    // The faked route answers asynchronously; wait for the confirmation to render.
+    await vi.waitFor(() => expect(w.text()).toContain('You\'re going'))
+    expect(api.calls[0]).toMatchObject({ url: '/api/rsvp', method: 'POST', body: { token: 'abc', status: 'going' } })
   })
 })

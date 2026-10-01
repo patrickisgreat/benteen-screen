@@ -1,15 +1,15 @@
 // @vitest-environment nuxt
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref, watch } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import EventAnnounceComposer from '../app/components/EventAnnounceComposer.vue'
+import { fakeApi, type ApiCall } from './utils/fakeApi'
 
 interface AnnounceBody { preview?: boolean, scope?: string, emails?: string[], message?: string, subject?: string, eventId?: string }
-const calls: Array<{ url: string, body: AnnounceBody }> = []
-// The audience picker previews the audience on mount; the real blast is the
-// non-preview call.
-const sends = () => calls.filter(c => !c.body.preview)
+const api = fakeApi(['/api/events/announce'], () => ({ ok: true, count: 3 }))
+// The audience picker is stubbed below, so every recorded call is a real blast.
+const sends = () => api.calls as Array<ApiCall & { body: AnnounceBody }>
 mockNuxtImport('useToast', () => () => ({ add: () => {} }))
 
 // The audience picker has its own test; here it's a stub that reports whatever
@@ -66,17 +66,11 @@ async function mountComposer() {
 }
 
 beforeEach(() => {
-  calls.length = 0
+  api.reset()
   stubCount.value = 3
   saveTemplate.mockClear()
   removeTemplate.mockClear()
-  vi.stubGlobal('$fetch', (url: string, opts: { body: AnnounceBody }) => {
-    calls.push({ url, body: opts.body })
-    if (opts.body.preview) return Promise.resolve({ ok: true, count: 3, recipients: [{ email: 'a@x', name: 'A' }, { email: 'b@x', name: null }, { email: 'c@x', name: 'C' }] })
-    return Promise.resolve({ ok: true, count: 3 })
-  })
 })
-afterEach(() => vi.unstubAllGlobals())
 
 describe('EventAnnounceComposer', () => {
   it('posts the announcement for the selected event', async () => {
