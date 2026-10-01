@@ -163,7 +163,7 @@ function onHeartClick(e: MouseEvent): void {
           />
           <div class="flex items-center gap-1">
             <UButton label="Save" icon="i-lucide-check" size="xs" @click="saveBlurb" />
-            <UButton label="Cancel" color="neutral" variant="ghost" size="xs" @click="editingBlurb = false" />
+            <UButton label="Cancel" color="neutral" variant="ghost" size="xs" @click="() => { editingBlurb = false }" />
           </div>
         </div>
         <template v-else>
