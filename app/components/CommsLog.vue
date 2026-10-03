@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import type { CommsLogEntry } from '~/composables/useCommsLog'
 
-defineProps<{ entries: CommsLogEntry[] }>()
+defineProps<{
+  entries: CommsLogEntry[]
+  /** True while a delivery-status refresh is running. */
+  syncing?: boolean
+}>()
+
+defineEmits<{ sync: [] }>()
 
 const KIND = {
   announcement: { icon: 'i-lucide-megaphone', label: 'Announcement' },
@@ -19,9 +25,21 @@ const STATUS = {
 
 <template>
   <div>
-    <h3 class="text-sm font-semibold text-muted mb-2">
-      Sent communications
-    </h3>
+    <div class="flex items-center justify-between gap-2 mb-2">
+      <h3 class="text-sm font-semibold text-muted">
+        Sent communications
+      </h3>
+      <UButton
+        v-if="entries.length"
+        label="Refresh delivery status"
+        icon="i-lucide-refresh-cw"
+        size="xs"
+        color="neutral"
+        variant="ghost"
+        :loading="syncing"
+        @click="$emit('sync')"
+      />
+    </div>
     <div v-if="entries.length" class="space-y-2">
       <UCard v-for="e in entries" :key="e.id" variant="subtle" :ui="{ body: 'p-3' }">
         <div class="flex items-start gap-3">
@@ -35,6 +53,11 @@ const STATUS = {
               · {{ e.recipientCount }} recipient{{ e.recipientCount === 1 ? '' : 's' }}
               <span v-if="e.failedCount"> · {{ e.failedCount }} failed</span>
               <span v-if="e.sentByName"> · by {{ e.sentByName }}</span>
+            </p>
+            <p v-if="e.delivery" class="text-xs text-muted" data-testid="delivery-stats">
+              {{ e.delivery.delivered }} delivered · {{ e.delivery.opened }} opened
+              <span v-if="e.delivery.clicked"> · {{ e.delivery.clicked }} clicked</span>
+              <span v-if="e.delivery.bounced" class="text-error"> · {{ e.delivery.bounced }} bounced</span>
             </p>
             <p v-if="e.error" class="text-xs text-error mt-1 break-words">
               {{ e.error }}
