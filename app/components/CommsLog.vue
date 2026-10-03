@@ -13,7 +13,8 @@ const KIND = {
   announcement: { icon: 'i-lucide-megaphone', label: 'Announcement' },
   invite: { icon: 'i-lucide-mail-plus', label: 'E-vite' },
   reminder: { icon: 'i-lucide-alarm-clock', label: 'Reminder' },
-  rsvp_confirmation: { icon: 'i-lucide-mail-check', label: 'RSVP confirmation' }
+  rsvp_confirmation: { icon: 'i-lucide-mail-check', label: 'RSVP confirmation' },
+  poll: { icon: 'i-lucide-vote', label: 'Poll' }
 } as const
 
 const STATUS = {

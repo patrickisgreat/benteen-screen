@@ -521,11 +521,13 @@ function onSelectEvent(event: MovieEvent): void {
 
       <template #comms>
         <p class="text-sm text-muted mb-4">
-          Email an announcement or reminder about an event. Recipients are BCC'd.
+          Email an announcement or reminder about an event. Each person gets their own copy.
         </p>
         <EventPicker v-model="selectedEventId" :items="eventOptions" />
         <template v-if="selectedEventId">
           <EventAnnounceComposer :event-id="selectedEventId" class="max-w-xl" />
+          <USeparator class="max-w-xl my-6" />
+          <EventPolls :event-id="selectedEventId" class="max-w-xl" />
           <CommsLog :entries="commsLog" :syncing="syncingDelivery" class="max-w-xl mt-6" @sync="refreshDeliveryStatus" />
         </template>
         <UCard v-else variant="subtle" class="text-center text-muted">
