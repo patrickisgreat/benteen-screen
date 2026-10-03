@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { htmlToText, uniqueEmails } from './email'
 
-/** Who an event announcement goes to. Ordered from narrowest to widest. */
-export const ANNOUNCE_SCOPES = ['guests', 'going', 'custom', 'members', 'invited'] as const
+/** Who an event announcement goes to. This night's audiences first, then out to
+ *  the whole club. */
+export const ANNOUNCE_SCOPES = ['guests', 'unopened', 'going', 'custom', 'members', 'invited'] as const
 export type AnnounceScope = (typeof ANNOUNCE_SCOPES)[number]
 
 export interface AnnounceScopeOption {
@@ -15,6 +16,7 @@ export interface AnnounceScopeOption {
  *  description of exactly who is included, so "everyone" is never a surprise. */
 export const ANNOUNCE_SCOPE_OPTIONS: readonly AnnounceScopeOption[] = [
   { value: 'guests', label: 'This night\'s guest list', description: 'Everyone on the e-vite list for this event, whether or not they\'ve replied.' },
+  { value: 'unopened', label: 'Haven\'t opened the e-vite', description: 'Guests who were sent this night\'s e-vite and show no sign of seeing it: no open, no click, no reply. Your message goes out with their own RSVP buttons.' },
   { value: 'going', label: 'Going to this night', description: 'Only people who RSVP\'d going, in the app or by e-vite.' },
   { value: 'custom', label: 'Pick specific people', description: 'Search the directory and choose exactly who gets it.' },
   { value: 'members', label: 'All members', description: 'Everyone who has signed in to the app, across all events.' },

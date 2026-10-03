@@ -38,22 +38,17 @@ export default defineEventHandler(async (event) => {
   // Recipients who are on this night's guest list: their opens count toward
   // their guest row, the same as the e-vite's. Best-effort — without the lookup
   // the announcement is still tracked per message.
-  const { data: guests, error: guestsError } = await db.from('event_invites').select('id, email').eq('event_id', request.eventId)
+  const { data: guests, error: guestsError } = await db.from('event_invites').select('id, email, token').eq('event_id', request.eventId)
   if (guestsError) console.warn('[events/announce] guest lookup failed -', guestsError.message)
-  const inviteIdByEmail = new Map((guests ?? []).map(g => [g.email, g.id]))
-
-  const eventDate = ev.event_date ? formatEmailDate(ev.event_date) : null
-  const link = `${resolveOrigin(event)}/overview`
-  const mails = recipients.map((recipient) => {
-    const mail = buildAnnounceEmail({
-      eventTitle: ev.title,
-      eventDate,
-      message: request.message,
-      subject: request.subject,
-      link,
-      recipientName: recipient.name
-    })
-    return { email: recipient.email, inviteId: inviteIdByEmail.get(recipient.email) ?? null, ...mail }
+  const mails = buildAnnounceMails({
+    recipients,
+    guests: guests ?? [],
+    scope: request.scope,
+    origin: resolveOrigin(event),
+    eventTitle: ev.title,
+    eventDate: ev.event_date ? formatEmailDate(ev.event_date) : null,
+    message: request.message,
+    subject: request.subject
   })
 
   // One distinct email per person through the batch endpoint. Continues past a
