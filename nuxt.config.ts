@@ -58,9 +58,10 @@ export default defineNuxtConfig({
       login: '/login',
       callback: '/confirm',
       // Public routes: landing/about, the invite-only request page, the password
-      // recovery page, and /rsvp (guests RSVP from an e-vite without an account).
+      // recovery page, and /rsvp + /poll (guests answer from an email without an
+      // account; their e-vite token authenticates).
       // The invite-only gate lives in RLS + middleware/invited.global.ts.
-      exclude: ['/', '/about', '/request-access', '/reset-password', '/rsvp']
+      exclude: ['/', '/about', '/request-access', '/reset-password', '/rsvp', '/poll']
     }
   }
 })
