@@ -71,6 +71,24 @@ export interface Database {
         Update: { id?: string, resend_id?: string, event_id?: string | null, comms_log_id?: string | null, invite_id?: string | null, kind?: string, email?: string, sent_at?: string, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null }
         Relationships: []
       }
+      polls: {
+        Row: { id: string, event_id: string, question: string, closed_at: string | null, created_by: string | null, created_at: string }
+        Insert: { id?: string, event_id: string, question: string, closed_at?: string | null, created_by?: string | null, created_at?: string }
+        Update: { id?: string, event_id?: string, question?: string, closed_at?: string | null, created_by?: string | null, created_at?: string }
+        Relationships: []
+      }
+      poll_options: {
+        Row: { id: string, poll_id: string, label: string, position: number }
+        Insert: { id?: string, poll_id: string, label: string, position: number }
+        Update: { id?: string, poll_id?: string, label?: string, position?: number }
+        Relationships: []
+      }
+      poll_votes: {
+        Row: { poll_id: string, invite_id: string, option_id: string, voted_at: string }
+        Insert: { poll_id: string, invite_id: string, option_id: string, voted_at?: string }
+        Update: { poll_id?: string, invite_id?: string, option_id?: string, voted_at?: string }
+        Relationships: []
+      }
       comms_templates: {
         Row: { id: string, name: string, subject: string | null, body: string, created_by: string | null, created_at: string }
         Insert: { id?: string, name: string, subject?: string | null, body: string, created_by?: string | null, created_at?: string }
