@@ -22,6 +22,18 @@ export async function requireUser(event: H3Event): Promise<{ user: AuthUser, use
 }
 
 /**
+ * Guards a cron route: Vercel Cron authenticates with `Authorization: Bearer
+ * <CRON_SECRET>`. The secret keeps a public route from being triggered by anyone;
+ * an unset secret rejects everything rather than leaving the route open.
+ */
+export function requireCron(event: H3Event): void {
+  const { cronSecret } = useRuntimeConfig(event)
+  if (!cronSecret || getHeader(event, 'authorization') !== `Bearer ${cronSecret}`) {
+    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+  }
+}
+
+/**
  * Asserts the user is an admin, using their own RLS-scoped client. Surfaces the
  * profile lookup error as a 500 (rather than silently treating it as "not
  * admin"), then throws 403 if they aren't an admin.

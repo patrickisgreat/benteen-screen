@@ -50,25 +50,25 @@ export default defineEventHandler(async (event) => {
   })
 
   let error: string | null = null
+  let resendId: string | null = null
   try {
-    await sendEmail(resendApiKey, resendFrom, { to: invite.email, subject: mail.subject, html: mail.html, text: mail.text, replyTo: user.email ?? undefined })
+    ;({ id: resendId } = await sendEmail(resendApiKey, resendFrom, { to: invite.email, subject: mail.subject, html: mail.html, text: mail.text, replyTo: user.email ?? undefined }))
   } catch (err) {
     error = err instanceof Error ? err.message : 'Failed to send email'
   }
   const sent = error ? 0 : 1
   const failed = error ? 1 : 0
 
-  const { error: logError } = await db.from('comms_log').insert({
-    event_id: eventId,
+  await recordSend(db, {
+    eventId,
     kind: 'rsvp_confirmation',
     subject: mail.subject,
-    recipient_count: sent,
-    failed_count: failed,
-    status: commsStatus(sent, failed),
+    sentBy: userId,
+    sent,
+    failed,
     error,
-    sent_by: userId
+    messages: resendId ? [{ resendId, email: invite.email, inviteId: invite.id }] : []
   })
-  if (logError) console.error('[events/invites/rsvp-confirmation] comms_log insert failed -', logError.message)
 
   return { ok: true, sent, failed, error }
 })

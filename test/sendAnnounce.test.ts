@@ -1,55 +1,82 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Mock the Resend SDK's single-send endpoint (sendAnnounce → sendEmail → emails.send).
-const { emailSend } = vi.hoisted(() => ({ emailSend: vi.fn() }))
+// Mock the Resend SDK's batch endpoint (sendAnnounce → sendBatch → batch.send):
+// every recipient gets their own email, 100 per request.
+const { batchSend } = vi.hoisted(() => ({ batchSend: vi.fn() }))
 vi.mock('resend', () => ({
   Resend: class {
-    emails = { send: emailSend }
+    batch = { send: batchSend }
   }
 }))
 
 const { sendAnnounce } = await import('../server/utils/email')
 
-const params = { subject: 's', html: '<p>h</p>', text: 't' }
-const recipients = (n: number): string[] => Array.from({ length: n }, (_, i) => `u${i}@x.com`)
-// Skip the inter-group delay so tests don't actually wait.
-const opts = { interBatchMs: 0 }
+interface SentItem { to: string, bcc?: string[], subject: string, html: string, replyTo?: string }
+
+const mails = (n: number) => Array.from({ length: n }, (_, i) => ({
+  email: `u${i}@x.com`,
+  inviteId: i % 2 === 0 ? `inv-${i}` : null,
+  subject: 's',
+  html: `<p>Hi u${i}</p>`,
+  text: `Hi u${i}`
+}))
+// Skip the inter-batch delay so tests don't actually wait.
+const base = { apiKey: 'key', from: 'from@x', interBatchMs: 0 }
+/** Resend accepts a batch: one id per item, in order. */
+const accept = (items: SentItem[]) => ({ data: { data: items.map(item => ({ id: `re_${item.to}` })) }, error: null })
 
 beforeEach(() => {
-  emailSend.mockReset()
-  emailSend.mockResolvedValue({ data: { id: 're_1' }, error: null })
+  batchSend.mockReset()
+  batchSend.mockImplementation((items: SentItem[]) => Promise.resolve(accept(items)))
+  vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
 describe('sendAnnounce', () => {
-  it('BCCs recipients in groups of 49 so every send stays within Resend\'s 50-recipient cap', async () => {
-    const res = await sendAnnounce('key', 'from@x', params, recipients(120), opts)
-    expect(emailSend).toHaveBeenCalledTimes(3)
-    const sends = emailSend.mock.calls.map(c => c[0] as { to: string, bcc: string[] })
-    expect(sends.map(s => s.bcc.length)).toEqual([49, 49, 22])
-    // The `to` takes one slot, so to + bcc must never exceed 50 (the off-by-one that
-    // made full groups fail and only delivered the leftover).
-    for (const s of sends) expect(1 + s.bcc.length).toBeLessThanOrEqual(50)
-    expect(res).toEqual({ sent: 120, failed: 0, error: null })
+  it('sends each recipient their own email, addressed to them — never a shared BCC', async () => {
+    await sendAnnounce({ ...base, replyTo: 'host@x', recipients: mails(3) })
+    expect(batchSend).toHaveBeenCalledTimes(1)
+    const items = batchSend.mock.calls[0]![0] as SentItem[]
+    expect(items.map(item => item.to)).toEqual(['u0@x.com', 'u1@x.com', 'u2@x.com'])
+    for (const item of items) expect(item.bcc).toBeUndefined()
+    // Each copy carries that recipient's own body, and replies go to the host.
+    expect(items[1]!.html).toBe('<p>Hi u1</p>')
+    expect(items[1]!.replyTo).toBe('host@x')
   })
 
-  it('sends a single group untouched when under the cap', async () => {
-    const res = await sendAnnounce('key', 'from@x', params, recipients(10), opts)
-    expect(emailSend).toHaveBeenCalledTimes(1)
-    expect(res.sent).toBe(10)
+  it('splits a large audience into batch requests of 100', async () => {
+    const res = await sendAnnounce({ ...base, recipients: mails(120) })
+    expect(batchSend.mock.calls.map(c => (c[0] as SentItem[]).length)).toEqual([100, 20])
+    expect(res.sent).toBe(120)
+    expect(res.failed).toBe(0)
   })
 
-  it('continues past a failed group and reports partial delivery (not a total failure)', async () => {
-    emailSend
-      .mockResolvedValueOnce({ data: { id: 're_1' }, error: null }) // group 1 (49) ok
-      .mockRejectedValueOnce(new Error('Too many recipients')) // group 2 (49) fails
-      .mockResolvedValueOnce({ data: { id: 're_3' }, error: null }) // group 3 (22) ok
-    const res = await sendAnnounce('key', 'from@x', params, recipients(120), opts)
-    expect(res).toEqual({ sent: 71, failed: 49, error: 'Too many recipients' })
+  it('returns one message per accepted email, tied to the guest row when there is one', async () => {
+    const res = await sendAnnounce({ ...base, recipients: mails(2) })
+    expect(res.messages).toEqual([
+      { resendId: 're_u0@x.com', email: 'u0@x.com', inviteId: 'inv-0' },
+      { resendId: 're_u1@x.com', email: 'u1@x.com', inviteId: null }
+    ])
+  })
+
+  it('continues past a failed batch and reports partial delivery (not a total failure)', async () => {
+    batchSend
+      .mockImplementationOnce((items: SentItem[]) => Promise.resolve(accept(items))) // batch 1 ok
+      .mockRejectedValueOnce(new Error('Too many requests')) // batch 2 fails
+      .mockImplementationOnce((items: SentItem[]) => Promise.resolve(accept(items))) // batch 3 ok
+    const res = await sendAnnounce({ ...base, batchSize: 2, recipients: mails(5) })
+    expect(res).toMatchObject({ sent: 3, failed: 2, error: 'Too many requests' })
+    expect(res.messages.map(m => m.email)).toEqual(['u0@x.com', 'u1@x.com', 'u4@x.com'])
+  })
+
+  it('counts a recipient Resend returned no id for as failed', async () => {
+    batchSend.mockResolvedValue({ data: { data: [{ id: 're_1' }] }, error: null }) // one id for two recipients
+    const res = await sendAnnounce({ ...base, recipients: mails(2) })
+    expect(res).toMatchObject({ sent: 1, failed: 1, error: null })
   })
 
   it('sends nothing for an empty recipient list', async () => {
-    const res = await sendAnnounce('key', 'from@x', params, [], opts)
-    expect(emailSend).not.toHaveBeenCalled()
-    expect(res).toEqual({ sent: 0, failed: 0, error: null })
+    const res = await sendAnnounce({ ...base, recipients: [] })
+    expect(batchSend).not.toHaveBeenCalled()
+    expect(res).toEqual({ sent: 0, failed: 0, error: null, messages: [] })
   })
 })

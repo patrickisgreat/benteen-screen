@@ -79,7 +79,7 @@ describe('sendEventInvites', () => {
     expect(calls.stamp).toHaveLength(1)
     expect(calls.stamp[0]!.rows).toHaveLength(2)
     expect(calls.stamp[0]!.opts).toEqual({ onConflict: 'id' })
-    expect(res).toEqual({ sent: 2, failed: 0, error: null })
+    expect(res).toMatchObject({ sent: 2, failed: 0, error: null })
   })
 
   it('stamps each row with its positionally-aligned Resend id, the NOT NULL columns, and one shared sent_at', async () => {
@@ -101,6 +101,24 @@ describe('sendEventInvites', () => {
 
     expect(calls.stamp[0]!.rows[0]!.resend_id).toBe('re_a')
     expect(calls.stamp[0]!.rows[1]!.resend_id).toBeNull()
+  })
+
+  it('returns one message per accepted e-vite, tied to its guest row, for the delivery log', async () => {
+    batchSend.mockResolvedValue(okWith('re_a')) // Resend returned an id for the first guest only
+    const { db } = makeFakeDb()
+
+    const res = await sendEventInvites(db, { ...baseOpts, recipients: [recipient('1', 'a@x'), recipient('2', 'b@x')] })
+
+    expect(res.messages).toEqual([{ resendId: 're_a', email: 'a@x', inviteId: '1' }])
+  })
+
+  it('returns no messages for a batch Resend rejected', async () => {
+    batchSend.mockResolvedValue({ data: null, error: { message: 'domain not verified' } })
+    const { db } = makeFakeDb()
+
+    const res = await sendEventInvites(db, { ...baseOpts, recipients: [recipient('1', 'a@x')] })
+
+    expect(res.messages).toEqual([])
   })
 
   it('splits a list larger than the batch size into multiple Resend requests', async () => {
@@ -132,7 +150,7 @@ describe('sendEventInvites', () => {
       recipients: [recipient('1', 'a@x'), recipient('2', 'b@x')]
     })
 
-    expect(res).toEqual({ sent: 1, failed: 1, error: 'domain not verified' })
+    expect(res).toMatchObject({ sent: 1, failed: 1, error: 'domain not verified' })
     // The failed batch was neither allowlisted nor stamped; only the surviving one was.
     expect(calls.allowlist).toHaveLength(1)
     expect(calls.stamp).toHaveLength(1)
@@ -156,7 +174,7 @@ describe('sendEventInvites', () => {
 
     const res = await sendEventInvites(db, { ...baseOpts, recipients: [recipient('1', 'a@x')] })
 
-    expect(res).toEqual({ sent: 1, failed: 0, error: null })
+    expect(res).toMatchObject({ sent: 1, failed: 0, error: null })
     expect(calls.stamp).toHaveLength(1) // stamping proceeded despite the allowlist error
   })
 
@@ -168,7 +186,7 @@ describe('sendEventInvites', () => {
     expect(batchSend).not.toHaveBeenCalled()
     expect(calls.allowlist).toHaveLength(0)
     expect(calls.stamp).toHaveLength(0)
-    expect(res).toEqual({ sent: 0, failed: 0, error: null })
+    expect(res).toMatchObject({ sent: 0, failed: 0, error: null })
   })
 
   it('waits between batches so a multi-batch blast stays under the rate limit', async () => {

@@ -26,8 +26,11 @@ export function verifySvixSignature(opts: {
   })
 }
 
-/** Maps a Resend webhook event type to the event_invites column it stamps. */
-export const RESEND_EVENT_COLUMN: Record<string, 'delivered_at' | 'opened_at' | 'clicked_at' | 'bounced_at'> = {
+/** The engagement timestamps tracked per email (and mirrored onto the guest row). */
+export type EmailStampColumn = 'delivered_at' | 'opened_at' | 'clicked_at' | 'bounced_at'
+
+/** Maps a Resend webhook event type to the engagement column it stamps. */
+export const RESEND_EVENT_COLUMN: Record<string, EmailStampColumn> = {
   'email.delivered': 'delivered_at',
   'email.opened': 'opened_at',
   'email.clicked': 'clicked_at',

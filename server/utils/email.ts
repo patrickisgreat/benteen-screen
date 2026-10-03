@@ -38,6 +38,65 @@ export function requireEmailConfig(event: H3Event): { resendApiKey: string, rese
   return { resendApiKey, resendFrom }
 }
 
+/**
+ * The From header for a send made by a person: "Pat Smith via Benteen Screen
+ * <movienight@…>". Inboxes show the display name first, and a person's name is
+ * what gets a friend's email opened. Only the display name changes — the address
+ * stays the verified sender, so SPF/DKIM are unaffected. Falls back to the
+ * configured sender when there is no usable name (none, or an email address
+ * standing in for one).
+ */
+export function personalFrom(from: string, senderName: string | null | undefined): string {
+  if (!senderName || senderName.includes('@')) return from
+  // A display name is a mail header: keep letters, digits and name punctuation
+  // only, so nothing in a profile name can break out of (or inject into) it.
+  const name = senderName.replace(/[^\p{L}\p{N} .'-]/gu, ' ').replace(/\s+/g, ' ').trim()
+  if (!name) return from
+  const match = /^\s*(.*?)\s*<([^<>]+)>\s*$/.exec(from)
+  const brand = match?.[1]?.replace(/"/g, '') ?? ''
+  const address = match?.[2] ?? from.trim()
+  return `${brand ? `${name} via ${brand}` : name} <${address}>`
+}
+
+/** One email Resend accepted: its message id, who it went to, and the guest-list
+ *  row it was about (when there is one). Recorded in `email_messages` so
+ *  delivery and opens are tracked per recipient, for every kind of send. */
+export interface SentMessage {
+  readonly resendId: string
+  readonly email: string
+  readonly inviteId: string | null
+}
+
+/** The current delivery state of one sent email, as Resend reports it. */
+export interface EmailStatus {
+  readonly id: string
+  /** Resend's `last_event`: delivered, opened, clicked, bounced, … */
+  readonly lastEvent: string
+}
+
+const EMAIL_STATUS_PAGE_SIZE = 100
+
+/**
+ * One page of the account's sent emails, newest first, with each one's latest
+ * delivery event. Pass the last id of a page as `after` to fetch the next. The
+ * pull-based twin of the Resend webhook: it lets the app recover delivery/opens
+ * even when no webhook ever arrived.
+ */
+export async function listEmailStatuses(
+  apiKey: string,
+  after?: string
+): Promise<{ items: EmailStatus[], hasMore: boolean }> {
+  const resend = getResend(apiKey)
+  const { data, error } = await resend.emails.list(
+    after ? { limit: EMAIL_STATUS_PAGE_SIZE, after } : { limit: EMAIL_STATUS_PAGE_SIZE }
+  )
+  if (error) throw new Error(error.message || 'Failed to list emails')
+  return {
+    items: (data?.data ?? []).map(email => ({ id: email.id, lastEvent: email.last_event })),
+    hasMore: data?.has_more ?? false
+  }
+}
+
 export interface SendParams {
   to: string | string[]
   bcc?: string[]
@@ -109,65 +168,82 @@ export function chunk<T>(items: readonly T[], size: number): T[][] {
   return out
 }
 
-// Resend caps a single send at 50 recipients across to + cc + bcc. We always set
-// one `to` (so real addresses stay BCC-hidden), which uses a slot — so only 49 BCC
-// fit per send. (50 BCC + the `to` = 51 → Resend rejects the whole group, which is
-// why a blast to >49 only delivered the final leftover group.) Distinct from the
-// 100-per-request batch endpoint above — that's a different Resend API.
-const ANNOUNCE_RECIPIENT_LIMIT = 49
+/** The messages Resend accepted from one batch, paired back to their recipients. */
+function acceptedMessages<T>(
+  group: readonly T[],
+  ids: readonly (string | null)[],
+  toRecipient: (item: T) => { email: string, inviteId: string | null }
+): SentMessage[] {
+  return group.flatMap((item, i) => {
+    const resendId = ids[i]
+    return resendId ? [{ resendId, ...toRecipient(item) }] : []
+  })
+}
+
+/** One person's copy of an announcement: their own greeting, their own message id. */
+export interface AnnounceMail {
+  readonly email: string
+  /** Their guest-list row for this event, when they are on it. */
+  readonly inviteId: string | null
+  readonly subject: string
+  readonly html: string
+  readonly text: string
+}
 
 export interface SendAnnounceResult {
-  /** Recipients in groups that sent successfully. */
+  /** Recipients Resend accepted. */
   readonly sent: number
-  /** Recipients in groups that failed. */
+  /** Recipients in batches that failed. */
   readonly failed: number
   /** First failure message (e.g. an unverified sender domain); null on full success. */
   readonly error: string | null
+  /** One entry per accepted email, for the per-recipient delivery log. */
+  readonly messages: readonly SentMessage[]
 }
 
 /**
- * Sends one announcement to many recipients, BCC'd in groups of 50 (Resend's
- * per-send recipient cap — a single BCC to more than that is rejected, which is
- * what 502'd the blast). Continues past a failed group so a mid-blast error
- * doesn't lose the groups that already went out, returning sent/failed counts +
- * the first error like `sendEventInvites`.
+ * Sends an announcement as one distinct email per recipient — addressed to them,
+ * greeting them by name, with its own Resend message id — through the batch
+ * endpoint (100 per request), exactly like the e-vite. This replaces the old
+ * BCC-in-groups send, which gave 49 people one shared message id (so nobody's
+ * open could be attributed) and arrived addressed to the sender, a pattern
+ * mailbox providers read as bulk mail. Continues past a failed batch so a
+ * mid-blast error doesn't lose the batches that already went out.
  *
- * ⚠️ At-least-once, like the e-vite blast: announcements have no per-recipient
- * record, so a retry after a partial failure re-delivers to the groups that
- * already succeeded. The returned `failed`/`error` are the operator's signal.
+ * ⚠️ At-least-once, like the e-vite blast: a retry after a partial failure
+ * re-delivers to the batches that already succeeded. The returned
+ * `failed`/`error` are the operator's signal.
  */
-export async function sendAnnounce(
-  apiKey: string,
-  from: string,
-  params: { subject: string, html: string, text: string, replyTo?: string },
-  recipients: readonly string[],
-  opts: { groupSize?: number, interBatchMs?: number } = {}
-): Promise<SendAnnounceResult> {
-  const groupSize = opts.groupSize ?? ANNOUNCE_RECIPIENT_LIMIT
+export async function sendAnnounce(opts: {
+  readonly apiKey: string
+  readonly from: string
+  readonly replyTo?: string
+  readonly recipients: readonly AnnounceMail[]
+  readonly batchSize?: number
+  readonly interBatchMs?: number
+}): Promise<SendAnnounceResult> {
+  const batchSize = opts.batchSize ?? INVITE_BATCH_SIZE
   const interBatchMs = opts.interBatchMs ?? INVITE_INTER_BATCH_MS
-  const groups = chunk(recipients, groupSize)
-  let sent = 0
+  const messages: SentMessage[] = []
   let firstError: string | null = null
-  for (let i = 0; i < groups.length; i++) {
-    if (i > 0) await sleep(interBatchMs)
-    const group = groups[i]!
+  const batches = chunk(opts.recipients, batchSize)
+  for (let b = 0; b < batches.length; b++) {
+    if (b > 0) await sleep(interBatchMs)
+    const group = batches[b]!
     try {
-      await sendEmail(apiKey, from, {
-        to: from, // a `to` is required; real recipients are BCC'd
-        bcc: [...group],
-        subject: params.subject,
-        html: params.html,
-        text: params.text,
-        replyTo: params.replyTo
-      })
-      sent += group.length
+      const { ids } = await sendBatch(
+        opts.apiKey,
+        opts.from,
+        group.map(r => ({ to: r.email, subject: r.subject, html: r.html, text: r.text, replyTo: opts.replyTo }))
+      )
+      messages.push(...acceptedMessages(group, ids, r => ({ email: r.email, inviteId: r.inviteId })))
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Unknown error'
       if (!firstError) firstError = message
       console.error('[events/announce] batch failed -', message)
     }
   }
-  return { sent, failed: recipients.length - sent, error: firstError }
+  return { sent: messages.length, failed: opts.recipients.length - messages.length, error: firstError, messages }
 }
 
 /** One guest's prepared e-vite: the `event_invites` row id + the built email. */
@@ -199,6 +275,8 @@ export interface SendEventInvitesResult {
   /** First failure message (usually identical across a batch, e.g. an unverified
    *  Resend sender domain) so the UI can show the real reason; null on full success. */
   readonly error: string | null
+  /** One entry per accepted email, for the per-recipient delivery log. */
+  readonly messages: readonly SentMessage[]
 }
 
 /**
@@ -222,6 +300,7 @@ export async function sendEventInvites(
 
   let sent = 0
   const failures: { email: string, error: string }[] = []
+  const messages: SentMessage[] = []
   const batches = chunk(opts.recipients, batchSize)
   for (let b = 0; b < batches.length; b++) {
     if (b > 0) await sleep(interBatchMs)
@@ -261,6 +340,7 @@ export async function sendEventInvites(
       // at-least-once note above — a retry of this batch may re-deliver it).
       if (stampError) throw new Error(`sent but could not record delivery: ${stampError.message}`)
       sent += group.length
+      messages.push(...acceptedMessages(group, ids, r => ({ email: r.email, inviteId: r.id })))
     } catch (e) {
       // Don't swallow: a swallowed Resend rejection once looked like "everyone was
       // already invited". A batch fails as a unit (e.g. an unverified sender
@@ -270,7 +350,7 @@ export async function sendEventInvites(
       console.error('[invites/send] batch failed -', message)
     }
   }
-  return { sent, failed: failures.length, error: failures[0]?.error ?? null }
+  return { sent, failed: failures.length, error: failures[0]?.error ?? null, messages }
 }
 
 /**
@@ -317,14 +397,16 @@ export interface ReminderRecipient {
   readonly id: string
   readonly email: string
   readonly token: string
+  /** Greets them by first name when known. */
+  readonly display_name?: string | null
 }
 
 /**
  * Sends the RSVP reminder to a list of non-responders for one event, in
  * rate-limit-friendly batches, and stamps `reminded_at` on the ones that went
  * out. Each reminder is a distinct one-click token email (like the e-vite), so it
- * uses the batch endpoint, not a BCC. Returns sent/failed counts + the first
- * error; the caller records the `comms_log` entry.
+ * uses the batch endpoint, not a BCC. Returns sent/failed counts, the first
+ * error, and the accepted messages; the caller records the send.
  */
 export async function sendEventReminders(
   db: SupabaseClient<Database>,
@@ -341,11 +423,11 @@ export async function sendEventReminders(
     readonly batchSize?: number
     readonly interBatchMs?: number
   }
-): Promise<{ sent: number, failed: number, error: string | null }> {
+): Promise<{ sent: number, failed: number, error: string | null, messages: readonly SentMessage[] }> {
   const batchSize = opts.batchSize ?? INVITE_BATCH_SIZE
   const interBatchMs = opts.interBatchMs ?? INVITE_INTER_BATCH_MS
   const stamp = new Date().toISOString()
-  let sent = 0
+  const messages: SentMessage[] = []
   let firstError: string | null = null
   const batches = chunk(opts.invites, batchSize)
   for (let b = 0; b < batches.length; b++) {
@@ -358,25 +440,27 @@ export async function sendEventReminders(
           eventDate: opts.eventDate,
           daysLeft: opts.daysLeft,
           rsvpUrl: `${opts.origin}/rsvp?token=${inv.token}`,
-          appUrl: opts.appUrl
+          appUrl: opts.appUrl,
+          recipientName: inv.display_name
         })
         return { to: inv.email, subject: mail.subject, html: mail.html, text: mail.text, replyTo: opts.replyTo }
       })
       const { ids } = await sendBatch(opts.apiKey, opts.from, items)
       // Stamp only the ones Resend accepted, so a failed batch retries next time.
-      const sentIds = group.filter((_, i) => ids[i] != null).map(inv => inv.id)
-      if (sentIds.length) {
+      const accepted = acceptedMessages(group, ids, inv => ({ email: inv.email, inviteId: inv.id }))
+      if (accepted.length) {
+        const sentIds = accepted.flatMap(m => m.inviteId ?? [])
         const { error: stampError } = await db.from('event_invites').update({ reminded_at: stamp }).in('id', sentIds)
         if (stampError) console.warn('[reminders] reminded_at stamp failed -', stampError.message)
       }
-      sent += sentIds.length
+      messages.push(...accepted)
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Unknown error'
       if (!firstError) firstError = message
       console.error('[reminders] batch failed -', message)
     }
   }
-  return { sent, failed: opts.invites.length - sent, error: firstError }
+  return { sent: messages.length, failed: opts.invites.length - messages.length, error: firstError, messages }
 }
 
 /**

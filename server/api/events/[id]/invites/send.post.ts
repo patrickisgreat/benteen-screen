@@ -68,6 +68,7 @@ export default defineEventHandler(async (event) => {
       posterUrl: ev.poster_url,
       description: ev.description,
       inviterName,
+      recipientName: invite.display_name,
       rsvpUrl: `${origin}/rsvp?token=${invite.token}`,
       appUrl: `${origin}/overview`,
       options: inviteOptions
@@ -83,26 +84,18 @@ export default defineEventHandler(async (event) => {
     }
   })
 
-  const result = await sendEventInvites(db, {
+  const { messages, ...result } = await sendEventInvites(db, {
     apiKey: resendApiKey,
-    from: resendFrom,
+    from: personalFrom(resendFrom, inviterName),
     replyTo: user.email ?? undefined,
     eventId,
     invitedBy: userId,
     recipients
   })
 
-  // Record the blast in the comms log when at least one e-vite went out (best-effort —
-  // a logging failure must not fail the send).
+  // Record the blast when at least one e-vite went out.
   if (result.sent > 0) {
-    const { error: logError } = await db.from('comms_log').insert({
-      event_id: eventId,
-      kind: 'invite',
-      subject: `E-vite — ${ev.title}`,
-      recipient_count: result.sent,
-      sent_by: userId
-    })
-    if (logError) console.error('[events/invites/send] comms_log insert failed -', logError.message)
+    await recordSend(db, { eventId, kind: 'invite', subject: `E-vite — ${ev.title}`, sentBy: userId, ...result, messages })
   }
 
   return { ok: true, ...result }
