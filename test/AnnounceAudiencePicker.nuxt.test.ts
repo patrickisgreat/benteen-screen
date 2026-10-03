@@ -63,6 +63,12 @@ describe('AnnounceAudiencePicker', () => {
     expect(w.emitted('count')?.at(-1)).toEqual([2])
   })
 
+  it('hands the resolved people to the composer, for its preview', async () => {
+    const w = await mount()
+    await settle()
+    expect(w.emitted('recipients')?.at(-1)).toEqual([[{ email: 'ada@x.com', name: 'Ada Lovelace' }, { email: 'bo@x.com', name: null }]])
+  })
+
   it('lists who will get it on request', async () => {
     const w = await mount()
     await settle()

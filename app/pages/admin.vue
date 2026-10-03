@@ -525,7 +525,7 @@ function onSelectEvent(event: MovieEvent): void {
         </p>
         <EventPicker v-model="selectedEventId" :items="eventOptions" />
         <template v-if="selectedEventId">
-          <EventAnnounceComposer :event-id="selectedEventId" class="max-w-xl" />
+          <EventAnnounceComposer :event-id="selectedEventId" :event="selectedEvent" class="max-w-xl" />
           <CommsLog :entries="commsLog" :syncing="syncingDelivery" class="max-w-xl mt-6" @sync="refreshDeliveryStatus" />
         </template>
         <UCard v-else variant="subtle" class="text-center text-muted">
