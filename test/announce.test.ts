@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ANNOUNCE_SCOPES, ANNOUNCE_SCOPE_OPTIONS, DEFAULT_ANNOUNCE_SCOPE, parseAnnounceRequest } from '../shared/utils/announce'
+import { ANNOUNCE_SCOPES, ANNOUNCE_SCOPE_OPTIONS, DEFAULT_ANNOUNCE_SCOPE, announceIncludesRsvpButtons, parseAnnounceRequest } from '../shared/utils/announce'
 
 const eventId = '11111111-1111-4111-8111-111111111111'
 const base = { eventId, message: '<p>Doors at 7</p>', scope: 'guests' }
@@ -13,6 +13,10 @@ describe('announce scopes', () => {
   it('offers the guests who haven\'t opened the e-vite as an audience', () => {
     expect(ANNOUNCE_SCOPES).toContain('unopened')
     expect(parseAnnounceRequest({ eventId, scope: 'unopened', preview: true })).toMatchObject({ ok: true, value: { scope: 'unopened' } })
+  })
+
+  it('gives RSVP buttons only to the audience that hasn\'t seen the e-vite', () => {
+    expect(ANNOUNCE_SCOPES.filter(announceIncludesRsvpButtons)).toEqual(['unopened'])
   })
 
   it('defaults to this night\'s guest list, not the whole club', () => {
