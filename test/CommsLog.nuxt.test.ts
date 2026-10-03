@@ -69,6 +69,11 @@ describe('CommsLog', () => {
     expect(w.text()).toContain('RSVP confirmation')
   })
 
+  it('labels a poll send', async () => {
+    const w = await mountSuspended(CommsLog, { props: { entries: [entry({ kind: 'poll', subject: null })] } })
+    expect(w.text()).toContain('Poll')
+  })
+
   it('shows delivered and opened counts for a tracked send', async () => {
     const tracked = entry({ delivery: { tracked: 12, delivered: 11, opened: 7, clicked: 0, bounced: 0 } })
     const w = await mountSuspended(CommsLog, { props: { entries: [tracked] } })

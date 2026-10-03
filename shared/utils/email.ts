@@ -162,6 +162,44 @@ export function buildAnnounceEmail(opts: {
   return { subject, html, text }
 }
 
+/**
+ * A poll sent to one guest: the question, an optional note from the host, and
+ * one button per choice. Each button is that guest's own tokenized link, so a
+ * tap records their answer with no sign-in — and tapping a different one later
+ * changes it.
+ */
+export function buildPollEmail(opts: {
+  eventTitle: string
+  eventDate: string | null
+  hostName: string | null
+  recipientName?: string | null
+  question: string
+  note?: string | null
+  /** The choices in order, each with this guest's vote link for it. */
+  options: readonly { label: string, url: string }[]
+}): BuiltEmail {
+  const host = opts.hostName ?? 'Your host'
+  const hi = greetingPrefix(opts.recipientName)
+  const intro = opts.note?.trim() || `${host} would like your answer. One tap is all it takes.`
+
+  const button = (option: { label: string, url: string }): string =>
+    `<a href="${escapeHtml(option.url)}" style="display:block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:600;font-size:15px;margin:0 0 8px;text-align:center">${escapeHtml(option.label)}</a>`
+
+  const subject = `${opts.question} (${opts.eventTitle})`
+  const html = shell(
+    `<p style="color:#6b7280;margin:0 0 4px;font-size:13px">${escapeHtml(opts.eventTitle)}${opts.eventDate ? ` · ${escapeHtml(opts.eventDate)}` : ''}</p>`
+    + `<h1 style="font-size:20px;margin:0 0 12px">${escapeHtml(opts.question)}</h1>`
+    + `<p>${escapeHtml(hi)}${escapeHtml(intro).replace(/\n/g, '<br>')}</p>`
+    + `<div style="margin:20px 0 12px">${opts.options.map(button).join('')}</div>`
+    + `<p style="font-size:13px;color:#6b7280">Changed your mind? Tap a different answer any time.</p>`
+  )
+  const text = `${opts.question}\n${opts.eventTitle}${opts.eventDate ? ` · ${opts.eventDate}` : ''}`
+    + `\n\n${hi}${intro}`
+    + `\n\n${opts.options.map(o => `${o.label}: ${o.url}`).join('\n')}`
+    + `\n\nChanged your mind? Open a different link any time.`
+  return { subject, html, text }
+}
+
 /** The three one-click RSVP buttons (going / maybe / no) off a tokenized base link. */
 function oneClickRsvpButtons(rsvpUrl: string): string {
   const button = (status: RsvpStatus, label: string, bg: string): string =>

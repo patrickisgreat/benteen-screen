@@ -7,6 +7,7 @@ import {
   buildEventInviteEmail,
   buildEventReminderEmail,
   buildInviteEmail,
+  buildPollEmail,
   buildRsvpConfirmationEmail,
   escapeHtml,
   firstName,
@@ -378,5 +379,55 @@ describe('personalized copy', () => {
   it('sends the announcement without a greeting when the name is unknown', () => {
     const m = buildAnnounceEmail({ eventTitle: 'Jaws', eventDate: null, message: 'Doors at 7', link: 'l' })
     expect(m.html).not.toContain('Hi ')
+  })
+})
+
+describe('buildPollEmail', () => {
+  const poll = {
+    eventTitle: 'Jaws',
+    eventDate: 'Friday',
+    hostName: 'Pat',
+    question: 'Move to Saturday?',
+    options: [
+      { label: 'Yes, Saturday', url: 'https://x/poll?token=t&poll=p&option=1' },
+      { label: 'Keep Friday', url: 'https://x/poll?token=t&poll=p&option=2' }
+    ]
+  }
+
+  it('gives each choice its own button linking to the guest\'s vote link', () => {
+    const m = buildPollEmail(poll)
+    expect(m.html).toContain('href="https://x/poll?token=t&amp;poll=p&amp;option=1"')
+    expect(m.html).toContain('Yes, Saturday')
+    expect(m.html).toContain('href="https://x/poll?token=t&amp;poll=p&amp;option=2"')
+    expect(m.text).toContain('Keep Friday: https://x/poll?token=t&poll=p&option=2')
+  })
+
+  it('leads with the question, in the subject and the body', () => {
+    const m = buildPollEmail(poll)
+    expect(m.subject).toBe('Move to Saturday? (Jaws)')
+    expect(m.html).toContain('Move to Saturday?</h1>')
+  })
+
+  it('greets the guest and uses the host\'s note when there is one', () => {
+    const m = buildPollEmail({ ...poll, recipientName: 'Sam Jones', note: 'Rain is forecast for Friday.' })
+    expect(m.html).toContain('Hi Sam, Rain is forecast for Friday.')
+    expect(m.text).toContain('Hi Sam, Rain is forecast for Friday.')
+  })
+
+  it('falls back to a line from the host when there is no note', () => {
+    expect(buildPollEmail(poll).html).toContain('Pat would like your answer')
+    expect(buildPollEmail({ ...poll, hostName: null }).html).toContain('Your host would like your answer')
+  })
+
+  it('escapes the question, note and choices (no HTML injection)', () => {
+    const m = buildPollEmail({
+      ...poll,
+      question: '<b>Q</b>',
+      note: '<img src=x onerror=alert(1)>',
+      options: [{ label: '<script>x</script>', url: 'https://x/poll?a=1' }, poll.options[1]!]
+    })
+    expect(m.html).not.toContain('<b>Q</b>')
+    expect(m.html).not.toContain('<img')
+    expect(m.html).not.toContain('<script>')
   })
 })

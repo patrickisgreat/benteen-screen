@@ -172,6 +172,79 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     expect(second.error).not.toBeNull()
   })
 
+  describe('guest polls', () => {
+    let pollId = ''
+    let yesId = ''
+    let noId = ''
+    let guestId = ''
+
+    beforeAll(async () => {
+      const { data: poll } = await admin!.from('polls').insert({ event_id: eventId, question: 'Move to Saturday?' }).select('id').single()
+      pollId = poll!.id
+      const { data: opts } = await admin!.from('poll_options')
+        .insert([{ poll_id: pollId, label: 'Yes', position: 0 }, { poll_id: pollId, label: 'No', position: 1 }])
+        .select('id, position')
+      yesId = opts!.find(o => o.position === 0)!.id
+      noId = opts!.find(o => o.position === 1)!.id
+      const { data: guest } = await admin!.from('event_invites').insert({ event_id: eventId, email: `rls_poll_guest_${stamp}@example.com` }).select('id').single()
+      guestId = guest!.id
+    })
+
+    it('polls and their results are admin-only: a member reads none and cannot create or vote', async () => {
+      for (const table of ['polls', 'poll_options', 'poll_votes'] as const) {
+        const read = await memberClient.from(table).select('*')
+        expect(read.data ?? [], `${table} must be hidden from members`).toEqual([])
+      }
+      const create = await memberClient.from('polls').insert({ event_id: eventId, question: 'Mine' })
+      expect(create.error).not.toBeNull()
+      const vote = await memberClient.from('poll_votes').insert({ poll_id: pollId, invite_id: guestId, option_id: yesId })
+      expect(vote.error).not.toBeNull()
+    })
+
+    it('an admin can create a poll and read its results', async () => {
+      const adminClient = await signInAs(adminEmail)
+      const created = await adminClient.from('polls').insert({ event_id: eventId, question: 'Bring chairs?' }).select('id').single()
+      expect(created.error).toBeNull()
+      const read = await adminClient.from('poll_options').select('id').eq('poll_id', pollId)
+      expect(read.data).toHaveLength(2)
+    })
+
+    it('one vote per guest per poll: a second answer replaces the first', async () => {
+      const first = await admin!.from('poll_votes').upsert({ poll_id: pollId, invite_id: guestId, option_id: yesId }, { onConflict: 'poll_id,invite_id' })
+      expect(first.error).toBeNull()
+      const second = await admin!.from('poll_votes').upsert({ poll_id: pollId, invite_id: guestId, option_id: noId }, { onConflict: 'poll_id,invite_id' })
+      expect(second.error).toBeNull()
+      const votes = await admin!.from('poll_votes').select('option_id').eq('poll_id', pollId).eq('invite_id', guestId)
+      expect(votes.data).toEqual([{ option_id: noId }])
+      // A plain second insert is refused by the primary key.
+      const dupe = await admin!.from('poll_votes').insert({ poll_id: pollId, invite_id: guestId, option_id: yesId })
+      expect(dupe.error).not.toBeNull()
+    })
+
+    it('rejects a vote for another poll\'s option', async () => {
+      const { data: other } = await admin!.from('polls').insert({ event_id: eventId, question: 'Other' }).select('id').single()
+      const { data: otherOption } = await admin!.from('poll_options').insert({ poll_id: other!.id, label: 'Elsewhere', position: 0 }).select('id').single()
+      const { data: voter } = await admin!.from('event_invites').insert({ event_id: eventId, email: `rls_poll_cross_${stamp}@example.com` }).select('id').single()
+      const vote = await admin!.from('poll_votes').insert({ poll_id: pollId, invite_id: voter!.id, option_id: otherOption!.id })
+      expect(vote.error).not.toBeNull()
+    })
+
+    it('rejects a vote from a guest of a different event, even from the service role', async () => {
+      const { data: otherEvent } = await admin!.from('events').insert({ title: `rls other ${stamp}`, event_date: new Date(Date.now() + 9 * 86_400_000).toISOString() }).select('id').single()
+      const { data: outsider } = await admin!.from('event_invites').insert({ event_id: otherEvent!.id, email: `rls_poll_outsider_${stamp}@example.com` }).select('id').single()
+      const vote = await admin!.from('poll_votes').insert({ poll_id: pollId, invite_id: outsider!.id, option_id: yesId })
+      expect(vote.error?.message).toContain('guest list')
+      await admin!.from('events').delete().eq('id', otherEvent!.id)
+    })
+
+    it('rejects a vote once the poll is closed, even from the service role', async () => {
+      const { data: closed } = await admin!.from('polls').insert({ event_id: eventId, question: 'Closed one', closed_at: new Date().toISOString() }).select('id').single()
+      const { data: option } = await admin!.from('poll_options').insert({ poll_id: closed!.id, label: 'Late', position: 0 }).select('id').single()
+      const vote = await admin!.from('poll_votes').insert({ poll_id: closed!.id, invite_id: guestId, option_id: option!.id })
+      expect(vote.error?.message).toContain('closed')
+    })
+  })
+
   it('an admin can RSVP (and +1) on another member\'s behalf; a member cannot', async () => {
     const adminClient = await signInAs(adminEmail)
     const emailT = `rls_behalf_${stamp}@example.com`
