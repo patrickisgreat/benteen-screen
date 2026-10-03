@@ -7,6 +7,7 @@ export interface ReminderInvite {
   id: string
   email: string
   token: string
+  display_name?: string | null
   rsvp: string | null
   sent_at: string | null
   reminded_at: string | null

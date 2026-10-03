@@ -3,8 +3,13 @@ import type { Database } from '~/types/database.types'
 
 /**
  * Resend (Svix) webhook → stamps delivery/open/click/bounce on the matching
- * event_invites row (correlated by the Resend message id). Public, but verified
- * by the signing secret; runs via the service role below RLS.
+ * email (correlated by the Resend message id), for every kind of send. Public,
+ * but verified by the signing secret; runs via the service role below RLS.
+ *
+ * Register it at the canonical host (the one that answers without redirecting):
+ * webhook senders don't follow a 308 from the apex to `www`, so an endpoint on
+ * the redirecting host fails every delivery. `syncEmailStatuses` is the safety
+ * net when events don't arrive.
  */
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
@@ -35,26 +40,20 @@ export default defineEventHandler(async (event) => {
   const emailId = payload.data?.email_id
   if (!column || !emailId) return { ok: true } // event we don't track — ack it anyway
 
-  const admin = serverSupabaseServiceRole<Database>(event)
-  // `column` is a fixed key from RESEND_EVENT_COLUMN, but a computed key widens to
-  // an index signature — cast to the row Update type at this validated boundary.
-  const patch = { [column]: new Date().toISOString() } as Database['public']['Tables']['event_invites']['Update']
-  const { count, error } = await admin
-    .from('event_invites')
-    .update(patch, { count: 'exact' })
-    .eq('resend_id', emailId)
-
   // Always 200 so Resend doesn't retry forever, but never silently — a swallowed
   // miss here is exactly why "Resend shows opens, the app shows none" is so hard to
-  // diagnose. Logs land in the function logs and distinguish the two failure modes.
-  if (error) {
-    console.error(`[webhooks/resend] failed to stamp ${column} for email_id ${emailId} -`, error.message)
-  } else if (!count) {
-    // Verified + parsed, but no invite carries this Resend id: the row was sent
-    // before resend_id was stored, or sent from a different route/sender.
-    console.warn(`[webhooks/resend] ${payload.type} matched no invite (email_id ${emailId})`)
-  } else {
-    console.info(`[webhooks/resend] stamped ${column} on ${count} invite(s) (email_id ${emailId})`)
+  // diagnose. Logs land in the function logs and distinguish the failure modes.
+  try {
+    const target = await stampEmailEvent(serverSupabaseServiceRole<Database>(event), column, emailId)
+    if (target === 'unmatched') {
+      // Verified + parsed, but nothing carries this Resend id: an email this app
+      // doesn't track (the admin digest, a club welcome) or one sent elsewhere.
+      console.warn(`[webhooks/resend] ${payload.type} matched no email (email_id ${emailId})`)
+    } else {
+      console.info(`[webhooks/resend] stamped ${column} on the ${target} (email_id ${emailId})`)
+    }
+  } catch (e) {
+    console.error(`[webhooks/resend] failed to stamp ${column} for email_id ${emailId} -`, e instanceof Error ? e.message : e)
   }
   return { ok: true }
 })

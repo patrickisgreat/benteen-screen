@@ -1,5 +1,5 @@
 import type { MaybeRefOrGetter } from 'vue'
-import type { CommsStatus } from '#shared/utils/comms'
+import { type CommsStatus, type DeliveryStats, tallyDelivery } from '#shared/utils/comms'
 import type { Database } from '~/types/database.types'
 
 export type CommsLogKind = 'announcement' | 'invite' | 'reminder' | 'rsvp_confirmation'
@@ -22,6 +22,15 @@ export interface CommsLogEntry {
   error: string | null
   sentByName: string | null
   createdAt: string
+  /** Delivered/opened counts from the per-recipient log; null when the send
+   *  predates it (nothing tracked). */
+  delivery: DeliveryStats | null
+}
+
+/** What a delivery-status refresh found: emails checked, and how many changed. */
+export interface DeliverySyncResult {
+  checked: number
+  updated: number
 }
 
 /** Narrow a free-text DB value to a known member, falling back to `fallback`. */
@@ -31,20 +40,25 @@ function oneOf<T extends string>(values: readonly T[], value: string, fallback: 
 
 /**
  * Admin-only log of communications sent for an event — announcements and e-vite
- * blasts, newest first. Admin-gated by RLS (the comms_log policies); a non-admin
- * reads nothing. Live via realtime, so a fresh send appears without a manual refresh.
+ * blasts, newest first — each with its delivered/opened counts. Admin-gated by RLS
+ * (the comms_log + email_messages policies); a non-admin reads nothing. Live via
+ * realtime, so a fresh send or a new open appears without a manual refresh.
+ * `syncDelivery` asks the server to pull the latest status from Resend, for when
+ * webhook events haven't arrived.
  */
 export function useCommsLog(eventId: MaybeRefOrGetter<string | null | undefined>): {
   entries: Ref<CommsLogEntry[]>
   error: Ref<string | null>
   refresh: () => Promise<void>
+  syncing: Ref<boolean>
+  syncDelivery: () => Promise<DeliverySyncResult>
 } {
   const supabase = useSupabaseClient<Database>()
 
   const { data: entries, error, refresh } = useRealtimeQuery<CommsLogEntry[]>({
     key: eventId,
     channel: 'comms-log',
-    tables: [{ table: 'comms_log' }],
+    tables: [{ table: 'comms_log' }, { table: 'email_messages' }],
     empty: [],
     errorFallback: 'Failed to load the comms log',
     load: async (id) => {
@@ -62,6 +76,14 @@ export function useCommsLog(eventId: MaybeRefOrGetter<string | null | undefined>
         : { data: [] }
       const nameById = new Map((senders ?? []).map(s => [s.id, s.display_name]))
 
+      // Delivery counts are an enrichment: if they can't be read, still show the log.
+      const { data: messages, error: messagesError } = await supabase
+        .from('email_messages')
+        .select('comms_log_id, delivered_at, opened_at, clicked_at, bounced_at')
+        .eq('event_id', id)
+      if (messagesError) console.warn('[useCommsLog] delivery stats unavailable -', messagesError.message)
+      const deliveryBySend = tallyDelivery(messages ?? [])
+
       return rows.map(r => ({
         id: r.id,
         // DB CHECK constrains kind/status to a known set; narrow at the boundary.
@@ -73,10 +95,26 @@ export function useCommsLog(eventId: MaybeRefOrGetter<string | null | undefined>
         status: oneOf(STATUSES, r.status ?? 'sent', 'sent'),
         error: r.error ?? null,
         sentByName: r.sent_by ? nameById.get(r.sent_by) ?? null : null,
-        createdAt: r.created_at
+        createdAt: r.created_at,
+        delivery: deliveryBySend.get(r.id) ?? null
       }))
     }
   })
 
-  return { entries, error, refresh }
+  const syncing = ref(false)
+
+  async function syncDelivery(): Promise<DeliverySyncResult> {
+    const id = toValue(eventId)
+    if (!id) return { checked: 0, updated: 0 }
+    syncing.value = true
+    try {
+      const result = await $fetch<DeliverySyncResult>(`/api/events/${id}/comms/sync`, { method: 'POST' })
+      await refresh()
+      return result
+    } finally {
+      syncing.value = false
+    }
+  }
+
+  return { entries, error, refresh, syncing, syncDelivery }
 }

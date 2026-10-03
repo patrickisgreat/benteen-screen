@@ -13,10 +13,7 @@ import type { Database } from '~/types/database.types'
  * no user here. The secret keeps the public route from being triggered by anyone.
  */
 export default defineEventHandler(async (event) => {
-  const config = useRuntimeConfig(event)
-  if (!config.cronSecret || getHeader(event, 'authorization') !== `Bearer ${config.cronSecret}`) {
-    throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-  }
+  requireCron(event)
 
   const { resendApiKey, resendFrom } = requireEmailConfig(event)
   const admin = serverSupabaseServiceRole<Database>(event)
@@ -30,7 +27,7 @@ export default defineEventHandler(async (event) => {
 
   const { data: rows, error } = await admin
     .from('events')
-    .select('id, title, event_date, reminders_enabled, event_invites(id, email, token, rsvp, sent_at, reminded_at)')
+    .select('id, title, event_date, reminders_enabled, event_invites(id, email, token, display_name, rsvp, sent_at, reminded_at)')
     .gte('event_date', now.toISOString())
     .lte('event_date', horizon)
   if (error) throw createError({ statusCode: 500, statusMessage: 'Could not load events', data: { cause: error.message } })
@@ -60,7 +57,7 @@ export default defineEventHandler(async (event) => {
 
   for (const d of due) {
     const eventDate = formatEmailDate(d.eventDate) || null
-    const { sent, failed, error } = await sendEventReminders(admin, {
+    const { sent, failed, error, messages } = await sendEventReminders(admin, {
       apiKey: resendApiKey,
       from: resendFrom,
       eventTitle: d.eventTitle,
@@ -72,16 +69,7 @@ export default defineEventHandler(async (event) => {
     })
     // Log the outcome of every attempt — including a total failure (sent = 0) —
     // so the admin Comms log shows what the automated run actually did.
-    const { error: logError } = await admin.from('comms_log').insert({
-      event_id: d.eventId,
-      kind: 'reminder',
-      subject: `Reminder — ${d.eventTitle}`,
-      recipient_count: sent,
-      failed_count: failed,
-      status: commsStatus(sent, failed),
-      error
-    })
-    if (logError) console.error('[crons/reminders] comms_log insert failed -', logError.message)
+    await recordSend(admin, { eventId: d.eventId, kind: 'reminder', subject: `Reminder — ${d.eventTitle}`, sent, failed, error, messages })
     if (sent > 0) {
       totalSent += sent
       digest.push({ eventTitle: d.eventTitle, eventDate, daysLeft: d.daysLeft, remindedCount: sent })

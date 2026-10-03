@@ -1,17 +1,28 @@
 // @vitest-environment nuxt
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 import type { CommsLogEntry } from '../app/composables/useCommsLog'
+import type { TrackedMessage } from '../shared/utils/comms'
+import { fakeApi } from './utils/fakeApi'
 
 interface LogRow { id: string, kind: string, scope: string | null, subject: string | null, recipient_count: number, failed_count?: number, status?: string, error?: string | null, sent_by: string | null, created_at: string }
 let logRows: LogRow[] = []
+let messageRows: TrackedMessage[] = []
+let messagesError: { message: string } | null = null
+let loads = 0
+
+const api = fakeApi(['/api/events/e1/comms/sync'], () => ({ ok: true, checked: 4, updated: 2 }))
 const profiles = [{ id: 'pat', display_name: 'Pat' }]
 
 const supabase = {
   from(table: string) {
     if (table === 'comms_log') {
+      loads += 1
       return { select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: logRows, error: null }) }) }) }
+    }
+    if (table === 'email_messages') {
+      return { select: () => ({ eq: () => Promise.resolve(messagesError ? { data: null, error: messagesError } : { data: messageRows, error: null }) }) }
     }
     // profiles
     return { select: () => ({ in: () => Promise.resolve({ data: profiles, error: null }) }) }
@@ -70,5 +81,63 @@ describe('useCommsLog', () => {
     const { entries } = useCommsLog(ref('e1'))
     await settle(entries)
     expect(entries.value[0]).toMatchObject({ status: 'sent', failedCount: 0, error: null })
+  })
+})
+
+describe('useCommsLog delivery tracking', () => {
+  const sendRow: LogRow = { id: 'c9', kind: 'announcement', scope: 'guests', subject: 'Doors at 7', recipient_count: 3, sent_by: null, created_at: '2026-06-23T00:00:00Z' }
+  const tracked = (over: Partial<TrackedMessage>): TrackedMessage => ({
+    comms_log_id: 'c9', delivered_at: null, opened_at: null, clicked_at: null, bounced_at: null, ...over
+  })
+
+  beforeEach(() => {
+    logRows = [sendRow]
+    messageRows = []
+    messagesError = null
+    api.reset()
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  it('attaches delivered/opened counts from the per-recipient log to each send', async () => {
+    messageRows = [tracked({ delivered_at: 't', opened_at: 't' }), tracked({ delivered_at: 't' }), tracked({ bounced_at: 't' })]
+    const { entries } = useCommsLog(ref('e1'))
+    await settle(entries)
+    expect(entries.value[0]!.delivery).toEqual({ tracked: 3, delivered: 2, opened: 1, clicked: 0, bounced: 1 })
+  })
+
+  it('leaves delivery null for a send with nothing tracked (it predates the log)', async () => {
+    const { entries } = useCommsLog(ref('e1'))
+    await settle(entries)
+    expect(entries.value[0]!.delivery).toBeNull()
+  })
+
+  it('still lists the sends when the delivery log cannot be read', async () => {
+    messagesError = { message: 'relation "email_messages" does not exist' }
+    const { entries, error } = useCommsLog(ref('e1'))
+    await settle(entries)
+    expect(entries.value).toHaveLength(1)
+    expect(entries.value[0]!.delivery).toBeNull()
+    expect(error.value).toBeNull()
+  })
+
+  it('syncDelivery asks the server to pull status from Resend, then reloads the log', async () => {
+    const { entries, syncing, syncDelivery } = useCommsLog(ref('e1'))
+    await settle(entries)
+    const loadsBefore = loads
+
+    const pending = syncDelivery()
+    expect(syncing.value).toBe(true)
+    expect(await pending).toMatchObject({ checked: 4, updated: 2 })
+
+    expect(api.calls).toHaveLength(1)
+    expect(api.calls[0]).toMatchObject({ url: '/api/events/e1/comms/sync', method: 'POST' })
+    expect(loads).toBeGreaterThan(loadsBefore)
+    expect(syncing.value).toBe(false)
+  })
+
+  it('syncDelivery does nothing without a selected event', async () => {
+    const { syncDelivery } = useCommsLog(ref(null))
+    expect(await syncDelivery()).toEqual({ checked: 0, updated: 0 })
+    expect(api.calls).toHaveLength(0)
   })
 })

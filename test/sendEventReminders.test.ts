@@ -45,26 +45,40 @@ describe('sendEventReminders', () => {
     expect(items[0]!.to).toBe('a@x.com')
     expect(items[0]!.html).toContain('https://x/rsvp?token=tok-a')
     expect(updates).toEqual([{ patch: expect.objectContaining({ reminded_at: expect.any(String) }), ids: ['a', 'b'] }])
-    expect(res).toEqual({ sent: 2, failed: 0, error: null })
+    expect(res).toMatchObject({ sent: 2, failed: 0, error: null })
+  })
+
+  it('returns one message per accepted reminder, tied to its guest row, for the delivery log', async () => {
+    batchSend.mockResolvedValue({ data: { data: [{ id: 're_1' }, null] }, error: null })
+    const res = await sendEventReminders(db, { ...baseOpts, invites: [invite('a'), invite('b')] })
+    expect(res.messages).toEqual([{ resendId: 're_1', email: 'a@x.com', inviteId: 'a' }])
+  })
+
+  it('greets each non-responder by first name when the guest row has one', async () => {
+    batchSend.mockResolvedValue({ data: { data: [{ id: 're_1' }, { id: 're_2' }] }, error: null })
+    await sendEventReminders(db, { ...baseOpts, invites: [{ ...invite('a'), display_name: 'Sam Jones' }, invite('b')] })
+    const items = batchSend.mock.calls[0]![0] as Array<{ html: string }>
+    expect(items[0]!.html).toContain('Hi Sam, Movie Night')
+    expect(items[1]!.html).not.toContain('Hi ')
   })
 
   it('only stamps invites Resend accepted (a null id = not sent)', async () => {
     batchSend.mockResolvedValue({ data: { data: [{ id: 're_1' }, null] }, error: null })
     const res = await sendEventReminders(db, { ...baseOpts, invites: [invite('a'), invite('b')] })
     expect(updates[0]!.ids).toEqual(['a'])
-    expect(res).toEqual({ sent: 1, failed: 1, error: null })
+    expect(res).toMatchObject({ sent: 1, failed: 1, error: null })
   })
 
   it('reports a failed batch without stamping, and keeps going', async () => {
     batchSend.mockRejectedValue(new Error('Unverified domain'))
     const res = await sendEventReminders(db, { ...baseOpts, invites: [invite('a')] })
     expect(updates).toHaveLength(0)
-    expect(res).toEqual({ sent: 0, failed: 1, error: 'Unverified domain' })
+    expect(res).toMatchObject({ sent: 0, failed: 1, error: 'Unverified domain' })
   })
 
   it('does nothing when there are no non-responders', async () => {
     const res = await sendEventReminders(db, { ...baseOpts, invites: [] })
     expect(batchSend).not.toHaveBeenCalled()
-    expect(res).toEqual({ sent: 0, failed: 0, error: null })
+    expect(res).toMatchObject({ sent: 0, failed: 0, error: null })
   })
 })

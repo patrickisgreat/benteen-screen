@@ -41,7 +41,15 @@ const { culled: culledSuggestions } = useCulledSuggestions(selectedEventId)
 const { items: bringItems, addItem: addBringItem, updateItem: updateBringItem, remove: removeBringItem } = useBringList(selectedEventId)
 const { counts: rsvpCounts } = useRsvp(selectedEventId)
 // Log of communications sent for the selected event (announcements + e-vite blasts).
-const { entries: commsLog } = useCommsLog(selectedEventId)
+const { entries: commsLog, syncing: syncingDelivery, syncDelivery } = useCommsLog(selectedEventId)
+
+async function refreshDeliveryStatus(): Promise<void> {
+  let updated = 0
+  const ok = await run(async () => {
+    ({ updated } = await syncDelivery())
+  }, 'Could not refresh delivery status')
+  if (ok) toast.add({ title: updated ? `Delivery status updated for ${updated} email${updated === 1 ? '' : 's'}` : 'Delivery status is up to date', color: 'success' })
+}
 
 // Upcoming events first (soonest first), then past events descending (oldest last).
 const sortedEvents = computed(() => sortEventsForAdmin(events.value))
@@ -518,7 +526,7 @@ function onSelectEvent(event: MovieEvent): void {
         <EventPicker v-model="selectedEventId" :items="eventOptions" />
         <template v-if="selectedEventId">
           <EventAnnounceComposer :event-id="selectedEventId" class="max-w-xl" />
-          <CommsLog :entries="commsLog" class="max-w-xl mt-6" />
+          <CommsLog :entries="commsLog" :syncing="syncingDelivery" class="max-w-xl mt-6" @sync="refreshDeliveryStatus" />
         </template>
         <UCard v-else variant="subtle" class="text-center text-muted">
           Select an event to send a blast.

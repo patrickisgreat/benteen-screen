@@ -7,7 +7,7 @@ import type { CommsLogEntry } from '../app/composables/useCommsLog'
 const entry = (over: Partial<CommsLogEntry> = {}): CommsLogEntry => ({
   id: 'c1', kind: 'announcement', scope: 'going', subject: 'See you Friday',
   recipientCount: 12, failedCount: 0, status: 'sent', error: null,
-  sentByName: 'Pat', createdAt: '2026-06-20T18:00:00Z', ...over
+  sentByName: 'Pat', createdAt: '2026-06-20T18:00:00Z', delivery: null, ...over
 })
 
 const entries: CommsLogEntry[] = [
@@ -67,5 +67,39 @@ describe('CommsLog', () => {
   it('labels an RSVP confirmation send', async () => {
     const w = await mountSuspended(CommsLog, { props: { entries: [entry({ kind: 'rsvp_confirmation', subject: null })] } })
     expect(w.text()).toContain('RSVP confirmation')
+  })
+
+  it('shows delivered and opened counts for a tracked send', async () => {
+    const tracked = entry({ delivery: { tracked: 12, delivered: 11, opened: 7, clicked: 0, bounced: 0 } })
+    const w = await mountSuspended(CommsLog, { props: { entries: [tracked] } })
+    const stats = w.get('[data-testid="delivery-stats"]').text()
+    expect(stats).toContain('11 delivered')
+    expect(stats).toContain('7 opened')
+    expect(stats).not.toContain('clicked')
+    expect(stats).not.toContain('bounced')
+  })
+
+  it('adds clicked and bounced counts only when there are some', async () => {
+    const tracked = entry({ delivery: { tracked: 12, delivered: 10, opened: 7, clicked: 3, bounced: 2 } })
+    const w = await mountSuspended(CommsLog, { props: { entries: [tracked] } })
+    const stats = w.get('[data-testid="delivery-stats"]').text()
+    expect(stats).toContain('3 clicked')
+    expect(stats).toContain('2 bounced')
+  })
+
+  it('shows no delivery line for a send that was never tracked', async () => {
+    const w = await mountSuspended(CommsLog, { props: { entries: [entry()] } })
+    expect(w.find('[data-testid="delivery-stats"]').exists()).toBe(false)
+  })
+
+  it('emits sync when the admin asks to refresh delivery status', async () => {
+    const w = await mountSuspended(CommsLog, { props: { entries: [entry()] } })
+    await w.get('button').trigger('click')
+    expect(w.emitted('sync')).toHaveLength(1)
+  })
+
+  it('offers no refresh when nothing has been sent', async () => {
+    const w = await mountSuspended(CommsLog, { props: { entries: [] } })
+    expect(w.find('button').exists()).toBe(false)
   })
 })

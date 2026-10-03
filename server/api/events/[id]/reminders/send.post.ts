@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
 
   const { data: invites, error: queueError } = await db
     .from('event_invites')
-    .select('id, email, token')
+    .select('id, email, token, display_name')
     .eq('event_id', eventId)
     .is('rsvp', null)
     .not('sent_at', 'is', null)
@@ -33,9 +33,9 @@ export default defineEventHandler(async (event) => {
   const origin = resolveOrigin(event)
   const daysLeft = Math.max(0, daysUntil(new Date(), ev.event_date))
 
-  const { sent, failed, error } = await sendEventReminders(db, {
+  const { sent, failed, error, messages } = await sendEventReminders(db, {
     apiKey: resendApiKey,
-    from: resendFrom,
+    from: personalFrom(resendFrom, inviterNameFromClaims(user)),
     replyTo: user.email ?? undefined,
     eventTitle: ev.title,
     eventDate: ev.event_date ? formatEmailDate(ev.event_date) : null,
@@ -47,17 +47,7 @@ export default defineEventHandler(async (event) => {
 
   // An attempt was made (the empty-queue case returned above), so log the outcome
   // — success, partial, or total failure — to the admin Comms log.
-  const { error: logError } = await db.from('comms_log').insert({
-    event_id: eventId,
-    kind: 'reminder',
-    subject: `Reminder — ${ev.title}`,
-    recipient_count: sent,
-    failed_count: failed,
-    status: commsStatus(sent, failed),
-    error,
-    sent_by: userId
-  })
-  if (logError) console.error('[events/reminders/send] comms_log insert failed -', logError.message)
+  await recordSend(db, { eventId, kind: 'reminder', subject: `Reminder — ${ev.title}`, sentBy: userId, sent, failed, error, messages })
 
   return { ok: true, sent, failed, error }
 })

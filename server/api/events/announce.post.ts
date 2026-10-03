@@ -6,8 +6,10 @@ import type { Database } from '~/types/database.types'
  * `preview: true` just reports who that audience is (count + names) so the
  * composer can show "will email N people" before anything goes out. Runs under
  * the caller's own session (RLS): an admin is allowlisted, so they can read
- * invites/rsvps/profiles/event_invites — no service role needed. Recipients are
- * BCC'd so addresses aren't leaked. Resend key is server-only (Invariant 2).
+ * invites/rsvps/profiles/event_invites — no service role needed. Every recipient
+ * gets their own copy (addressed to them, greeting them by name), so addresses
+ * aren't leaked and each one's delivery/opens are tracked like an e-vite. Resend
+ * key is server-only (Invariant 2).
  *
  * Audiences (see shared/utils/announce.ts): this night's guest list, those going,
  * hand-picked people, all members, or the whole club roster.
@@ -29,41 +31,54 @@ export default defineEventHandler(async (event) => {
   const recipients = await resolveAnnounceAudience(db, request.eventId, request.scope, request.emails)
   if (request.preview) return { ok: true, count: recipients.length, recipients }
 
-  const emails = recipients.map(r => r.email)
-  if (!emails.length) return { ok: true, count: 0, failed: 0, error: null }
+  if (!recipients.length) return { ok: true, count: 0, failed: 0, error: null }
 
   const { resendApiKey, resendFrom } = requireEmailConfig(event)
 
-  const mail = buildAnnounceEmail({
-    eventTitle: ev.title,
-    eventDate: ev.event_date ? formatEmailDate(ev.event_date) : null,
-    message: request.message,
-    subject: request.subject,
-    link: `${resolveOrigin(event)}/overview`
+  // Recipients who are on this night's guest list: their opens count toward
+  // their guest row, the same as the e-vite's. Best-effort — without the lookup
+  // the announcement is still tracked per message.
+  const { data: guests, error: guestsError } = await db.from('event_invites').select('id, email').eq('event_id', request.eventId)
+  if (guestsError) console.warn('[events/announce] guest lookup failed -', guestsError.message)
+  const inviteIdByEmail = new Map((guests ?? []).map(g => [g.email, g.id]))
+
+  const eventDate = ev.event_date ? formatEmailDate(ev.event_date) : null
+  const link = `${resolveOrigin(event)}/overview`
+  const mails = recipients.map((recipient) => {
+    const mail = buildAnnounceEmail({
+      eventTitle: ev.title,
+      eventDate,
+      message: request.message,
+      subject: request.subject,
+      link,
+      recipientName: recipient.name
+    })
+    return { email: recipient.email, inviteId: inviteIdByEmail.get(recipient.email) ?? null, ...mail }
   })
 
-  // Send in BCC groups of 50 (Resend's per-send cap). Continues past a failed
-  // group, so a mid-blast error doesn't lose the groups that already delivered —
-  // the result reports sent/failed for the UI to surface (no all-or-nothing 502).
-  const { sent, failed, error } = await sendAnnounce(
-    resendApiKey,
-    resendFrom,
-    { subject: mail.subject, html: mail.html, text: mail.text, replyTo: user.email ?? undefined },
-    emails
-  )
+  // One distinct email per person through the batch endpoint. Continues past a
+  // failed batch, so a mid-blast error doesn't lose the ones that already
+  // delivered — the result reports sent/failed for the UI (no all-or-nothing 502).
+  const { sent, failed, error, messages } = await sendAnnounce({
+    apiKey: resendApiKey,
+    from: personalFrom(resendFrom, inviterNameFromClaims(user)),
+    replyTo: user.email ?? undefined,
+    recipients: mails
+  })
 
-  // Record what actually went out (best-effort — a logging failure must not fail
-  // the request; surface it in logs instead).
   if (sent > 0) {
-    const { error: logError } = await db.from('comms_log').insert({
-      event_id: request.eventId,
+    await recordSend(db, {
+      eventId: request.eventId,
       kind: 'announcement',
       scope: request.scope,
-      subject: mail.subject,
-      recipient_count: sent,
-      sent_by: userId
+      // Every copy shares the subject; only the greeting differs.
+      subject: mails[0]!.subject,
+      sentBy: userId,
+      sent,
+      failed,
+      error,
+      messages
     })
-    if (logError) console.error('[events/announce] comms_log insert failed -', logError.message)
   }
 
   return { ok: true, count: sent, failed, error }

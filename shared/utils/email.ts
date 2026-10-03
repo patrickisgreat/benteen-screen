@@ -75,6 +75,23 @@ export function uniqueEmails(values: Array<string | null | undefined>): string[]
   return [...seen]
 }
 
+/**
+ * The name to greet someone by: the first word of their display name. Null when
+ * there is no usable name — some roster rows carry an email address in the name
+ * column, and "Hi sam@x.com," reads worse than no greeting at all.
+ */
+export function firstName(displayName: string | null | undefined): string | null {
+  const first = displayName?.trim().split(/\s+/)[0]
+  if (!first || first.includes('@')) return null
+  return first
+}
+
+/** "Hi Sam, " to lead a sentence with, or '' when we don't know their name. */
+function greetingPrefix(recipientName: string | null | undefined): string {
+  const name = firstName(recipientName)
+  return name ? `Hi ${name}, ` : ''
+}
+
 function shell(bodyHtml: string): string {
   return `<div style="font-family:ui-sans-serif,system-ui,sans-serif;max-width:560px;margin:0 auto;color:#1f2937;line-height:1.5">${bodyHtml}</div>`
 }
@@ -115,18 +132,22 @@ export function buildAnnounceEmail(opts: {
   message: string
   link: string
   subject?: string
+  /** Who this copy is for — greets them by first name when known. */
+  recipientName?: string | null
 }): BuiltEmail {
   const subject = opts.subject?.trim() || `${opts.eventTitle} — Benteen Screen On The Green`
+  const name = firstName(opts.recipientName)
   // The admin message is rich text from the composer's editor; keep only its
   // known tags (plain text still works — newlines become <br>).
   const messageHtml = sanitizeEmailHtml(opts.message)
   const html = shell(
     `<h1 style="font-size:20px;margin:0 0 4px">${escapeHtml(opts.eventTitle)}</h1>`
     + (opts.eventDate ? `<p style="color:#6b7280;margin:0 0 16px">${escapeHtml(opts.eventDate)}</p>` : '')
+    + (name ? `<p>Hi ${escapeHtml(name)},</p>` : '')
     + `<div>${messageHtml}</div>`
     + `<p style="margin:20px 0">${ctaButton('View on Benteen Screen', opts.link)}</p>`
   )
-  const text = `${opts.eventTitle}${opts.eventDate ? ` — ${opts.eventDate}` : ''}\n\n${htmlToText(opts.message)}\n\n${opts.link}`
+  const text = `${opts.eventTitle}${opts.eventDate ? ` — ${opts.eventDate}` : ''}\n\n${name ? `Hi ${name},\n\n` : ''}${htmlToText(opts.message)}\n\n${opts.link}`
   return { subject, html, text }
 }
 
@@ -150,7 +171,10 @@ export function buildEventReminderEmail(opts: {
   daysLeft: number
   rsvpUrl: string // base: https://site/rsvp?token=abc
   appUrl?: string | null
+  /** Who this copy is for — greets them by first name when known. */
+  recipientName?: string | null
 }): BuiltEmail {
+  const hi = greetingPrefix(opts.recipientName)
   const last = opts.daysLeft <= 1
   const when = opts.daysLeft <= 0 ? 'today' : opts.daysLeft === 1 ? 'tomorrow' : `in ${opts.daysLeft} days`
   const heading = last ? 'Last call' : 'Don\'t forget to RSVP'
@@ -163,12 +187,12 @@ export function buildEventReminderEmail(opts: {
   const html = shell(
     `<h1 style="font-size:20px;margin:0 0 4px">${heading} 🎬</h1>`
     + `<p style="color:#6b7280;margin:0 0 16px"><strong>${escapeHtml(opts.eventTitle)}</strong>${opts.eventDate ? ` — ${escapeHtml(opts.eventDate)}` : ''}</p>`
-    + `<p>Movie Night is ${when} and we haven't heard from you yet. Are you in?</p>`
+    + `<p>${escapeHtml(hi)}Movie Night is ${when} and we haven't heard from you yet. Are you in?</p>`
     + `<p style="margin:22px 0 4px">${oneClickRsvpButtons(opts.rsvpUrl)}</p>`
     + lineup
   )
   const text = `${heading} — ${opts.eventTitle}${opts.eventDate ? ` (${opts.eventDate})` : ''}.`
-    + `\n\nMovie Night is ${when} and we haven't heard from you yet.`
+    + `\n\n${hi}Movie Night is ${when} and we haven't heard from you yet.`
     + `\n\nRSVP:\n${oneClickRsvpText(opts.rsvpUrl)}`
     + (opts.appUrl ? `\n\nSee the lineup & vote: ${opts.appUrl}` : '')
   return { subject, html, text }
@@ -327,6 +351,8 @@ export function buildEventInviteEmail(opts: {
   posterUrl?: string | null
   description?: string | null
   inviterName: string | null
+  /** Who this copy is for — greets them by first name when known. */
+  recipientName?: string | null
   rsvpUrl: string // base: https://site/rsvp?token=abc
   appUrl?: string | null // "see the lineup" CTA
   options?: InviteOptions
@@ -334,6 +360,7 @@ export function buildEventInviteEmail(opts: {
   const o = opts.options ?? DEFAULT_INVITE_OPTIONS
   const p = palette(o.theme, o.accent)
   const inviter = opts.inviterName ? escapeHtml(opts.inviterName) : 'Your host'
+  const hi = greetingPrefix(opts.recipientName)
   const showPoster = o.showPoster && Boolean(opts.posterUrl)
 
   const rsvp = (status: string, label: string, bg: string): string =>
@@ -372,7 +399,11 @@ export function buildEventInviteEmail(opts: {
     ? `<p style="margin:20px 0 0;font-size:14px"><a href="${escapeHtml(opts.appUrl)}" style="color:${p.accent};font-weight:600;text-decoration:none">See the lineup &amp; vote on the movie →</a></p>`
     : ''
 
-  const subject = `You're invited: ${opts.eventTitle}`
+  // A subject from a person ("Pat invited you to…") reads as mail from someone
+  // you know; the generic form is the fallback when we have no inviter name.
+  const subject = opts.inviterName
+    ? `${opts.inviterName} invited you to ${opts.eventTitle}`
+    : `You're invited: ${opts.eventTitle}`
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
     + `<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet"></head>`
     + `<body style="margin:0;padding:0;background:${p.bg};-webkit-text-size-adjust:100%">`
@@ -383,7 +414,7 @@ export function buildEventInviteEmail(opts: {
     + `<p style="margin:0 0 6px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:${p.eyebrow}">🎬 Movie Night · Benteen Screen</p>`
     + `<h1 style="margin:0 0 14px;font-family:${p.titleFont};font-weight:700;font-size:42px;line-height:1.05;letter-spacing:0.5px;color:${p.titleColor}">${escapeHtml(opts.eventTitle)}</h1>`
     + detailsHtml
-    + `<p style="margin:0 0 16px;color:${p.text};font-size:15px;line-height:1.5">${inviter} hopes you can make it. Will you be there?</p>`
+    + `<p style="margin:0 0 16px;color:${p.text};font-size:15px;line-height:1.5">${escapeHtml(hi)}${inviter} hopes you can make it. Will you be there?</p>`
     + noteHtml
     + descHtml
     + `<p style="margin:22px 0 4px">${rsvp('going', 'I\'m going', p.accent)}${rsvp('maybe', 'Maybe', '#6b7280')}${rsvp('no', 'Can\'t make it', '#374151')}</p>`
@@ -393,7 +424,7 @@ export function buildEventInviteEmail(opts: {
     + `</table></td></tr></table></body></html>`
 
   const textParts = [
-    `You're invited: ${opts.eventTitle}`,
+    `${hi}${opts.inviterName ?? 'Your host'} hopes you can make it to ${opts.eventTitle}. Will you be there?`,
     o.showDetails ? [opts.eventDate, opts.eventTime, opts.location].filter(Boolean).join(' · ') : '',
     note,
     descText,
