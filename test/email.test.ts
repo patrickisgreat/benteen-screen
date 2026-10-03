@@ -359,6 +359,22 @@ describe('personalized copy', () => {
     expect(m.text).toContain('Hi Sam,\n\nDoors at 7')
   })
 
+  it('closes an announcement with the guest\'s one-click RSVP buttons when given their link', () => {
+    const m = buildAnnounceEmail({ eventTitle: 'Jaws', eventDate: null, message: 'Did you see this?', link: 'https://x/overview', rsvpUrl: 'https://x/rsvp?token=abc' })
+    expect(m.html).toContain('https://x/rsvp?token=abc&amp;status=going')
+    expect(m.html).toContain('status=maybe')
+    expect(m.html).toContain('status=no')
+    expect(m.html).not.toContain('View on Benteen Screen')
+    expect(m.html).toContain('https://x/overview') // still a way to the lineup
+    expect(m.text).toContain('Going: https://x/rsvp?token=abc&status=going')
+  })
+
+  it('keeps the app button on an announcement with no RSVP link', () => {
+    const m = buildAnnounceEmail({ eventTitle: 'Jaws', eventDate: null, message: 'Doors at 7', link: 'https://x/overview' })
+    expect(m.html).toContain('View on Benteen Screen')
+    expect(m.html).not.toContain('/rsvp?token=')
+  })
+
   it('sends the announcement without a greeting when the name is unknown', () => {
     const m = buildAnnounceEmail({ eventTitle: 'Jaws', eventDate: null, message: 'Doors at 7', link: 'l' })
     expect(m.html).not.toContain('Hi ')

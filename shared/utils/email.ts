@@ -134,9 +134,20 @@ export function buildAnnounceEmail(opts: {
   subject?: string
   /** Who this copy is for — greets them by first name when known. */
   recipientName?: string | null
+  /** Their tokenized RSVP link (https://site/rsvp?token=abc). When given, the
+   *  message closes with the one-click RSVP buttons instead of the app button —
+   *  for guests who haven't replied, so answering takes one tap and no sign-in. */
+  rsvpUrl?: string | null
 }): BuiltEmail {
   const subject = opts.subject?.trim() || `${opts.eventTitle} — Benteen Screen On The Green`
   const name = firstName(opts.recipientName)
+  const actionHtml = opts.rsvpUrl
+    ? `<p style="margin:22px 0 4px">${oneClickRsvpButtons(opts.rsvpUrl)}</p>`
+    + `<p style="margin:16px 0 0;font-size:14px"><a href="${escapeHtml(opts.link)}" style="color:#16a34a;font-weight:600;text-decoration:none">See the lineup &amp; vote →</a></p>`
+    : `<p style="margin:20px 0">${ctaButton('View on Benteen Screen', opts.link)}</p>`
+  const actionText = opts.rsvpUrl
+    ? `RSVP:\n${oneClickRsvpText(opts.rsvpUrl)}\n\nSee the lineup & vote: ${opts.link}`
+    : opts.link
   // The admin message is rich text from the composer's editor; keep only its
   // known tags (plain text still works — newlines become <br>).
   const messageHtml = sanitizeEmailHtml(opts.message)
@@ -145,9 +156,9 @@ export function buildAnnounceEmail(opts: {
     + (opts.eventDate ? `<p style="color:#6b7280;margin:0 0 16px">${escapeHtml(opts.eventDate)}</p>` : '')
     + (name ? `<p>Hi ${escapeHtml(name)},</p>` : '')
     + `<div>${messageHtml}</div>`
-    + `<p style="margin:20px 0">${ctaButton('View on Benteen Screen', opts.link)}</p>`
+    + actionHtml
   )
-  const text = `${opts.eventTitle}${opts.eventDate ? ` — ${opts.eventDate}` : ''}\n\n${name ? `Hi ${name},\n\n` : ''}${htmlToText(opts.message)}\n\n${opts.link}`
+  const text = `${opts.eventTitle}${opts.eventDate ? ` — ${opts.eventDate}` : ''}\n\n${name ? `Hi ${name},\n\n` : ''}${htmlToText(opts.message)}\n\n${actionText}`
   return { subject, html, text }
 }
 
