@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.24.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.23.0...v1.24.0) (2026-10-03)
+
+
+### Features
+
+* draft a new email to guests who haven't opened the e-vite ([#200](https://github.com/patrickisgreat/benteen-screen/issues/200)) ([41fc47d](https://github.com/patrickisgreat/benteen-screen/commit/41fc47d61fa78544ccaf68e6d26b3235a197e4de))
+* personal, per-recipient emails with delivery tracking that survives a missed webhook ([#198](https://github.com/patrickisgreat/benteen-screen/issues/198)) ([a018a1d](https://github.com/patrickisgreat/benteen-screen/commit/a018a1da147ceb5d5017152d9fa26a3e0d330473))
+
 ## [1.23.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.22.0...v1.23.0) (2026-10-01)
 
 
