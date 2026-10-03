@@ -117,6 +117,61 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('event_invites').delete().eq('event_id', eventId)
   })
 
+  it('email_messages are admin-only: a member reads none, and cannot log or stamp one', async () => {
+    const resendId = `re_rls_member_${stamp}`
+    const seeded = await admin!.from('email_messages').insert({ resend_id: resendId, event_id: eventId, kind: 'announcement', email: memberEmail })
+    expect(seeded.error).toBeNull()
+
+    const read = await memberClient.from('email_messages').select('id').eq('event_id', eventId)
+    expect(read.error).toBeNull()
+    expect(read.data).toEqual([])
+
+    const insert = await memberClient.from('email_messages').insert({ resend_id: `${resendId}_forged`, event_id: eventId, kind: 'announcement', email: memberEmail })
+    expect(insert.error).not.toBeNull()
+
+    // An RLS-filtered update is not an error — it just matches no rows.
+    await memberClient.from('email_messages').update({ opened_at: new Date().toISOString() }).eq('resend_id', resendId)
+    const after = await admin!.from('email_messages').select('opened_at').eq('resend_id', resendId).single()
+    expect(after.data?.opened_at).toBeNull()
+  })
+
+  it('an admin can log a message and stamp it; the stamp is mirrored onto the guest row, first one wins', async () => {
+    const adminClient = await signInAs(adminEmail)
+    const guestEmail = `rls_tracked_${stamp}@example.com`
+    const { data: invite, error: inviteError } = await adminClient
+      .from('event_invites').insert({ event_id: eventId, email: guestEmail }).select('id').single()
+    expect(inviteError).toBeNull()
+
+    const evite = `re_rls_evite_${stamp}`
+    const reminder = `re_rls_reminder_${stamp}`
+    const logged = await adminClient.from('email_messages').insert([
+      { resend_id: evite, event_id: eventId, invite_id: invite!.id, kind: 'invite', email: guestEmail },
+      { resend_id: reminder, event_id: eventId, invite_id: invite!.id, kind: 'reminder', email: guestEmail }
+    ])
+    expect(logged.error).toBeNull()
+
+    const firstOpen = '2026-01-01T10:00:00+00:00'
+    const stamped = await adminClient.from('email_messages').update({ delivered_at: firstOpen, opened_at: firstOpen }).eq('resend_id', evite)
+    expect(stamped.error).toBeNull()
+    const guest = await adminClient.from('event_invites').select('delivered_at, opened_at, bounced_at').eq('id', invite!.id).single()
+    expect(new Date(guest.data!.opened_at!).toISOString()).toBe(new Date(firstOpen).toISOString())
+    expect(guest.data!.delivered_at).not.toBeNull()
+    expect(guest.data!.bounced_at).toBeNull()
+
+    // A later open of the reminder must not move the guest's first-opened time.
+    await adminClient.from('email_messages').update({ opened_at: '2026-01-05T10:00:00+00:00' }).eq('resend_id', reminder)
+    const later = await adminClient.from('event_invites').select('opened_at').eq('id', invite!.id).single()
+    expect(new Date(later.data!.opened_at!).toISOString()).toBe(new Date(firstOpen).toISOString())
+  })
+
+  it('a duplicate Resend id cannot be logged twice', async () => {
+    const resendId = `re_rls_dupe_${stamp}`
+    const first = await admin!.from('email_messages').insert({ resend_id: resendId, event_id: eventId, kind: 'invite', email: memberEmail })
+    expect(first.error).toBeNull()
+    const second = await admin!.from('email_messages').insert({ resend_id: resendId, event_id: eventId, kind: 'invite', email: memberEmail })
+    expect(second.error).not.toBeNull()
+  })
+
   it('an admin can RSVP (and +1) on another member\'s behalf; a member cannot', async () => {
     const adminClient = await signInAs(adminEmail)
     const emailT = `rls_behalf_${stamp}@example.com`
