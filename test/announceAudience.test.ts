@@ -49,6 +49,23 @@ describe('resolveAnnounceAudience', () => {
     expect(out).toEqual([{ email: 'ada@x.com', name: 'Ada' }, { email: 'bo@x.com', name: null }])
   })
 
+  it('unopened = guests sent the e-vite with no open, click, reply or bounce', async () => {
+    const guest = (email: string, over: Row = {}): Row => ({
+      email, display_name: null, event_id: eventId, sent_at: 't', opened_at: null, clicked_at: null, bounced_at: null, rsvp: null, ...over
+    })
+    const db = makeFakeDb({ event_invites: [
+      guest('unseen@x.com', { display_name: 'Una' }),
+      guest('opened@x.com', { opened_at: 't' }),
+      guest('clicked@x.com', { clicked_at: 't' }),
+      guest('replied@x.com', { rsvp: 'no' }),
+      guest('bounced@x.com', { bounced_at: 't' }),
+      guest('notsent@x.com', { sent_at: null }),
+      guest('other-night@x.com', { event_id: 'evt-2' })
+    ] })
+    const out = await resolveAnnounceAudience(db, eventId, 'unopened', [])
+    expect(out).toEqual([{ email: 'unseen@x.com', name: 'Una' }])
+  })
+
   it('going merges in-app going members with e-vite guests who replied going', async () => {
     const db = makeFakeDb({
       rsvps: [{ user_id: 'u1', event_id: eventId, status: 'going' }],

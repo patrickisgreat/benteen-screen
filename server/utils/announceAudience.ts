@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AnnounceRecipient, AnnounceScope } from '#shared/utils/announce'
 import type { Database } from '~/types/database.types'
+import { isUnopenedInvite } from '../../shared/utils/unopenedInvite'
 
 interface NamedEmailRow {
   email: string | null
@@ -37,6 +38,14 @@ export async function resolveAnnounceAudience(
       const { data, error } = await db.from('event_invites').select('email, display_name').eq('event_id', eventId)
       if (error) throw error
       return toRecipients(data ?? [])
+    }
+    case 'unopened': {
+      const { data, error } = await db
+        .from('event_invites')
+        .select('email, display_name, sent_at, opened_at, clicked_at, bounced_at, rsvp')
+        .eq('event_id', eventId)
+      if (error) throw error
+      return toRecipients((data ?? []).filter(isUnopenedInvite))
     }
     case 'going': {
       // Both RSVP stores: members who tapped going in-app + e-vite guests who replied going.

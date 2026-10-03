@@ -5,9 +5,14 @@ const eventId = '11111111-1111-4111-8111-111111111111'
 const base = { eventId, message: '<p>Doors at 7</p>', scope: 'guests' }
 
 describe('announce scopes', () => {
-  it('describes every scope exactly once, in narrow-to-wide order', () => {
+  it('describes every scope exactly once, in the order the composer lists them', () => {
     expect(ANNOUNCE_SCOPE_OPTIONS.map(o => o.value)).toEqual([...ANNOUNCE_SCOPES])
     for (const o of ANNOUNCE_SCOPE_OPTIONS) expect(o.description.length).toBeGreaterThan(10)
+  })
+
+  it('offers the guests who haven\'t opened the e-vite as an audience', () => {
+    expect(ANNOUNCE_SCOPES).toContain('unopened')
+    expect(parseAnnounceRequest({ eventId, scope: 'unopened', preview: true })).toMatchObject({ ok: true, value: { scope: 'unopened' } })
   })
 
   it('defaults to this night\'s guest list, not the whole club', () => {
