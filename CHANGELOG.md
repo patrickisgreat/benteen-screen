@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.24.0...v1.25.0) (2026-10-03)
+
+
+### Features
+
+* poll the guest list by email with one-tap answers ([#201](https://github.com/patrickisgreat/benteen-screen/issues/201)) ([c764aa6](https://github.com/patrickisgreat/benteen-screen/commit/c764aa69342eb3ae81da356a5f3315133863fe9e))
+
 ## [1.24.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.23.0...v1.24.0) (2026-10-03)
 
 
