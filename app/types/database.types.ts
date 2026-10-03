@@ -65,6 +65,12 @@ export interface Database {
         Update: { id?: string, event_id?: string | null, kind?: string, scope?: string | null, subject?: string | null, recipient_count?: number, failed_count?: number, status?: string, error?: string | null, sent_by?: string | null, created_at?: string }
         Relationships: []
       }
+      email_messages: {
+        Row: { id: string, resend_id: string, event_id: string | null, comms_log_id: string | null, invite_id: string | null, kind: string, email: string, sent_at: string, delivered_at: string | null, opened_at: string | null, clicked_at: string | null, bounced_at: string | null }
+        Insert: { id?: string, resend_id: string, event_id?: string | null, comms_log_id?: string | null, invite_id?: string | null, kind: string, email: string, sent_at?: string, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null }
+        Update: { id?: string, resend_id?: string, event_id?: string | null, comms_log_id?: string | null, invite_id?: string | null, kind?: string, email?: string, sent_at?: string, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null }
+        Relationships: []
+      }
       comms_templates: {
         Row: { id: string, name: string, subject: string | null, body: string, created_by: string | null, created_at: string }
         Insert: { id?: string, name: string, subject?: string | null, body: string, created_by?: string | null, created_at?: string }
