@@ -9,6 +9,7 @@ import {
   buildInviteEmail,
   buildRsvpConfirmationEmail,
   escapeHtml,
+  firstName,
   formatEmailDate,
   htmlToText,
   sanitizeEmailHtml,
@@ -301,5 +302,65 @@ describe('buildClubWelcomeEmail', () => {
     const m = buildClubWelcomeEmail({ inviterName: '<script>alert(1)</script>', link: 'https://x/login' })
     expect(m.html).not.toContain('<script>')
     expect(m.html).toContain('&lt;script&gt;')
+  })
+})
+
+describe('firstName', () => {
+  it('takes the first word of a display name', () => {
+    expect(firstName('Sam Jones')).toBe('Sam')
+    expect(firstName('  Sam  ')).toBe('Sam')
+  })
+
+  it('is null when there is no usable name', () => {
+    expect(firstName(null)).toBeNull()
+    expect(firstName('   ')).toBeNull()
+  })
+
+  it('never greets someone by an email address stored in the name column', () => {
+    expect(firstName('sam@x.com')).toBeNull()
+  })
+})
+
+describe('personalized copy', () => {
+  const invite = { eventTitle: 'Jaws', eventDate: null, rsvpUrl: 'https://x/rsvp?token=abc' }
+
+  it('greets the e-vite guest by first name in both html and text', () => {
+    const m = buildEventInviteEmail({ ...invite, inviterName: 'Pat', recipientName: 'Sam Jones' })
+    expect(m.html).toContain('Hi Sam, Pat hopes you can make it')
+    expect(m.text).toContain('Hi Sam, Pat hopes you can make it to Jaws')
+  })
+
+  it('omits the greeting when the guest has no name', () => {
+    const m = buildEventInviteEmail({ ...invite, inviterName: 'Pat', recipientName: null })
+    expect(m.html).not.toContain('Hi ')
+    expect(m.html).toContain('Pat hopes you can make it')
+  })
+
+  it('escapes a guest name before it reaches the e-vite html', () => {
+    const m = buildEventInviteEmail({ ...invite, inviterName: 'Pat', recipientName: '<b>Sam</b> Jones' })
+    expect(m.html).not.toContain('<b>Sam</b>')
+    expect(m.html).toContain('&lt;b&gt;Sam&lt;/b&gt;')
+  })
+
+  it('puts the inviter in the e-vite subject, falling back to the generic one', () => {
+    expect(buildEventInviteEmail({ ...invite, inviterName: 'Pat' }).subject).toBe('Pat invited you to Jaws')
+    expect(buildEventInviteEmail({ ...invite, inviterName: null }).subject).toBe('You\'re invited: Jaws')
+  })
+
+  it('greets the reminder recipient by first name', () => {
+    const m = buildEventReminderEmail({ ...invite, daysLeft: 3, recipientName: 'Sam Jones' })
+    expect(m.html).toContain('Hi Sam, Movie Night is in 3 days')
+    expect(m.text).toContain('Hi Sam, Movie Night is in 3 days')
+  })
+
+  it('greets the announcement recipient on its own line, above the message', () => {
+    const m = buildAnnounceEmail({ eventTitle: 'Jaws', eventDate: null, message: 'Doors at 7', link: 'l', recipientName: 'Sam Jones' })
+    expect(m.html).toContain('<p>Hi Sam,</p><div>Doors at 7</div>')
+    expect(m.text).toContain('Hi Sam,\n\nDoors at 7')
+  })
+
+  it('sends the announcement without a greeting when the name is unknown', () => {
+    const m = buildAnnounceEmail({ eventTitle: 'Jaws', eventDate: null, message: 'Doors at 7', link: 'l' })
+    expect(m.html).not.toContain('Hi ')
   })
 })
