@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.25.0...v1.26.0) (2026-10-04)
+
+
+### Features
+
+* update delivery and open status automatically, no refresh button ([#204](https://github.com/patrickisgreat/benteen-screen/issues/204)) ([aae3766](https://github.com/patrickisgreat/benteen-screen/commit/aae3766f73f499dc065374cc252245d3f4413eed))
+
 ## [1.25.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.24.0...v1.25.0) (2026-10-03)
 
 
