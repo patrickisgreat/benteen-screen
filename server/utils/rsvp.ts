@@ -7,13 +7,17 @@ export interface InviteTarget {
   id: string
   event_id: string
   email: string
+  /** Their current guest count — kept when a reply doesn't state one. */
+  plus_ones?: number
 }
 
 export interface InviteReply {
   /** null clears the reply back to "no reply yet" (so they're remindable again). */
   status: RsvpStatus | null
-  /** Additional guests; only kept when going. Already validated by the caller. */
-  plusOnes: number
+  /** Additional guests; only kept when going. Already validated by the caller.
+   *  Omitted = keep the guest count they already have (a one-click email link
+   *  only says going/maybe/no, so re-confirming must not drop their +1s). */
+  plusOnes?: number
   /** Stamp clicked_at too — true when the reply came from the e-vite link itself. */
   markClicked?: boolean
 }
@@ -33,7 +37,7 @@ export async function recordInviteRsvp(
 ): Promise<{ status: RsvpStatus | null, plusOnes: number }> {
   const { status } = reply
   // Guests only count when going.
-  const plusOnes = status === 'going' ? reply.plusOnes : 0
+  const plusOnes = status === 'going' ? (reply.plusOnes ?? invite.plus_ones ?? 0) : 0
   const now = new Date().toISOString()
 
   const { error: inviteError } = await db

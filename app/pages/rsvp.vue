@@ -27,7 +27,10 @@ function isStatus(value: string): value is RsvpStatus {
   return value === 'going' || value === 'maybe' || value === 'no'
 }
 
-async function rsvp(status: RsvpStatus): Promise<void> {
+/** Record a reply. `keepGuests` is the email-link case: the link only says
+ *  going/maybe/no, so the server keeps whatever guest count they already had
+ *  (re-confirming "going" must not drop their +1s) and tells us what it is. */
+async function rsvp(status: RsvpStatus, keepGuests = false): Promise<void> {
   if (!token.value) {
     phase.value = 'error'
     return
@@ -36,7 +39,11 @@ async function rsvp(status: RsvpStatus): Promise<void> {
   if (status !== 'going') guests.value = 0
   phase.value = 'saving'
   try {
-    await $fetch('/api/rsvp', { method: 'POST', body: { token: token.value, status, plusOnes: guests.value } })
+    const recorded = await $fetch<{ plusOnes: number }>('/api/rsvp', {
+      method: 'POST',
+      body: { token: token.value, status, plusOnes: keepGuests ? undefined : guests.value }
+    })
+    guests.value = recorded.plusOnes
     current.value = status
     phase.value = 'done'
   } catch {
@@ -63,7 +70,7 @@ async function setGuests(count: number): Promise<void> {
 onMounted(() => {
   const requested = (route.query.status ?? '').toString()
   if (isStatus(requested)) {
-    void rsvp(requested)
+    void rsvp(requested, true)
   } else {
     phase.value = 'error'
   }
