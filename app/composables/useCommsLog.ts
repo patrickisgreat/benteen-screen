@@ -43,14 +43,13 @@ function oneOf<T extends string>(values: readonly T[], value: string, fallback: 
  * blasts, newest first — each with its delivered/opened counts. Admin-gated by RLS
  * (the comms_log + email_messages policies); a non-admin reads nothing. Live via
  * realtime, so a fresh send or a new open appears without a manual refresh.
- * `syncDelivery` asks the server to pull the latest status from Resend, for when
- * webhook events haven't arrived.
+ * `syncDelivery` asks the server to pull the latest status from Resend, so the
+ * counts stay current even when webhook events don't arrive.
  */
 export function useCommsLog(eventId: MaybeRefOrGetter<string | null | undefined>): {
   entries: Ref<CommsLogEntry[]>
   error: Ref<string | null>
   refresh: () => Promise<void>
-  syncing: Ref<boolean>
   syncDelivery: () => Promise<DeliverySyncResult>
 } {
   const supabase = useSupabaseClient<Database>()
@@ -101,20 +100,15 @@ export function useCommsLog(eventId: MaybeRefOrGetter<string | null | undefined>
     }
   })
 
-  const syncing = ref(false)
-
   async function syncDelivery(): Promise<DeliverySyncResult> {
     const id = toValue(eventId)
     if (!id) return { checked: 0, updated: 0 }
-    syncing.value = true
-    try {
-      const result = await $fetch<DeliverySyncResult>(`/api/events/${id}/comms/sync`, { method: 'POST' })
-      await refresh()
-      return result
-    } finally {
-      syncing.value = false
-    }
+    const result = await $fetch<DeliverySyncResult>(`/api/events/${id}/comms/sync`, { method: 'POST' })
+    // Realtime normally reloads the log as stamps land; reload here too so the
+    // counts are right even if a realtime event is missed.
+    if (result.updated > 0) await refresh()
+    return result
   }
 
-  return { entries, error, refresh, syncing, syncDelivery }
+  return { entries, error, refresh, syncDelivery }
 }

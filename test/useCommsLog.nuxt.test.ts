@@ -12,7 +12,8 @@ let messageRows: TrackedMessage[] = []
 let messagesError: { message: string } | null = null
 let loads = 0
 
-const api = fakeApi(['/api/events/e1/comms/sync'], () => ({ ok: true, checked: 4, updated: 2 }))
+let syncResult = { ok: true, checked: 4, updated: 2 }
+const api = fakeApi(['/api/events/e1/comms/sync'], () => syncResult)
 const profiles = [{ id: 'pat', display_name: 'Pat' }]
 
 const supabase = {
@@ -94,6 +95,7 @@ describe('useCommsLog delivery tracking', () => {
     logRows = [sendRow]
     messageRows = []
     messagesError = null
+    syncResult = { ok: true, checked: 4, updated: 2 }
     api.reset()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
   })
@@ -120,19 +122,27 @@ describe('useCommsLog delivery tracking', () => {
     expect(error.value).toBeNull()
   })
 
-  it('syncDelivery asks the server to pull status from Resend, then reloads the log', async () => {
-    const { entries, syncing, syncDelivery } = useCommsLog(ref('e1'))
+  it('syncDelivery asks the server to pull status from Resend and reloads the log when something changed', async () => {
+    const { entries, syncDelivery } = useCommsLog(ref('e1'))
     await settle(entries)
     const loadsBefore = loads
 
-    const pending = syncDelivery()
-    expect(syncing.value).toBe(true)
-    expect(await pending).toMatchObject({ checked: 4, updated: 2 })
+    expect(await syncDelivery()).toMatchObject({ checked: 4, updated: 2 })
 
     expect(api.calls).toHaveLength(1)
     expect(api.calls[0]).toMatchObject({ url: '/api/events/e1/comms/sync', method: 'POST' })
     expect(loads).toBeGreaterThan(loadsBefore)
-    expect(syncing.value).toBe(false)
+  })
+
+  it('syncDelivery leaves the log alone when nothing changed', async () => {
+    syncResult = { ok: true, checked: 4, updated: 0 }
+    const { entries, syncDelivery } = useCommsLog(ref('e1'))
+    await settle(entries)
+    const loadsBefore = loads
+
+    await syncDelivery()
+
+    expect(loads).toBe(loadsBefore)
   })
 
   it('syncDelivery does nothing without a selected event', async () => {
