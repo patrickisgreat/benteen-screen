@@ -97,14 +97,9 @@ describe('CommsLog', () => {
     expect(w.find('[data-testid="delivery-stats"]').exists()).toBe(false)
   })
 
-  it('emits sync when the admin asks to refresh delivery status', async () => {
+  it('says delivery status updates on its own, with no button to press', async () => {
     const w = await mountSuspended(CommsLog, { props: { entries: [entry()] } })
-    await w.get('button').trigger('click')
-    expect(w.emitted('sync')).toHaveLength(1)
-  })
-
-  it('offers no refresh when nothing has been sent', async () => {
-    const w = await mountSuspended(CommsLog, { props: { entries: [] } })
+    expect(w.text()).toContain('update automatically')
     expect(w.find('button').exists()).toBe(false)
   })
 })
