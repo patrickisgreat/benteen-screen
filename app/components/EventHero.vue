@@ -8,6 +8,13 @@ const props = defineProps<{ event: MovieEvent, backdrop: string | null }>()
 defineEmits<{ open: [] }>()
 
 const upcoming = computed(() => isUpcoming(props.event.event_date))
+// The day it moved from, when an admin rescheduled it to a different day.
+const movedFrom = computed(() => {
+  const previous = toDate(props.event.previous_event_date)
+  const current = toDate(props.event.event_date)
+  if (!previous || !current || isSameDay(previous, current)) return null
+  return formatDate(previous)
+})
 // How this event's poster fills the header (ratio / focal point / zoom).
 const display = computed(() => normalizePosterDisplay(props.event.poster_display))
 </script>
@@ -21,16 +28,29 @@ const display = computed(() => normalizePosterDisplay(props.event.poster_display
     @click="$emit('open')"
   >
     <!-- Blurred fill so a contained poster rests on a soft backdrop, not black bars. -->
-    <img v-if="backdrop" :src="backdrop" alt="" class="absolute inset-0 size-full object-cover scale-110 blur-2xl opacity-50">
+    <img
+      v-if="backdrop"
+      :src="backdrop"
+      alt=""
+      class="absolute inset-0 size-full object-cover scale-110 blur-2xl opacity-50"
+    >
     <!-- The poster itself: object-contain (whole image visible) with the event's
          focal point + zoom. Hover-scale on the wrapper composes with the zoom. -->
     <div
       v-if="backdrop"
       class="absolute inset-0 transition-transform duration-500 group-hover:scale-105"
     >
-      <img :src="backdrop" alt="" class="size-full object-contain" :style="posterFillStyle(display)">
+      <img
+        :src="backdrop"
+        alt=""
+        class="size-full object-contain"
+        :style="posterFillStyle(display)"
+      >
     </div>
-    <div v-else class="absolute inset-0 bg-elevated" />
+    <div
+      v-else
+      class="absolute inset-0 bg-elevated"
+    />
 
     <!-- Legibility gradient so the title is readable over any poster -->
     <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/10" />
@@ -47,12 +67,26 @@ const display = computed(() => normalizePosterDisplay(props.event.poster_display
           size="sm"
         />
         <span class="text-sm text-white/80">{{ formatDate(event.event_date) }}</span>
+        <UBadge
+          v-if="upcoming && movedFrom"
+          color="warning"
+          variant="solid"
+          icon="i-lucide-calendar-clock"
+          size="sm"
+          :label="`New date · was ${movedFrom}`"
+        />
       </div>
       <h1 class="text-2xl sm:text-3xl font-bold text-white drop-shadow-md text-balance underline-offset-4 decoration-2 decoration-white/40 group-hover:underline">
         {{ event.title }}
       </h1>
-      <p v-if="event.location" class="mt-1.5 flex items-center gap-1.5 text-sm text-white/80">
-        <UIcon name="i-lucide-map-pin" class="shrink-0" /> {{ event.location }}
+      <p
+        v-if="event.location"
+        class="mt-1.5 flex items-center gap-1.5 text-sm text-white/80"
+      >
+        <UIcon
+          name="i-lucide-map-pin"
+          class="shrink-0"
+        /> {{ event.location }}
       </p>
       <!-- Weather sits on its own line beneath the address. -->
       <WeatherForecast

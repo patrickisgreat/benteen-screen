@@ -18,6 +18,13 @@ const { people, pendingInvites, loadError, setBlocked, setAdmin, revokeInvite } 
 const modalOpen = ref(false)
 const inviteOpen = ref(false)
 const editingEvent = ref<MovieEvent | null>(null)
+const reschedulingEvent = ref<MovieEvent | null>(null)
+const rescheduleOpen = ref(false)
+
+function openReschedule(event: MovieEvent): void {
+  reschedulingEvent.value = event
+  rescheduleOpen.value = true
+}
 const eventPendingDelete = ref<MovieEvent | null>(null)
 
 // People → "invite to an event": the person being invited, and the upcoming nights to pick from.
@@ -365,6 +372,15 @@ function onSelectEvent(event: MovieEvent): void {
                   @click="onSelectEvent(event)"
                 />
                 <UButton
+                  icon="i-lucide-calendar-clock"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Move date"
+                  title="Move date and notify guests"
+                  @click="openReschedule(event)"
+                />
+                <UButton
                   icon="i-lucide-pencil"
                   color="neutral"
                   variant="ghost"
@@ -548,6 +564,7 @@ function onSelectEvent(event: MovieEvent): void {
 
     <!-- Create / edit modal -->
     <EventFormModal v-model:open="modalOpen" :event="editingEvent" @save="onSave" />
+    <RescheduleEventModal v-model:open="rescheduleOpen" :event="reschedulingEvent" />
 
     <!-- Admin invite a friend -->
     <InviteFriendModal v-model:open="inviteOpen" />

@@ -48,6 +48,7 @@ const stubs = {
   UTabs: { template: '<div><slot name="invites" /></div>' },
   UserStatsModal: true,
   EventStatsModal: true,
+  RescheduleEventModal: true,
   EventInviteManager: true,
   EventAnnounceComposer: true,
   CommsLog: true,
