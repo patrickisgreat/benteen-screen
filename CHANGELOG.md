@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.27.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.26.0...v1.27.0) (2026-10-06)
+
+
+### Features
+
+* move an event's date in one step and notify everyone, keeping RSVPs ([#206](https://github.com/patrickisgreat/benteen-screen/issues/206)) ([6a8d79b](https://github.com/patrickisgreat/benteen-screen/commit/6a8d79b2350fd7f9b94dc8d84166f9f85ed7a73d))
+
 ## [1.26.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.25.0...v1.26.0) (2026-10-04)
 
 
