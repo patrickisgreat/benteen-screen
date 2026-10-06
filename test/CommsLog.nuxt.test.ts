@@ -69,6 +69,11 @@ describe('CommsLog', () => {
     expect(w.text()).toContain('RSVP confirmation')
   })
 
+  it('labels a date-change notice', async () => {
+    const w = await mountSuspended(CommsLog, { props: { entries: [entry({ kind: 'date_change', subject: null })] } })
+    expect(w.text()).toContain('Date change')
+  })
+
   it('labels a poll send', async () => {
     const w = await mountSuspended(CommsLog, { props: { entries: [entry({ kind: 'poll', subject: null })] } })
     expect(w.text()).toContain('Poll')

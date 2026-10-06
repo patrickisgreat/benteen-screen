@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ref } from 'vue'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
+import { fakeApi } from './utils/fakeApi'
 
 interface UpdateCall { payload: Record<string, unknown>, filters: Record<string, unknown> }
 const calls = { updates: [] as UpdateCall[] }
@@ -27,11 +28,33 @@ const supabase = {
   }
 }
 
+const api = fakeApi(['/api/events/e1/reschedule', '/api/events/e1/reschedule-audience'], call => (
+  call.url.endsWith('audience')
+    ? { total: 3, going: 1, maybe: 0, declined: 0, noReply: 2, sample: null }
+    : { ok: true, moved: true, sent: 3, failed: 0, error: null }
+))
+
 mockNuxtImport('useSupabaseClient', () => () => supabase)
 mockNuxtImport('useSupabaseUser', () => () => ref({ id: 'me' }))
 
 beforeEach(() => {
   calls.updates = []
+  api.reset()
+})
+
+describe('useEventAdmin rescheduling', () => {
+  it('asks the server who a date change would email', async () => {
+    const { rescheduleAudience } = useEventAdmin()
+    expect(await rescheduleAudience('e1')).toMatchObject({ total: 3, going: 1 })
+    expect(api.calls[0]).toMatchObject({ url: '/api/events/e1/reschedule-audience', method: 'GET' })
+  })
+
+  it('moves the event through the server route and reports who was emailed', async () => {
+    const { rescheduleEvent } = useEventAdmin()
+    const request = { eventDate: '2026-10-18T04:00:00.000Z', startTime: '8pm', note: 'Rain', notify: true }
+    expect(await rescheduleEvent('e1', request)).toEqual({ sent: 3, failed: 0, error: null })
+    expect(api.calls[0]).toMatchObject({ url: '/api/events/e1/reschedule', method: 'POST', body: request })
+  })
 })
 
 describe('useEventAdmin.setVotingLocked', () => {

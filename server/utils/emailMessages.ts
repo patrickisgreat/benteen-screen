@@ -12,7 +12,7 @@ import type { EmailStampColumn } from './webhook'
 
 type Db = SupabaseClient<Database>
 
-export type EmailKind = 'announcement' | 'invite' | 'reminder' | 'rsvp_confirmation' | 'poll'
+export type EmailKind = 'announcement' | 'invite' | 'reminder' | 'rsvp_confirmation' | 'poll' | 'date_change'
 
 export interface SendRecord {
   readonly eventId: string

@@ -8,7 +8,8 @@ const KIND = {
   invite: { icon: 'i-lucide-mail-plus', label: 'E-vite' },
   reminder: { icon: 'i-lucide-alarm-clock', label: 'Reminder' },
   rsvp_confirmation: { icon: 'i-lucide-mail-check', label: 'RSVP confirmation' },
-  poll: { icon: 'i-lucide-vote', label: 'Poll' }
+  poll: { icon: 'i-lucide-vote', label: 'Poll' },
+  date_change: { icon: 'i-lucide-calendar-clock', label: 'Date change' }
 } as const
 
 const STATUS = {

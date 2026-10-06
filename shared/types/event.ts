@@ -16,6 +16,10 @@ export interface MovieEvent {
   poster_display: Record<string, unknown> | null
   /** Whether the auto RSVP-reminder cron emails this event's non-responders. */
   reminders_enabled: boolean
+  /** The date it moved from, when an admin rescheduled it; null = never moved. */
+  previous_event_date: string | null
+  previous_start_time: string | null
+  rescheduled_at: string | null
   created_at: string
 }
 

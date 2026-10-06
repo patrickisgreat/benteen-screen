@@ -301,6 +301,67 @@ export function buildRsvpConfirmationEmail(opts: {
   return { subject, html, text }
 }
 
+// What a date change means for someone, by the reply they had given.
+const DATE_CHANGE_STANDING: Record<RsvpStatus, string> = {
+  going: 'You\'re still on the list as going. If the new date works, there\'s nothing to do. If it doesn\'t, let us know:',
+  maybe: 'You\'re still down as a maybe. Now that the date has changed, where do you land?',
+  no: 'You couldn\'t make the original date. Does the new one work for you?'
+}
+
+/**
+ * Tells one person that a movie night has moved: the old date struck through,
+ * the new one, an optional note from the host, and where their own RSVP stands.
+ * Replies are kept across the move, so the copy says what theirs is and offers
+ * the one-click buttons to change it — or, for a member with no e-vite link, a
+ * button into the app.
+ */
+export function buildDateChangeEmail(opts: {
+  eventTitle: string
+  /** Already formatted; null when the old date is unknown. */
+  oldDate: string | null
+  newDate: string
+  newTime?: string | null
+  hostName: string | null
+  recipientName?: string | null
+  note?: string | null
+  /** The reply they have on file; null = none yet. */
+  rsvp: RsvpStatus | null
+  /** Their tokenized RSVP link (https://site/rsvp?token=abc); null for an app-only member. */
+  rsvpUrl: string | null
+  appUrl: string
+}): BuiltEmail {
+  const host = opts.hostName ?? 'Your host'
+  const hi = greetingPrefix(opts.recipientName)
+  const when = `${opts.newDate}${opts.newTime ? ` · ${opts.newTime}` : ''}`
+  const reason = opts.note?.trim() || `${host} had to move movie night.`
+  const standing = opts.rsvp ? DATE_CHANGE_STANDING[opts.rsvp] : 'We haven\'t heard from you yet. Can you make the new date?'
+
+  const actionHtml = opts.rsvpUrl
+    ? `<p style="margin:18px 0 4px">${oneClickRsvpButtons(opts.rsvpUrl)}</p>`
+    + `<p style="margin:16px 0 0;font-size:14px"><a href="${escapeHtml(opts.appUrl)}" style="color:#16a34a;font-weight:600;text-decoration:none">See the lineup &amp; vote →</a></p>`
+    : `<p style="margin:20px 0">${ctaButton('Update your RSVP', opts.appUrl)}</p>`
+  const actionText = opts.rsvpUrl
+    ? `${oneClickRsvpText(opts.rsvpUrl)}\n\nSee the lineup & vote: ${opts.appUrl}`
+    : `Update your RSVP: ${opts.appUrl}`
+
+  const subject = `New date: ${opts.eventTitle} is now ${opts.newDate}`
+  const html = shell(
+    `<h1 style="font-size:20px;margin:0 0 4px">${escapeHtml(opts.eventTitle)} has a new date 🎬</h1>`
+    + `<p style="margin:12px 0 16px;font-size:16px">`
+    + (opts.oldDate ? `<span style="color:#9ca3af;text-decoration:line-through">${escapeHtml(opts.oldDate)}</span><br>` : '')
+    + `<strong>${escapeHtml(when)}</strong></p>`
+    + `<p>${escapeHtml(hi)}${escapeHtml(reason).replace(/\n/g, '<br>')}</p>`
+    + `<p>${escapeHtml(standing)}</p>`
+    + actionHtml
+  )
+  const text = `${opts.eventTitle} has a new date: ${when}`
+    + (opts.oldDate ? ` (was ${opts.oldDate})` : '')
+    + `\n\n${hi}${reason}`
+    + `\n\n${standing}`
+    + `\n\n${actionText}`
+  return { subject, html, text }
+}
+
 /** One event's line in the admin reminder digest. `eventDate` is already
  *  formatted (or null); `remindedCount` is how many non-responders were nudged. */
 export interface AdminReminderDigestItem {

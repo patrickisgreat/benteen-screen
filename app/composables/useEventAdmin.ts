@@ -1,5 +1,13 @@
 import type { Database } from '~/types/database.types'
 import type { PosterDisplay } from '#shared/utils/posterDisplay'
+import type { RescheduleAudience, RescheduleRequest } from '#shared/utils/reschedule'
+
+/** What moving an event reports back: how many people the notice reached. */
+export interface RescheduleResult {
+  sent: number
+  failed: number
+  error: string | null
+}
 
 export interface EventInput {
   title: string
@@ -59,6 +67,18 @@ export function useEventAdmin() {
     if (error) throw error
   }
 
+  /** Who a date change would email, counted by where their RSVP stands. */
+  async function rescheduleAudience(id: string): Promise<RescheduleAudience> {
+    return await $fetch<RescheduleAudience>(`/api/events/${id}/reschedule-audience`)
+  }
+
+  /** Move an event to a new date and (by default) email everyone it concerns.
+   *  Goes through the server: the notice is sent with the server-only Resend key. */
+  async function rescheduleEvent(id: string, request: RescheduleRequest): Promise<RescheduleResult> {
+    const result = await $fetch<RescheduleResult & { ok: boolean }>(`/api/events/${id}/reschedule`, { method: 'POST', body: request })
+    return { sent: result.sent, failed: result.failed, error: result.error }
+  }
+
   /** Upload a poster image to the public `event-posters` bucket; returns its public URL. */
   async function uploadPoster(file: File): Promise<string> {
     const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
@@ -73,5 +93,5 @@ export function useEventAdmin() {
     return data.publicUrl
   }
 
-  return { createEvent, updateEvent, deleteEvent, setVotingLocked, uploadPoster }
+  return { createEvent, updateEvent, deleteEvent, setVotingLocked, rescheduleAudience, rescheduleEvent, uploadPoster }
 }

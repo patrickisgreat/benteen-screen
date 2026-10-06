@@ -103,26 +103,66 @@ function submit(): void {
   >
     <template #body>
       <div class="space-y-4">
-        <UFormField label="Date" required>
-          <UInput v-model="dateStr" type="date" class="w-full" />
+        <UFormField
+          label="Date"
+          required
+          :help="isEdit ? 'Changing it here is silent. To tell guests about a new date, use “Move date” on the event instead.' : undefined"
+        >
+          <UInput
+            v-model="dateStr"
+            type="date"
+            class="w-full"
+          />
         </UFormField>
-        <UFormField label="Title" required>
-          <UInput v-model="title" placeholder="e.g. Cult Classics Night" class="w-full" />
+        <UFormField
+          label="Title"
+          required
+        >
+          <UInput
+            v-model="title"
+            placeholder="e.g. Cult Classics Night"
+            class="w-full"
+          />
         </UFormField>
 
         <div class="grid sm:grid-cols-2 gap-4">
-          <UFormField label="Start time" hint="optional">
-            <UInput v-model="startTime" placeholder="e.g. 7:30 PM" class="w-full" />
+          <UFormField
+            label="Start time"
+            hint="optional"
+          >
+            <UInput
+              v-model="startTime"
+              placeholder="e.g. 7:30 PM"
+              class="w-full"
+            />
           </UFormField>
-          <UFormField label="Location" hint="optional">
-            <UInput v-model="location" placeholder="e.g. Benteen Park" class="w-full" />
+          <UFormField
+            label="Location"
+            hint="optional"
+          >
+            <UInput
+              v-model="location"
+              placeholder="e.g. Benteen Park"
+              class="w-full"
+            />
           </UFormField>
         </div>
-        <UFormField label="Map / location link" hint="optional">
-          <UInput v-model="locationUrl" type="url" placeholder="https://maps.google.com/…" class="w-full" />
+        <UFormField
+          label="Map / location link"
+          hint="optional"
+        >
+          <UInput
+            v-model="locationUrl"
+            type="url"
+            placeholder="https://maps.google.com/…"
+            class="w-full"
+          />
         </UFormField>
 
-        <UFormField label="Event poster" hint="optional">
+        <UFormField
+          label="Event poster"
+          hint="optional"
+        >
           <div class="flex items-center gap-3">
             <div
               v-if="posterUrl"
@@ -146,9 +186,20 @@ function submit(): void {
                 @click="() => { posterUrl = null }"
               />
             </div>
-            <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFileChange">
+            <input
+              ref="fileInput"
+              type="file"
+              accept="image/*"
+              class="hidden"
+              @change="onFileChange"
+            >
           </div>
-          <PosterAdjuster v-if="posterUrl" v-model="posterDisplay" :poster-url="posterUrl" class="mt-3" />
+          <PosterAdjuster
+            v-if="posterUrl"
+            v-model="posterDisplay"
+            :poster-url="posterUrl"
+            class="mt-3"
+          />
         </UFormField>
 
         <UFormField label="Description">
@@ -159,8 +210,19 @@ function submit(): void {
 
     <template #footer>
       <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full">
-        <UButton label="Cancel" color="neutral" variant="ghost" class="justify-center" @click="() => { open = false }" />
-        <UButton :label="isEdit ? 'Save changes' : 'Add event'" class="justify-center" :disabled="!canSave || uploading" @click="submit" />
+        <UButton
+          label="Cancel"
+          color="neutral"
+          variant="ghost"
+          class="justify-center"
+          @click="() => { open = false }"
+        />
+        <UButton
+          :label="isEdit ? 'Save changes' : 'Add event'"
+          class="justify-center"
+          :disabled="!canSave || uploading"
+          @click="submit"
+        />
       </div>
     </template>
   </UModal>
