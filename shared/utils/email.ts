@@ -162,6 +162,44 @@ export function buildAnnounceEmail(opts: {
   return { subject, html, text }
 }
 
+/**
+ * A poll sent to one guest: the question, an optional note from the host, and
+ * one button per choice. Each button is that guest's own tokenized link, so a
+ * tap records their answer with no sign-in — and tapping a different one later
+ * changes it.
+ */
+export function buildPollEmail(opts: {
+  eventTitle: string
+  eventDate: string | null
+  hostName: string | null
+  recipientName?: string | null
+  question: string
+  note?: string | null
+  /** The choices in order, each with this guest's vote link for it. */
+  options: readonly { label: string, url: string }[]
+}): BuiltEmail {
+  const host = opts.hostName ?? 'Your host'
+  const hi = greetingPrefix(opts.recipientName)
+  const intro = opts.note?.trim() || `${host} would like your answer. One tap is all it takes.`
+
+  const button = (option: { label: string, url: string }): string =>
+    `<a href="${escapeHtml(option.url)}" style="display:block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:600;font-size:15px;margin:0 0 8px;text-align:center">${escapeHtml(option.label)}</a>`
+
+  const subject = `${opts.question} (${opts.eventTitle})`
+  const html = shell(
+    `<p style="color:#6b7280;margin:0 0 4px;font-size:13px">${escapeHtml(opts.eventTitle)}${opts.eventDate ? ` · ${escapeHtml(opts.eventDate)}` : ''}</p>`
+    + `<h1 style="font-size:20px;margin:0 0 12px">${escapeHtml(opts.question)}</h1>`
+    + `<p>${escapeHtml(hi)}${escapeHtml(intro).replace(/\n/g, '<br>')}</p>`
+    + `<div style="margin:20px 0 12px">${opts.options.map(button).join('')}</div>`
+    + `<p style="font-size:13px;color:#6b7280">Changed your mind? Tap a different answer any time.</p>`
+  )
+  const text = `${opts.question}\n${opts.eventTitle}${opts.eventDate ? ` · ${opts.eventDate}` : ''}`
+    + `\n\n${hi}${intro}`
+    + `\n\n${opts.options.map(o => `${o.label}: ${o.url}`).join('\n')}`
+    + `\n\nChanged your mind? Open a different link any time.`
+  return { subject, html, text }
+}
+
 /** The three one-click RSVP buttons (going / maybe / no) off a tokenized base link. */
 function oneClickRsvpButtons(rsvpUrl: string): string {
   const button = (status: RsvpStatus, label: string, bg: string): string =>
@@ -260,6 +298,67 @@ export function buildRsvpConfirmationEmail(opts: {
     + `\n\n${host} marked you as ${answer}. If that's right, you're all set.`
     + `\n\nNot right? Change it any time:\n${oneClickRsvpText(opts.rsvpUrl)}`
     + (opts.appUrl ? `\n\nOr sign in to the app to change it, see the lineup and vote: ${opts.appUrl}` : '')
+  return { subject, html, text }
+}
+
+// What a date change means for someone, by the reply they had given.
+const DATE_CHANGE_STANDING: Record<RsvpStatus, string> = {
+  going: 'You\'re still on the list as going. If the new date works, there\'s nothing to do. If it doesn\'t, let us know:',
+  maybe: 'You\'re still down as a maybe. Now that the date has changed, where do you land?',
+  no: 'You couldn\'t make the original date. Does the new one work for you?'
+}
+
+/**
+ * Tells one person that a movie night has moved: the old date struck through,
+ * the new one, an optional note from the host, and where their own RSVP stands.
+ * Replies are kept across the move, so the copy says what theirs is and offers
+ * the one-click buttons to change it — or, for a member with no e-vite link, a
+ * button into the app.
+ */
+export function buildDateChangeEmail(opts: {
+  eventTitle: string
+  /** Already formatted; null when the old date is unknown. */
+  oldDate: string | null
+  newDate: string
+  newTime?: string | null
+  hostName: string | null
+  recipientName?: string | null
+  note?: string | null
+  /** The reply they have on file; null = none yet. */
+  rsvp: RsvpStatus | null
+  /** Their tokenized RSVP link (https://site/rsvp?token=abc); null for an app-only member. */
+  rsvpUrl: string | null
+  appUrl: string
+}): BuiltEmail {
+  const host = opts.hostName ?? 'Your host'
+  const hi = greetingPrefix(opts.recipientName)
+  const when = `${opts.newDate}${opts.newTime ? ` · ${opts.newTime}` : ''}`
+  const reason = opts.note?.trim() || `${host} had to move movie night.`
+  const standing = opts.rsvp ? DATE_CHANGE_STANDING[opts.rsvp] : 'We haven\'t heard from you yet. Can you make the new date?'
+
+  const actionHtml = opts.rsvpUrl
+    ? `<p style="margin:18px 0 4px">${oneClickRsvpButtons(opts.rsvpUrl)}</p>`
+    + `<p style="margin:16px 0 0;font-size:14px"><a href="${escapeHtml(opts.appUrl)}" style="color:#16a34a;font-weight:600;text-decoration:none">See the lineup &amp; vote →</a></p>`
+    : `<p style="margin:20px 0">${ctaButton('Update your RSVP', opts.appUrl)}</p>`
+  const actionText = opts.rsvpUrl
+    ? `${oneClickRsvpText(opts.rsvpUrl)}\n\nSee the lineup & vote: ${opts.appUrl}`
+    : `Update your RSVP: ${opts.appUrl}`
+
+  const subject = `New date: ${opts.eventTitle} is now ${opts.newDate}`
+  const html = shell(
+    `<h1 style="font-size:20px;margin:0 0 4px">${escapeHtml(opts.eventTitle)} has a new date 🎬</h1>`
+    + `<p style="margin:12px 0 16px;font-size:16px">`
+    + (opts.oldDate ? `<span style="color:#9ca3af;text-decoration:line-through">${escapeHtml(opts.oldDate)}</span><br>` : '')
+    + `<strong>${escapeHtml(when)}</strong></p>`
+    + `<p>${escapeHtml(hi)}${escapeHtml(reason).replace(/\n/g, '<br>')}</p>`
+    + `<p>${escapeHtml(standing)}</p>`
+    + actionHtml
+  )
+  const text = `${opts.eventTitle} has a new date: ${when}`
+    + (opts.oldDate ? ` (was ${opts.oldDate})` : '')
+    + `\n\n${hi}${reason}`
+    + `\n\n${standing}`
+    + `\n\n${actionText}`
   return { subject, html, text }
 }
 

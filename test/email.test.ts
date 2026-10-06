@@ -4,9 +4,11 @@ import {
   buildAdminReminderDigestEmail,
   buildAnnounceEmail,
   buildClubWelcomeEmail,
+  buildDateChangeEmail,
   buildEventInviteEmail,
   buildEventReminderEmail,
   buildInviteEmail,
+  buildPollEmail,
   buildRsvpConfirmationEmail,
   escapeHtml,
   firstName,
@@ -378,5 +380,116 @@ describe('personalized copy', () => {
   it('sends the announcement without a greeting when the name is unknown', () => {
     const m = buildAnnounceEmail({ eventTitle: 'Jaws', eventDate: null, message: 'Doors at 7', link: 'l' })
     expect(m.html).not.toContain('Hi ')
+  })
+})
+
+describe('buildPollEmail', () => {
+  const poll = {
+    eventTitle: 'Jaws',
+    eventDate: 'Friday',
+    hostName: 'Pat',
+    question: 'Move to Saturday?',
+    options: [
+      { label: 'Yes, Saturday', url: 'https://x/poll?token=t&poll=p&option=1' },
+      { label: 'Keep Friday', url: 'https://x/poll?token=t&poll=p&option=2' }
+    ]
+  }
+
+  it('gives each choice its own button linking to the guest\'s vote link', () => {
+    const m = buildPollEmail(poll)
+    expect(m.html).toContain('href="https://x/poll?token=t&amp;poll=p&amp;option=1"')
+    expect(m.html).toContain('Yes, Saturday')
+    expect(m.html).toContain('href="https://x/poll?token=t&amp;poll=p&amp;option=2"')
+    expect(m.text).toContain('Keep Friday: https://x/poll?token=t&poll=p&option=2')
+  })
+
+  it('leads with the question, in the subject and the body', () => {
+    const m = buildPollEmail(poll)
+    expect(m.subject).toBe('Move to Saturday? (Jaws)')
+    expect(m.html).toContain('Move to Saturday?</h1>')
+  })
+
+  it('greets the guest and uses the host\'s note when there is one', () => {
+    const m = buildPollEmail({ ...poll, recipientName: 'Sam Jones', note: 'Rain is forecast for Friday.' })
+    expect(m.html).toContain('Hi Sam, Rain is forecast for Friday.')
+    expect(m.text).toContain('Hi Sam, Rain is forecast for Friday.')
+  })
+
+  it('falls back to a line from the host when there is no note', () => {
+    expect(buildPollEmail(poll).html).toContain('Pat would like your answer')
+    expect(buildPollEmail({ ...poll, hostName: null }).html).toContain('Your host would like your answer')
+  })
+
+  it('escapes the question, note and choices (no HTML injection)', () => {
+    const m = buildPollEmail({
+      ...poll,
+      question: '<b>Q</b>',
+      note: '<img src=x onerror=alert(1)>',
+      options: [{ label: '<script>x</script>', url: 'https://x/poll?a=1' }, poll.options[1]!]
+    })
+    expect(m.html).not.toContain('<b>Q</b>')
+    expect(m.html).not.toContain('<img')
+    expect(m.html).not.toContain('<script>')
+  })
+})
+
+describe('buildDateChangeEmail', () => {
+  const base = {
+    eventTitle: 'Jaws',
+    oldDate: 'Friday, October 17, 2026',
+    newDate: 'Saturday, October 18, 2026',
+    newTime: '8pm',
+    hostName: 'Pat',
+    rsvpUrl: 'https://x/rsvp?token=abc',
+    appUrl: 'https://x/overview'
+  }
+
+  it('leads with the new date in the subject and shows old → new in the body', () => {
+    const m = buildDateChangeEmail({ ...base, rsvp: null })
+    expect(m.subject).toBe('New date: Jaws is now Saturday, October 18, 2026')
+    expect(m.html).toContain('line-through">Friday, October 17, 2026</span>')
+    expect(m.html).toContain('<strong>Saturday, October 18, 2026 · 8pm</strong>')
+    expect(m.text).toContain('new date: Saturday, October 18, 2026 · 8pm (was Friday, October 17, 2026)')
+  })
+
+  it('tells someone who is going that their RSVP stands, with buttons to change it', () => {
+    const m = buildDateChangeEmail({ ...base, rsvp: 'going', recipientName: 'Sam Jones' })
+    expect(m.html).toContain('still on the list as going')
+    expect(m.html).toContain('nothing to do')
+    expect(m.html).toContain('https://x/rsvp?token=abc&amp;status=no')
+    expect(m.html).toContain('Hi Sam, ')
+  })
+
+  it('asks a maybe where they land now', () => {
+    expect(buildDateChangeEmail({ ...base, rsvp: 'maybe' }).html).toContain('still down as a maybe')
+  })
+
+  it('invites someone who declined the old date to reconsider', () => {
+    const m = buildDateChangeEmail({ ...base, rsvp: 'no' })
+    expect(m.html).toContain('couldn&#39;t make the original date')
+    expect(m.html).toContain('status=going')
+  })
+
+  it('asks someone who never replied whether they can make it', () => {
+    expect(buildDateChangeEmail({ ...base, rsvp: null }).html).toContain('haven&#39;t heard from you yet')
+  })
+
+  it('uses the host\'s note as the reason, or a default line from the host', () => {
+    expect(buildDateChangeEmail({ ...base, rsvp: null, note: 'Rain is forecast for Friday.' }).html).toContain('Rain is forecast for Friday.')
+    expect(buildDateChangeEmail({ ...base, rsvp: null }).html).toContain('Pat had to move movie night.')
+    expect(buildDateChangeEmail({ ...base, rsvp: null, hostName: null }).html).toContain('Your host had to move movie night.')
+  })
+
+  it('sends an app-only member to the app instead of one-click buttons', () => {
+    const m = buildDateChangeEmail({ ...base, rsvp: 'going', rsvpUrl: null })
+    expect(m.html).toContain('Update your RSVP')
+    expect(m.html).not.toContain('/rsvp?token=')
+    expect(m.text).toContain('Update your RSVP: https://x/overview')
+  })
+
+  it('escapes the title and note (no HTML injection)', () => {
+    const m = buildDateChangeEmail({ ...base, rsvp: null, eventTitle: '<b>Jaws</b>', note: '<img src=x onerror=alert(1)>' })
+    expect(m.html).not.toContain('<b>Jaws</b>')
+    expect(m.html).not.toContain('<img')
   })
 })

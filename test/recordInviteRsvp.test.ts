@@ -75,6 +75,20 @@ describe('recordInviteRsvp', () => {
     })
   })
 
+  it('keeps the guest count they already had when a reply does not state one', async () => {
+    const fake = makeFakeDb()
+    // The one-click email link only says "going": their +2 must survive it.
+    const result = await recordInviteRsvp(fake.db, { ...invite, plus_ones: 2 }, { status: 'going' })
+    expect(result).toEqual({ status: 'going', plusOnes: 2 })
+    expect(fake.calls.inviteUpdates[0]!.patch.plus_ones).toBe(2)
+  })
+
+  it('still drops guests when an unstated-count reply is not going', async () => {
+    const fake = makeFakeDb()
+    const result = await recordInviteRsvp(fake.db, { ...invite, plus_ones: 2 }, { status: 'no' })
+    expect(result.plusOnes).toBe(0)
+  })
+
   it('drops the guest count when the reply is not going', async () => {
     const result = await recordInviteRsvp(fake.db, invite, { status: 'maybe', plusOnes: 3 })
     expect(result.plusOnes).toBe(0)

@@ -69,6 +69,16 @@ describe('CommsLog', () => {
     expect(w.text()).toContain('RSVP confirmation')
   })
 
+  it('labels a date-change notice', async () => {
+    const w = await mountSuspended(CommsLog, { props: { entries: [entry({ kind: 'date_change', subject: null })] } })
+    expect(w.text()).toContain('Date change')
+  })
+
+  it('labels a poll send', async () => {
+    const w = await mountSuspended(CommsLog, { props: { entries: [entry({ kind: 'poll', subject: null })] } })
+    expect(w.text()).toContain('Poll')
+  })
+
   it('shows delivered and opened counts for a tracked send', async () => {
     const tracked = entry({ delivery: { tracked: 12, delivered: 11, opened: 7, clicked: 0, bounced: 0 } })
     const w = await mountSuspended(CommsLog, { props: { entries: [tracked] } })
@@ -92,14 +102,9 @@ describe('CommsLog', () => {
     expect(w.find('[data-testid="delivery-stats"]').exists()).toBe(false)
   })
 
-  it('emits sync when the admin asks to refresh delivery status', async () => {
+  it('says delivery status updates on its own, with no button to press', async () => {
     const w = await mountSuspended(CommsLog, { props: { entries: [entry()] } })
-    await w.get('button').trigger('click')
-    expect(w.emitted('sync')).toHaveLength(1)
-  })
-
-  it('offers no refresh when nothing has been sent', async () => {
-    const w = await mountSuspended(CommsLog, { props: { entries: [] } })
+    expect(w.text()).toContain('update automatically')
     expect(w.find('button').exists()).toBe(false)
   })
 })

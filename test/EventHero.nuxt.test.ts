@@ -91,4 +91,25 @@ describe('EventHero', () => {
     })
     expect(w.text()).not.toContain('Benteen Field')
   })
+
+  it('flags an upcoming event that moved to a different day, saying when it was', async () => {
+    const moved = { ...baseEvent, previous_event_date: '2999-07-14T19:00:00Z', rescheduled_at: '2999-07-01T00:00:00Z' }
+    const w = await mountSuspended(EventHero, { props: { event: moved, backdrop: null } })
+    expect(w.text()).toContain('New date · was')
+    expect(w.text()).toContain('2999')
+  })
+
+  it('shows no "new date" flag for an event that never moved, or only changed time', async () => {
+    const never = await mountSuspended(EventHero, { props: { event: baseEvent, backdrop: null } })
+    expect(never.text()).not.toContain('New date')
+    const sameDay = { ...baseEvent, previous_event_date: baseEvent.event_date, rescheduled_at: '2999-07-01T00:00:00Z' }
+    const timeOnly = await mountSuspended(EventHero, { props: { event: sameDay, backdrop: null } })
+    expect(timeOnly.text()).not.toContain('New date')
+  })
+
+  it('drops the flag once the event has passed', async () => {
+    const past = { ...baseEvent, event_date: '2001-07-15T19:00:00Z', previous_event_date: '2001-07-14T19:00:00Z', rescheduled_at: '2001-07-01T00:00:00Z' }
+    const w = await mountSuspended(EventHero, { props: { event: past, backdrop: null } })
+    expect(w.text()).not.toContain('New date')
+  })
 })

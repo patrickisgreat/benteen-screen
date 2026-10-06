@@ -30,9 +30,9 @@ export interface Database {
         Relationships: []
       }
       events: {
-        Row: { id: string, title: string, description: string, event_date: string, start_time: string | null, location: string | null, location_url: string | null, poster_url: string | null, voting_locked_at: string | null, invite_options: Record<string, unknown> | null, poster_display: Record<string, unknown> | null, reminders_enabled: boolean, created_by: string | null, created_at: string }
-        Insert: { id?: string, title: string, description?: string, event_date: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, voting_locked_at?: string | null, invite_options?: Record<string, unknown> | null, poster_display?: Record<string, unknown> | null, reminders_enabled?: boolean, created_by?: string | null, created_at?: string }
-        Update: { id?: string, title?: string, description?: string, event_date?: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, voting_locked_at?: string | null, invite_options?: Record<string, unknown> | null, poster_display?: Record<string, unknown> | null, reminders_enabled?: boolean, created_by?: string | null, created_at?: string }
+        Row: { id: string, title: string, description: string, event_date: string, start_time: string | null, location: string | null, location_url: string | null, poster_url: string | null, voting_locked_at: string | null, invite_options: Record<string, unknown> | null, poster_display: Record<string, unknown> | null, reminders_enabled: boolean, previous_event_date: string | null, previous_start_time: string | null, rescheduled_at: string | null, created_by: string | null, created_at: string }
+        Insert: { id?: string, title: string, description?: string, event_date: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, voting_locked_at?: string | null, invite_options?: Record<string, unknown> | null, poster_display?: Record<string, unknown> | null, reminders_enabled?: boolean, previous_event_date?: string | null, previous_start_time?: string | null, rescheduled_at?: string | null, created_by?: string | null, created_at?: string }
+        Update: { id?: string, title?: string, description?: string, event_date?: string, start_time?: string | null, location?: string | null, location_url?: string | null, poster_url?: string | null, voting_locked_at?: string | null, invite_options?: Record<string, unknown> | null, poster_display?: Record<string, unknown> | null, reminders_enabled?: boolean, previous_event_date?: string | null, previous_start_time?: string | null, rescheduled_at?: string | null, created_by?: string | null, created_at?: string }
         Relationships: []
       }
       rsvps: {
@@ -69,6 +69,24 @@ export interface Database {
         Row: { id: string, resend_id: string, event_id: string | null, comms_log_id: string | null, invite_id: string | null, kind: string, email: string, sent_at: string, delivered_at: string | null, opened_at: string | null, clicked_at: string | null, bounced_at: string | null }
         Insert: { id?: string, resend_id: string, event_id?: string | null, comms_log_id?: string | null, invite_id?: string | null, kind: string, email: string, sent_at?: string, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null }
         Update: { id?: string, resend_id?: string, event_id?: string | null, comms_log_id?: string | null, invite_id?: string | null, kind?: string, email?: string, sent_at?: string, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null }
+        Relationships: []
+      }
+      polls: {
+        Row: { id: string, event_id: string, question: string, closed_at: string | null, created_by: string | null, created_at: string }
+        Insert: { id?: string, event_id: string, question: string, closed_at?: string | null, created_by?: string | null, created_at?: string }
+        Update: { id?: string, event_id?: string, question?: string, closed_at?: string | null, created_by?: string | null, created_at?: string }
+        Relationships: []
+      }
+      poll_options: {
+        Row: { id: string, poll_id: string, label: string, position: number }
+        Insert: { id?: string, poll_id: string, label: string, position: number }
+        Update: { id?: string, poll_id?: string, label?: string, position?: number }
+        Relationships: []
+      }
+      poll_votes: {
+        Row: { poll_id: string, invite_id: string, option_id: string, voted_at: string }
+        Insert: { poll_id: string, invite_id: string, option_id: string, voted_at?: string }
+        Update: { poll_id?: string, invite_id?: string, option_id?: string, voted_at?: string }
         Relationships: []
       }
       comms_templates: {

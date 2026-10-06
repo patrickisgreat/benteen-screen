@@ -1,19 +1,15 @@
 <script setup lang="ts">
 import type { CommsLogEntry } from '~/composables/useCommsLog'
 
-defineProps<{
-  entries: CommsLogEntry[]
-  /** True while a delivery-status refresh is running. */
-  syncing?: boolean
-}>()
-
-defineEmits<{ sync: [] }>()
+defineProps<{ entries: CommsLogEntry[] }>()
 
 const KIND = {
   announcement: { icon: 'i-lucide-megaphone', label: 'Announcement' },
   invite: { icon: 'i-lucide-mail-plus', label: 'E-vite' },
   reminder: { icon: 'i-lucide-alarm-clock', label: 'Reminder' },
-  rsvp_confirmation: { icon: 'i-lucide-mail-check', label: 'RSVP confirmation' }
+  rsvp_confirmation: { icon: 'i-lucide-mail-check', label: 'RSVP confirmation' },
+  poll: { icon: 'i-lucide-vote', label: 'Poll' },
+  date_change: { icon: 'i-lucide-calendar-clock', label: 'Date change' }
 } as const
 
 const STATUS = {
@@ -29,21 +25,28 @@ const STATUS = {
       <h3 class="text-sm font-semibold text-muted">
         Sent communications
       </h3>
-      <UButton
+      <p
         v-if="entries.length"
-        label="Refresh delivery status"
-        icon="i-lucide-refresh-cw"
-        size="xs"
-        color="neutral"
-        variant="ghost"
-        :loading="syncing"
-        @click="$emit('sync')"
-      />
+        class="text-xs text-muted"
+      >
+        Delivery and opens update automatically
+      </p>
     </div>
-    <div v-if="entries.length" class="space-y-2">
-      <UCard v-for="e in entries" :key="e.id" variant="subtle" :ui="{ body: 'p-3' }">
+    <div
+      v-if="entries.length"
+      class="space-y-2"
+    >
+      <UCard
+        v-for="e in entries"
+        :key="e.id"
+        variant="subtle"
+        :ui="{ body: 'p-3' }"
+      >
         <div class="flex items-start gap-3">
-          <UIcon :name="KIND[e.kind].icon" class="size-4 mt-0.5 text-muted shrink-0" />
+          <UIcon
+            :name="KIND[e.kind].icon"
+            class="size-4 mt-0.5 text-muted shrink-0"
+          />
           <div class="min-w-0 flex-1">
             <p class="text-sm font-medium truncate">
               {{ e.subject || KIND[e.kind].label }}
@@ -54,23 +57,42 @@ const STATUS = {
               <span v-if="e.failedCount"> · {{ e.failedCount }} failed</span>
               <span v-if="e.sentByName"> · by {{ e.sentByName }}</span>
             </p>
-            <p v-if="e.delivery" class="text-xs text-muted" data-testid="delivery-stats">
+            <p
+              v-if="e.delivery"
+              class="text-xs text-muted"
+              data-testid="delivery-stats"
+            >
               {{ e.delivery.delivered }} delivered · {{ e.delivery.opened }} opened
               <span v-if="e.delivery.clicked"> · {{ e.delivery.clicked }} clicked</span>
-              <span v-if="e.delivery.bounced" class="text-error"> · {{ e.delivery.bounced }} bounced</span>
+              <span
+                v-if="e.delivery.bounced"
+                class="text-error"
+              > · {{ e.delivery.bounced }} bounced</span>
             </p>
-            <p v-if="e.error" class="text-xs text-error mt-1 break-words">
+            <p
+              v-if="e.error"
+              class="text-xs text-error mt-1 break-words"
+            >
               {{ e.error }}
             </p>
           </div>
           <div class="flex flex-col items-end gap-1 shrink-0">
-            <UBadge :label="STATUS[e.status].label" :color="STATUS[e.status].color" variant="subtle" size="sm" />
+            <UBadge
+              :label="STATUS[e.status].label"
+              :color="STATUS[e.status].color"
+              variant="subtle"
+              size="sm"
+            />
             <time class="text-xs text-muted">{{ formatDateTime(e.createdAt) }}</time>
           </div>
         </div>
       </UCard>
     </div>
-    <UCard v-else variant="subtle" class="text-center text-muted text-sm">
+    <UCard
+      v-else
+      variant="subtle"
+      class="text-center text-muted text-sm"
+    >
       Nothing sent yet for this event.
     </UCard>
   </div>

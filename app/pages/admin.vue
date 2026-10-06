@@ -18,6 +18,13 @@ const { people, pendingInvites, loadError, setBlocked, setAdmin, revokeInvite } 
 const modalOpen = ref(false)
 const inviteOpen = ref(false)
 const editingEvent = ref<MovieEvent | null>(null)
+const reschedulingEvent = ref<MovieEvent | null>(null)
+const rescheduleOpen = ref(false)
+
+function openReschedule(event: MovieEvent): void {
+  reschedulingEvent.value = event
+  rescheduleOpen.value = true
+}
 const eventPendingDelete = ref<MovieEvent | null>(null)
 
 // People → "invite to an event": the person being invited, and the upcoming nights to pick from.
@@ -41,15 +48,13 @@ const { culled: culledSuggestions } = useCulledSuggestions(selectedEventId)
 const { items: bringItems, addItem: addBringItem, updateItem: updateBringItem, remove: removeBringItem } = useBringList(selectedEventId)
 const { counts: rsvpCounts } = useRsvp(selectedEventId)
 // Log of communications sent for the selected event (announcements + e-vite blasts).
-const { entries: commsLog, syncing: syncingDelivery, syncDelivery } = useCommsLog(selectedEventId)
+const { entries: commsLog, syncDelivery } = useCommsLog(selectedEventId)
 
-async function refreshDeliveryStatus(): Promise<void> {
-  let updated = 0
-  const ok = await run(async () => {
-    ({ updated } = await syncDelivery())
-  }, 'Could not refresh delivery status')
-  if (ok) toast.add({ title: updated ? `Delivery status updated for ${updated} email${updated === 1 ? '' : 's'}` : 'Delivery status is up to date', color: 'success' })
-}
+// Keep delivered/opened current without anyone asking: pull the selected event's
+// status from Resend while this page is open. The stamps reach the Comms log and
+// the guest list through realtime, whichever tab is showing.
+const DELIVERY_SYNC_INTERVAL_MS = 30_000
+useVisiblePolling(syncDelivery, DELIVERY_SYNC_INTERVAL_MS, selectedEventId)
 
 // Upcoming events first (soonest first), then past events descending (oldest last).
 const sortedEvents = computed(() => sortEventsForAdmin(events.value))
@@ -367,6 +372,15 @@ function onSelectEvent(event: MovieEvent): void {
                   @click="onSelectEvent(event)"
                 />
                 <UButton
+                  icon="i-lucide-calendar-clock"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Move date"
+                  title="Move date and notify guests"
+                  @click="openReschedule(event)"
+                />
+                <UButton
                   icon="i-lucide-pencil"
                   color="neutral"
                   variant="ghost"
@@ -521,12 +535,14 @@ function onSelectEvent(event: MovieEvent): void {
 
       <template #comms>
         <p class="text-sm text-muted mb-4">
-          Email an announcement or reminder about an event. Recipients are BCC'd.
+          Email an announcement or reminder about an event. Each person gets their own copy.
         </p>
         <EventPicker v-model="selectedEventId" :items="eventOptions" />
         <template v-if="selectedEventId">
-          <EventAnnounceComposer :event-id="selectedEventId" :event="selectedEvent" class="max-w-xl" />
-          <CommsLog :entries="commsLog" :syncing="syncingDelivery" class="max-w-xl mt-6" @sync="refreshDeliveryStatus" />
+          <EventAnnounceComposer :event-id="selectedEventId" class="max-w-xl" />
+          <USeparator class="max-w-xl my-6" />
+          <EventPolls :event-id="selectedEventId" class="max-w-xl" />
+          <CommsLog :entries="commsLog" class="max-w-xl mt-6" />
         </template>
         <UCard v-else variant="subtle" class="text-center text-muted">
           Select an event to send a blast.
@@ -548,6 +564,7 @@ function onSelectEvent(event: MovieEvent): void {
 
     <!-- Create / edit modal -->
     <EventFormModal v-model:open="modalOpen" :event="editingEvent" @save="onSave" />
+    <RescheduleEventModal v-model:open="rescheduleOpen" :event="reschedulingEvent" />
 
     <!-- Admin invite a friend -->
     <InviteFriendModal v-model:open="inviteOpen" />

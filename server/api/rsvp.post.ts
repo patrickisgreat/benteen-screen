@@ -8,7 +8,9 @@ const bodySchema = z.object({
   status: z.enum(['going', 'maybe', 'no']),
   // Additional guests the invitee is bringing. Only meaningful when going; clamped
   // to the shared cap (mirrors the CHECK constraint) so a crafted body can't inflate.
-  plusOnes: z.number().int().min(0).max(MAX_PLUS_ONES).optional().default(0)
+  // Omitted by the one-click email links, which only state going/maybe/no: the
+  // guest's current count is kept, so re-confirming "going" doesn't drop their +1s.
+  plusOnes: z.number().int().min(0).max(MAX_PLUS_ONES).optional()
 })
 
 /**
@@ -25,7 +27,7 @@ export default defineEventHandler(async (event) => {
   const admin = serverSupabaseServiceRole<Database>(event)
   const { data: invite } = await admin
     .from('event_invites')
-    .select('id, event_id, email')
+    .select('id, event_id, email, plus_ones')
     .eq('token', token)
     .maybeSingle()
   if (!invite) throw createError({ statusCode: 404, statusMessage: 'Invitation not found' })
