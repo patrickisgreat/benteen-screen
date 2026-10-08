@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.27.0...v1.28.0) (2026-10-08)
+
+
+### Features
+
+* preview an announcement before sending, and restore the starter template ([#203](https://github.com/patrickisgreat/benteen-screen/issues/203)) ([043768e](https://github.com/patrickisgreat/benteen-screen/commit/043768e3dc3c6f2a085db23fef2e775ba60385ae))
+
 ## [1.27.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.26.0...v1.27.0) (2026-10-06)
 
 
