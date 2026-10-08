@@ -5,11 +5,12 @@ import { ANNOUNCE_CUSTOM_LIMIT, ANNOUNCE_SCOPE_OPTIONS, type AnnounceRecipient, 
 // directory search + chips for hand-picking people, and a live "will email N
 // people" preview resolved by the same server code that sends — so the number
 // the admin sees is the number that goes out. Emits the count so the composer
-// can label the send button and block an empty blast.
+// can label the send button and block an empty blast, and the resolved people so
+// it can preview a real recipient's copy.
 const scope = defineModel<AnnounceScope>('scope', { required: true })
 const emails = defineModel<string[]>('emails', { default: () => [] })
 const props = withDefaults(defineProps<{ eventId: string | undefined, debounceMs?: number }>(), { debounceMs: 300 })
-const emit = defineEmits<{ count: [count: number | null] }>()
+const emit = defineEmits<{ count: [count: number | null], recipients: [recipients: AnnounceRecipient[]] }>()
 
 // URadioGroup wants a mutable array; the options themselves are frozen in shared/.
 const scopeItems = [...ANNOUNCE_SCOPE_OPTIONS]
@@ -34,6 +35,7 @@ const recipients = ref<AnnounceRecipient[] | null>(null)
 const loading = ref(false)
 const previewError = ref<string | null>(null)
 const count = computed(() => recipients.value?.length ?? null)
+watch(recipients, people => emit('recipients', people ?? []))
 
 // Only the newest preview may land: a slow earlier request must not overwrite a
 // fresher audience after the admin has already switched.

@@ -15,19 +15,24 @@ mockNuxtImport('useToast', () => () => ({ add: () => {} }))
 // The audience picker has its own test; here it's a stub that reports whatever
 // count the test wants and exposes a button to switch to a custom audience.
 const stubCount = ref<number | null>(3)
+const stubRecipients = ref<Array<{ email: string, name: string | null }>>([])
 const AnnounceAudiencePickerStub = defineComponent({
   props: { scope: { type: String, required: true }, emails: { type: Array, default: () => [] }, eventId: { type: String, default: undefined } },
-  emits: ['update:scope', 'update:emails', 'count'],
+  emits: ['update:scope', 'update:emails', 'count', 'recipients'],
   setup(props, { emit }) {
     watch(stubCount, c => emit('count', c), { immediate: true })
-    return () => h('button', {
-      'type': 'button',
-      'data-testid': 'pick-custom',
-      'onClick': () => {
-        emit('update:scope', 'custom')
-        emit('update:emails', ['ada@x.com'])
-      }
-    }, props.scope)
+    watch(stubRecipients, r => emit('recipients', r), { immediate: true })
+    return () => h('div', [
+      h('button', {
+        'type': 'button',
+        'data-testid': 'pick-custom',
+        'onClick': () => {
+          emit('update:scope', 'custom')
+          emit('update:emails', ['ada@x.com'])
+        }
+      }, props.scope),
+      h('button', { 'type': 'button', 'data-testid': 'pick-unopened', 'onClick': () => emit('update:scope', 'unopened') }, 'unopened')
+    ])
   }
 })
 
@@ -58,9 +63,15 @@ mockNuxtImport('useCommsTemplates', () => () => ({
   removeTemplate
 }))
 
+const eventObj = {
+  id: 'e1', title: 'Jaws on the Green', description: null, event_date: '2026-10-17T04:00:00Z', start_time: null,
+  location: null, location_url: null, poster_url: null, voting_locked_at: null, invite_options: null, created_at: ''
+}
+
 async function mountComposer() {
   return await mountSuspended(EventAnnounceComposer, {
-    props: { eventId: 'e1' },
+    // previewDebounceMs: 0 → the preview iframe catches up on the next timer tick.
+    props: { eventId: 'e1', event: eventObj, previewDebounceMs: 0 },
     global: { stubs: { RichTextEditor: RichTextEditorStub, AnnounceAudiencePicker: AnnounceAudiencePickerStub } }
   })
 }
@@ -68,6 +79,7 @@ async function mountComposer() {
 beforeEach(() => {
   api.reset()
   stubCount.value = 3
+  stubRecipients.value = []
   saveTemplate.mockClear()
   removeTemplate.mockClear()
 })
@@ -171,5 +183,67 @@ describe('EventAnnounceComposer', () => {
     await w.find('form').trigger('submit')
     await flushPromises()
     expect(sends()[0]?.body).toMatchObject({ scope: 'custom', emails: ['ada@x.com'], message: 'Just you two' })
+  })
+
+  describe('live preview', () => {
+    const previewHtml = (w: Awaited<ReturnType<typeof mountComposer>>): string =>
+      w.get('[data-testid="email-preview"] iframe').attributes('srcdoc') ?? ''
+
+    it('shows nothing until there is a message to preview', async () => {
+      const w = await mountComposer()
+      expect(w.find('[data-testid="email-preview"]').exists()).toBe(false)
+    })
+
+    it('renders the email as it will be sent: event heading, message, and the app button', async () => {
+      const w = await mountComposer()
+      await w.find('textarea').setValue('<p>Doors at <strong>7</strong></p>')
+      await vi.waitFor(() => expect(previewHtml(w)).toContain('Doors at <strong>7</strong>'))
+      expect(previewHtml(w)).toContain('Jaws on the Green')
+      expect(previewHtml(w)).toContain('View on Benteen Screen')
+    })
+
+    it('greets a real recipient from the chosen audience by first name and says whose copy it is', async () => {
+      stubRecipients.value = [{ email: 'anon@x.com', name: null }, { email: 'sam@x.com', name: 'Sam Jones' }]
+      const w = await mountComposer()
+      await w.find('textarea').setValue('Doors at 7')
+      await vi.waitFor(() => expect(previewHtml(w)).toContain('Hi Sam,'))
+      expect(w.get('[data-testid="email-preview"]').text()).toContain('This is Sam\'s copy')
+    })
+
+    it('shows no greeting when nobody in the audience has a name', async () => {
+      stubRecipients.value = [{ email: 'anon@x.com', name: null }]
+      const w = await mountComposer()
+      await w.find('textarea').setValue('Doors at 7')
+      await vi.waitFor(() => expect(previewHtml(w)).toContain('Doors at 7'))
+      expect(previewHtml(w)).not.toContain('Hi ')
+      expect(w.get('[data-testid="email-preview"]').text()).toContain('when we know it')
+    })
+
+    it('shows the subject the email will carry, defaulting when left blank', async () => {
+      const w = await mountComposer()
+      await w.find('textarea').setValue('Doors at 7')
+      expect(w.get('[data-testid="email-preview"]').text()).toContain('Subject: Jaws on the Green — Benteen Screen On The Green')
+      await w.find('input').setValue('Did my invite reach you?')
+      expect(w.get('[data-testid="email-preview"]').text()).toContain('Subject: Did my invite reach you?')
+    })
+
+    it('shows the RSVP buttons when writing to people who haven\'t opened the e-vite', async () => {
+      const w = await mountComposer()
+      await w.find('textarea').setValue('Did this reach you?')
+      await w.get('[data-testid="pick-unopened"]').trigger('click')
+      await vi.waitFor(() => expect(previewHtml(w)).toContain('status=going'))
+      expect(previewHtml(w)).toContain('Maybe')
+      expect(previewHtml(w)).not.toContain('View on Benteen Screen')
+      expect(w.get('[data-testid="email-preview"]').text()).toContain('RSVP buttons')
+    })
+
+    it('never lets a script in the message reach the preview', async () => {
+      const w = await mountComposer()
+      await w.find('textarea').setValue('<p>Hi</p><script>alert(1)</script><img src=x onerror=alert(1)>')
+      await vi.waitFor(() => expect(previewHtml(w)).toContain('<p>Hi</p>'))
+      expect(previewHtml(w)).not.toContain('<script>')
+      expect(previewHtml(w)).not.toContain('<img')
+      expect(w.get('[data-testid="email-preview"] iframe').attributes('sandbox')).toBe('')
+    })
   })
 })

@@ -1,4 +1,4 @@
-import type { AnnounceRecipient, AnnounceScope } from '../../shared/utils/announce'
+import { type AnnounceRecipient, type AnnounceScope, announceIncludesRsvpButtons } from '../../shared/utils/announce'
 import { buildAnnounceEmail } from '../../shared/utils/email'
 import type { AnnounceMail } from './email'
 
@@ -27,7 +27,7 @@ export function buildAnnounceMails(opts: {
   readonly subject?: string
 }): AnnounceMail[] {
   const guestByEmail = new Map(opts.guests.map(g => [g.email, g]))
-  const withRsvpButtons = opts.scope === 'unopened'
+  const withRsvpButtons = announceIncludesRsvpButtons(opts.scope)
   return opts.recipients.map((recipient) => {
     const guest = guestByEmail.get(recipient.email)
     const mail = buildAnnounceEmail({

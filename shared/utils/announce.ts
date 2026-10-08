@@ -23,6 +23,16 @@ export const ANNOUNCE_SCOPE_OPTIONS: readonly AnnounceScopeOption[] = [
   { value: 'invited', label: 'Whole club roster', description: 'Everyone ever invited to the club, joined or not. The biggest list.' }
 ]
 
+/**
+ * Whether an audience's copies close with each guest's own one-click RSVP
+ * buttons instead of the button into the app. Only people who haven't seen the
+ * e-vite get them — they haven't replied either, so answering should take one
+ * tap and no sign-in. One rule for the send and for the composer's preview.
+ */
+export function announceIncludesRsvpButtons(scope: AnnounceScope): boolean {
+  return scope === 'unopened'
+}
+
 /** The sensible default: the people invited to this night, not the whole club. */
 export const DEFAULT_ANNOUNCE_SCOPE: AnnounceScope = 'guests'
 

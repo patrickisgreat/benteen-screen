@@ -2,7 +2,8 @@
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { CommsTemplate } from '#shared/types/comms-template'
-import { ANNOUNCE_SCOPES, DEFAULT_ANNOUNCE_SCOPE, type AnnounceScope } from '#shared/utils/announce'
+import type { MovieEvent } from '#shared/types/event'
+import { ANNOUNCE_SCOPES, DEFAULT_ANNOUNCE_SCOPE, type AnnounceRecipient, type AnnounceScope } from '#shared/utils/announce'
 
 // Admin event blast composer → POST /api/events/announce (admin-gated server-side).
 // The audience is chosen in AnnounceAudiencePicker, which also previews exactly
@@ -10,8 +11,14 @@ import { ANNOUNCE_SCOPES, DEFAULT_ANNOUNCE_SCOPE, type AnnounceScope } from '#sh
 // empty audience can't be sent. The message is rich text (tiptap); the server
 // sanitizes it to a strict tag allowlist before it goes into the email. Templates
 // let a recurring blast (e.g. the vote + bring-list nudge) be applied, tweaked,
-// and re-sent later.
-const props = defineProps<{ eventId: string | undefined }>()
+// and re-sent later. A live preview renders one real recipient's copy with the
+// same builder the server sends with, so the greeting and buttons are what goes out.
+const props = withDefaults(defineProps<{
+  eventId: string | undefined
+  /** The selected event — its title and date head the email, so the preview needs them. */
+  event?: MovieEvent | null
+  previewDebounceMs?: number
+}>(), { event: null, previewDebounceMs: 250 })
 const toast = useToast()
 const { run } = useToastAction()
 const sending = ref(false)
@@ -42,6 +49,37 @@ const sendLabel = computed(() => (recipientCount.value ? `Send to ${recipientCou
 const canSend = computed(() => Boolean(props.eventId) && recipientCount.value !== null && recipientCount.value > 0)
 
 const messageHasText = computed(() => htmlToText(state.message).length > 0)
+
+// --- Live preview ------------------------------------------------------------
+// Every recipient gets their own copy, greeted by first name. Preview the copy
+// of someone in the chosen audience whose name we know, so the greeting shows.
+const audience = ref<AnnounceRecipient[]>([])
+const previewRecipient = computed(() => audience.value.find(r => firstName(r.name)) ?? audience.value[0] ?? null)
+
+const preview = computed(() => {
+  const ev = props.event
+  if (!ev || !messageHasText.value) return null
+  return buildAnnounceEmail({
+    eventTitle: ev.title,
+    eventDate: ev.event_date ? formatEmailDate(ev.event_date) : null,
+    message: state.message,
+    subject: state.subject,
+    link: '#',
+    recipientName: previewRecipient.value?.name,
+    // Real copies carry each guest's own tokenized links; the preview's go nowhere.
+    rsvpUrl: announceIncludesRsvpButtons(state.scope) ? '#' : null
+  })
+})
+// Debounced so typing doesn't reload the iframe on every keystroke.
+const previewHtml = useDebouncedValue(() => preview.value?.html ?? '', props.previewDebounceMs)
+
+const previewCaption = computed(() => {
+  const name = firstName(previewRecipient.value?.name)
+  const whose = name
+    ? `This is ${name}'s copy — each person is greeted by their own first name.`
+    : 'Each person is greeted by their first name when we know it.'
+  return announceIncludesRsvpButtons(state.scope) ? `${whose} The RSVP buttons are their own one-click links.` : whose
+})
 
 // The subject always mirrors the chosen template — including clearing it for a
 // subject-less template — so the form never shows a stale draft as "applied".
@@ -117,13 +155,26 @@ async function onSubmit(event: FormSubmitEvent<FormData>): Promise<void> {
 
 <template>
   <div class="space-y-3">
-    <div v-if="templates.length" class="space-y-1.5">
+    <div
+      v-if="templates.length"
+      class="space-y-1.5"
+    >
       <p class="text-xs font-medium text-muted">
         Templates
       </p>
       <div class="flex flex-wrap gap-2">
-        <UButtonGroup v-for="tpl in templates" :key="tpl.id" size="xs">
-          <UButton :label="tpl.name" icon="i-lucide-file-text" color="neutral" variant="outline" @click="applyTemplate(tpl)" />
+        <UButtonGroup
+          v-for="tpl in templates"
+          :key="tpl.id"
+          size="xs"
+        >
+          <UButton
+            :label="tpl.name"
+            icon="i-lucide-file-text"
+            color="neutral"
+            variant="outline"
+            @click="applyTemplate(tpl)"
+          />
           <UButton
             icon="i-lucide-x"
             color="neutral"
@@ -135,26 +186,83 @@ async function onSubmit(event: FormSubmitEvent<FormData>): Promise<void> {
       </div>
     </div>
 
-    <UForm :schema="schema" :state="state" class="space-y-3" @submit="onSubmit">
+    <UForm
+      :schema="schema"
+      :state="state"
+      class="space-y-3"
+      @submit="onSubmit"
+    >
       <UFormField name="scope">
         <AnnounceAudiencePicker
           v-model:scope="state.scope"
           v-model:emails="state.emails"
           :event-id="eventId"
           @count="recipientCount = $event"
+          @recipients="audience = $event"
         />
       </UFormField>
-      <UFormField label="Subject" name="subject" hint="Optional">
-        <UInput v-model="state.subject" placeholder="Movie night reminder" class="w-full" />
+      <UFormField
+        label="Subject"
+        name="subject"
+        hint="Optional"
+      >
+        <UInput
+          v-model="state.subject"
+          placeholder="Movie night reminder"
+          class="w-full"
+        />
       </UFormField>
-      <UFormField label="Message" name="message" required>
+      <UFormField
+        label="Message"
+        name="message"
+        required
+      >
         <RichTextEditor v-model="state.message" />
       </UFormField>
 
-      <div v-if="savingTemplate" class="flex gap-2">
-        <UInput v-model="templateName" placeholder="Template name" class="flex-1" @keydown.enter.prevent="onSaveTemplate" />
-        <UButton label="Save" :disabled="!templateName.trim()" @click="onSaveTemplate" />
-        <UButton label="Cancel" color="neutral" variant="ghost" @click="() => { savingTemplate = false }" />
+      <div
+        v-if="preview"
+        class="space-y-1.5"
+        data-testid="email-preview"
+      >
+        <p class="text-sm font-semibold">
+          Preview
+        </p>
+        <p class="text-sm text-muted break-words">
+          <span class="font-medium">Subject:</span> {{ preview.subject }}
+        </p>
+        <iframe
+          :srcdoc="previewHtml"
+          title="Email preview"
+          sandbox=""
+          class="w-full h-80 rounded-lg ring ring-default bg-white"
+        />
+        <p class="text-xs text-muted">
+          {{ previewCaption }}
+        </p>
+      </div>
+
+      <div
+        v-if="savingTemplate"
+        class="flex gap-2"
+      >
+        <UInput
+          v-model="templateName"
+          placeholder="Template name"
+          class="flex-1"
+          @keydown.enter.prevent="onSaveTemplate"
+        />
+        <UButton
+          label="Save"
+          :disabled="!templateName.trim()"
+          @click="onSaveTemplate"
+        />
+        <UButton
+          label="Cancel"
+          color="neutral"
+          variant="ghost"
+          @click="() => { savingTemplate = false }"
+        />
       </div>
 
       <div class="flex flex-wrap justify-between gap-2">

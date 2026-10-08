@@ -150,19 +150,8 @@ const previewHtml = computed(() => {
 })
 
 // Debounce the iframe srcdoc so typing in the message doesn't refetch the
-// preview's <link> font on every keystroke. Seed it synchronously so the preview
-// is there on first paint.
-const debouncedPreview = ref(previewHtml.value)
-let previewTimer: ReturnType<typeof setTimeout> | null = null
-watch(previewHtml, (html) => {
-  if (previewTimer) clearTimeout(previewTimer)
-  previewTimer = setTimeout(() => {
-    debouncedPreview.value = html
-  }, 250)
-})
-onScopeDispose(() => {
-  if (previewTimer) clearTimeout(previewTimer)
-})
+// preview's <link> font on every keystroke.
+const debouncedPreview = useDebouncedValue(previewHtml, 250)
 
 async function onSaveOptions(): Promise<void> {
   savingOptions.value = true
