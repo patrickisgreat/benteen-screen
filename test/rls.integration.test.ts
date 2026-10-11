@@ -108,6 +108,27 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     expect(error).toBeTruthy()
   })
 
+  it('event_invites.phone must be E.164: the database rejects a number the sms: link could not dial', async () => {
+    const bad = await admin!.from('event_invites').insert({ event_id: eventId, email: `rls_badphone_${stamp}@example.com`, phone: '555-1234' })
+    expect(bad.error, 'a non-E.164 phone must be rejected by the check constraint').toBeTruthy()
+    const good = await admin!.from('event_invites').insert({ event_id: eventId, email: `rls_goodphone_${stamp}@example.com`, phone: '+15551234567' }).select('phone').single()
+    expect(good.error).toBeNull()
+    expect(good.data?.phone).toBe('+15551234567')
+    await admin!.from('event_invites').delete().eq('event_id', eventId)
+  })
+
+  it('a non-admin member cannot read a guest phone or stamp a text', async () => {
+    const { data: row } = await admin!.from('event_invites')
+      .insert({ event_id: eventId, email: `rls_texted_${stamp}@example.com`, phone: '+15551234567' })
+      .select('id').single()
+    const read = await memberClient.from('event_invites').select('phone').eq('id', row!.id)
+    expect(read.data ?? [], 'phones live behind the admin-only policy').toHaveLength(0)
+    await memberClient.from('event_invites').update({ texted_at: new Date().toISOString() }).eq('id', row!.id)
+    const after = await admin!.from('event_invites').select('texted_at').eq('id', row!.id).single()
+    expect(after.data?.texted_at, 'a member update must be a silent no-op under RLS').toBeNull()
+    await admin!.from('event_invites').delete().eq('event_id', eventId)
+  })
+
   it('event_invites are admin-only: a non-admin member reads zero rows', async () => {
     await admin!.from('event_invites').insert({ event_id: eventId, email: `rls_guest_${stamp}@example.com` })
     const mine = await memberClient.from('event_invites').select('*').eq('event_id', eventId)
