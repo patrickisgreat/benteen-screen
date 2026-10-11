@@ -18,7 +18,7 @@ let eventsList: Array<Record<string, unknown>> = [] // other events (seed)
 let poolList: Array<Record<string, unknown>> = [] // invites across other events (seed pool)
 let rosterList: Array<Record<string, unknown>> = [] // allowlist roster (seed fallback)
 let profilesList: Array<Record<string, unknown>> = [] // profiles (seed name enrichment)
-const ops = { inserted: [] as unknown[], deleted: [] as unknown[] }
+const ops = { inserted: [] as unknown[], deleted: [] as unknown[], updated: [] as Array<{ patch: unknown, ids: unknown[] }> }
 
 // Thenable + chainable stub mirroring the PostgREST builder. event_invites resolves
 // to the seed `poolList` when filtered with .in() (the pool query) and `list`
@@ -44,6 +44,16 @@ function builder(table: string) {
       ops.inserted.push(v)
       return Promise.resolve({ error: null })
     },
+    update: (patch: unknown) => ({
+      eq: (_col: string, val: unknown) => {
+        ops.updated.push({ patch, ids: [val] })
+        return Promise.resolve({ error: null })
+      },
+      in: (_col: string, vals: unknown[]) => {
+        ops.updated.push({ patch, ids: vals })
+        return Promise.resolve({ error: null })
+      }
+    }),
     delete: () => ({
       eq: (_col: string, val: unknown) => {
         ops.deleted.push(val)
@@ -84,6 +94,7 @@ beforeEach(() => {
   profilesList = []
   ops.inserted = []
   ops.deleted = []
+  ops.updated = []
 })
 
 describe('useEventInvites', () => {
@@ -105,6 +116,40 @@ describe('useEventInvites', () => {
     await flushPromises()
     await addInvite('New@X.com', 'New')
     expect(ops.inserted.some(i => (i as { email?: string }).email === 'New@X.com')).toBe(true)
+  })
+
+  it('addInvite stores the mobile number when one is given, null otherwise', async () => {
+    const { addInvite } = useEventInvites(ref('e'))
+    await flushPromises()
+    await addInvite('a@x', 'A', '+15551234567')
+    await addInvite('b@x')
+    expect(ops.inserted[0]).toMatchObject({ email: 'a@x', phone: '+15551234567' })
+    expect(ops.inserted[1]).toMatchObject({ email: 'b@x', phone: null })
+  })
+
+  it('setPhone updates the guest\'s number and clears it with null', async () => {
+    const { setPhone } = useEventInvites(ref('e'))
+    await flushPromises()
+    await setPhone('inv-1', '+15551234567')
+    await setPhone('inv-1', null)
+    expect(ops.updated[0]).toEqual({ patch: { phone: '+15551234567' }, ids: ['inv-1'] })
+    expect(ops.updated[1]).toEqual({ patch: { phone: null }, ids: ['inv-1'] })
+  })
+
+  it('markTexted stamps texted_at on every given guest at once', async () => {
+    const { markTexted } = useEventInvites(ref('e'))
+    await flushPromises()
+    await markTexted(['a', 'b'])
+    expect(ops.updated).toHaveLength(1)
+    expect(ops.updated[0]!.ids).toEqual(['a', 'b'])
+    expect((ops.updated[0]!.patch as { texted_at: string }).texted_at).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+  })
+
+  it('markTexted is a no-op for an empty list', async () => {
+    const { markTexted } = useEventInvites(ref('e'))
+    await flushPromises()
+    await markTexted([])
+    expect(ops.updated).toHaveLength(0)
   })
 
   it('removeInvite deletes by id', async () => {
@@ -132,12 +177,13 @@ describe('useEventInvites', () => {
     // Current event ('e') has no invites; an older event ('prev') does.
     list = []
     eventsList = [{ id: 'prev' }]
-    poolList = [{ event_id: 'prev', email: 'guest@x', display_name: 'Guest' }]
+    poolList = [{ event_id: 'prev', email: 'guest@x', display_name: 'Guest', phone: '+15551230001' }]
     const { seedFromLastEvent } = useEventInvites(ref('e'))
     await flushPromises()
     const added = await seedFromLastEvent()
     expect(added).toBe(1)
-    expect(ops.inserted.flat().some(i => (i as { email?: string }).email === 'guest@x')).toBe(true)
+    // The number typed for them last time comes along, so it's entered once, not per event.
+    expect(ops.inserted.flat()).toContainEqual({ event_id: 'e', email: 'guest@x', display_name: 'Guest', phone: '+15551230001' })
   })
 
   it('seedFromLastEvent returns 0 when no prior event has a list and the roster is empty', async () => {
