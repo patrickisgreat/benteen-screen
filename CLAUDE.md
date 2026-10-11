@@ -161,6 +161,16 @@ reliable for this scale) rather than patching state.
 Client → `GET /api/movies/search?q=...` → server handler reads `runtimeConfig.tmdbApiKey`
 → TMDB. Validate and clamp query params at the boundary. Never call TMDB from a component.
 
+### Texting guests (SMS)
+
+There is **no SMS provider**. Texting is `sms:` deep links built client-side
+(`shared/utils/sms.ts`): the host's own Messages app opens pre-addressed and pre-filled
+and the host taps send, so texts come from their personal number and nothing is sent
+without them. Guest numbers live on the admin-only `event_invites.phone` (E.164, enforced
+by a CHECK; normalize with `normalizePhone`), carry forward with "pull from last event"
+and the guest directory, and `texted_at` records who has been nudged. Do not add a
+provider or move numbers onto member-readable tables without a privacy review.
+
 ## Environment
 
 Copy `.env.example` to `.env` and fill in real values (Supabase dashboard → Settings → API):
