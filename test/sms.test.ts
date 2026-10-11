@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_TEXT_TEMPLATE, buildSmsHref, firstName, renderTextTemplate } from '../shared/utils/sms'
+import { DEFAULT_TEXT_TEMPLATE, buildSmsHref, renderTextTemplate, textName } from '../shared/utils/sms'
 
 const vars = { name: 'Sam', event: 'The Goonies', date: 'Fri, Oct 17', link: 'https://bsotg.app/rsvp?token=abc' }
 
@@ -23,15 +23,16 @@ describe('renderTextTemplate', () => {
   })
 })
 
-describe('firstName', () => {
+describe('textName', () => {
   it('uses the first word of a display name', () => {
-    expect(firstName('Sam Bennett', 'sam@x.com')).toBe('Sam')
-    expect(firstName('  Sam ', 'sam@x.com')).toBe('Sam')
+    expect(textName('Sam Bennett', 'sam@x.com')).toBe('Sam')
+    expect(textName('  Sam ', 'sam@x.com')).toBe('Sam')
   })
 
-  it('falls back to the email handle when there is no name', () => {
-    expect(firstName(null, 'sam.b@x.com')).toBe('sam.b')
-    expect(firstName('   ', 'sam.b@x.com')).toBe('sam.b')
+  it('falls back to the email handle when there is no usable name', () => {
+    expect(textName(null, 'sam.b@x.com')).toBe('sam.b')
+    expect(textName('   ', 'sam.b@x.com')).toBe('sam.b')
+    expect(textName('sam.b@x.com', 'sam.b@x.com')).toBe('sam.b') // roster rows sometimes carry the email as the name
   })
 })
 

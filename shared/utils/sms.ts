@@ -1,3 +1,5 @@
+import { firstName } from './email'
+
 /** Building the text message the host sends from their own phone. Nothing here
  *  talks to a carrier: `buildSmsHref` makes an `sms:` link that opens Messages
  *  pre-addressed and pre-filled, and the host taps send. */
@@ -17,12 +19,11 @@ export function renderTextTemplate(template: string, vars: TextVars): string {
   return template.replace(/\{(name|event|date|link)\}/g, (_, key: TextPlaceholder) => vars[key])
 }
 
-/** How to address someone in a text: their first name, else the part of their
- *  email before the @ ("sam.b" → "sam.b" is still friendlier than the address). */
-export function firstName(displayName: string | null, email: string): string {
-  const name = displayName?.trim()
-  if (name) return name.split(/\s+/)[0] ?? name
-  return email.split('@')[0] ?? email
+/** How to address someone in a text: their first name (the email helper's rule),
+ *  else the part of their email before the @ — "sam.b" is still friendlier than
+ *  the whole address, and a text with no name at all reads like spam. */
+export function textName(displayName: string | null, email: string): string {
+  return firstName(displayName) ?? email.split('@')[0] ?? email
 }
 
 /** An `sms:` link to one or more recipients with a pre-filled body.

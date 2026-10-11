@@ -137,7 +137,7 @@ const textTemplate = computed(() => options.value.textMessage.trim() || DEFAULT_
 function textVars(invite: EventInvite | null): TextVars {
   const ev = props.event
   return {
-    name: invite ? firstName(invite.display_name, invite.email) : 'everyone',
+    name: invite ? textName(invite.display_name, invite.email) : 'everyone',
     event: ev?.title ?? 'movie night',
     date: ev?.event_date ? formatDate(ev.event_date, { weekday: 'short', month: 'short', day: 'numeric' }) : 'soon',
     link: invite ? rsvpLink(invite) : location.origin
