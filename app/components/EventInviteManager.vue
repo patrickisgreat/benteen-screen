@@ -3,15 +3,18 @@ import type { EventInvite } from '#shared/types/event-invite'
 import type { MovieEvent } from '#shared/types/event'
 import type { RsvpStatus } from '#shared/types/rsvp'
 import { INVITE_ACCENTS, INVITE_THEMES, type InviteAccent, type InviteOptions, type InviteTheme } from '#shared/types/invite-options'
+import type { TextVars } from '#shared/utils/sms'
 
 // Admin guest-list manager + Evite tracker + e-vite editor for one event. Lets
 // admins customize the invite (theme/accent/message/toggles with a live preview),
 // add guests (live-searching the club directory via GuestPicker) / remove them,
 // pull last event's list in on demand, send tokenized e-vites, RSVP (and +1) on
-// a guest's behalf, and shows live RSVP / open / click tracking.
+// a guest's behalf, text guests from the host's own phone (one at a time, or a
+// group text to everyone who hasn't replied), and shows live RSVP / open / click
+// tracking.
 const props = defineProps<{ eventId: string, event?: MovieEvent | null }>()
 const toast = useToast()
-const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders, setRsvp, notifyRsvp } = useEventInvites(() => props.eventId)
+const { invites, stats, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders, setRsvp, notifyRsvp, setPhone, markTexted } = useEventInvites(() => props.eventId)
 const { save: saveInviteOptions } = useInviteOptions(() => props.eventId)
 const { setEnabled: setRemindersEnabled } = useEventReminders(() => props.eventId)
 
@@ -108,14 +111,83 @@ async function onRemind(): Promise<void> {
   }
 }
 
-// A link the admin can personally text/DM someone: it opens the one-click RSVP page.
+// Their personal one-click RSVP page — what goes in a text or DM.
+const rsvpLink = (invite: EventInvite): string => `${location.origin}/rsvp?token=${invite.token}`
+
 async function copyRsvpLink(invite: EventInvite): Promise<void> {
-  const url = `${location.origin}/rsvp?token=${invite.token}`
+  const url = rsvpLink(invite)
   try {
     await navigator.clipboard.writeText(url)
     toast.add({ title: 'RSVP link copied', icon: 'i-lucide-check', color: 'success' })
   } catch {
     toast.add({ title: 'Copy failed — here it is', description: url, color: 'warning' })
+  }
+}
+
+// --- Texting from the host's phone -----------------------------------------
+// The app never sends SMS: each button is an `sms:` link that opens Messages
+// pre-addressed and pre-filled, and the host taps send. We only remember numbers
+// (setPhone) and who's been nudged (markTexted).
+const textForId = ref<string | null>(null)
+const textOpen = ref(false)
+const textFor = computed(() => invites.value.find(i => i.id === textForId.value) ?? null)
+const textTemplate = computed(() => options.value.textMessage.trim() || DEFAULT_TEXT_TEMPLATE)
+
+// Placeholder values for one guest, or for the whole group (no personal link then).
+function textVars(invite: EventInvite | null): TextVars {
+  const ev = props.event
+  return {
+    name: invite ? firstName(invite.display_name, invite.email) : 'everyone',
+    event: ev?.title ?? 'movie night',
+    date: ev?.event_date ? formatDate(ev.event_date, { weekday: 'short', month: 'short', day: 'numeric' }) : 'soon',
+    link: invite ? rsvpLink(invite) : location.origin
+  }
+}
+const textMessageFor = computed(() => renderTextTemplate(textTemplate.value, textVars(textFor.value)))
+
+function openTextFor(invite: EventInvite): void {
+  textForId.value = invite.id
+  textOpen.value = true
+}
+
+async function onSavePhone(phone: string | null): Promise<void> {
+  const invite = textFor.value
+  if (!invite) return
+  try {
+    await setPhone(invite.id, phone)
+    toast.add({ title: phone ? 'Number saved' : 'Number removed', icon: 'i-lucide-check', color: 'success' })
+  } catch (error) {
+    toast.add({ title: 'Could not save the number', description: error instanceof Error ? error.message : undefined, color: 'error' })
+  }
+}
+
+// Messages is opening (the button is the sms: link); remember the number if it's
+// new and stamp them texted. Failures here never block the text itself.
+async function onText(phone: string): Promise<void> {
+  const invite = textFor.value
+  if (!invite) return
+  try {
+    if (phone !== invite.phone) await setPhone(invite.id, phone)
+    await markTexted([invite.id])
+  } catch (error) {
+    toast.add({ title: 'Could not mark them as texted', description: error instanceof Error ? error.message : undefined, color: 'error' })
+  }
+}
+
+// Group text: everyone who hasn't replied and has a number, in one conversation.
+const groupTextable = computed(() => invites.value.filter(i => !i.rsvp && i.phone))
+const groupMissingNumbers = computed(() => invites.value.filter(i => !i.rsvp && !i.phone).length)
+const groupTextHref = computed(() => {
+  const numbers = groupTextable.value.flatMap(i => (i.phone ? [i.phone] : []))
+  if (!numbers.length) return undefined
+  return buildSmsHref(numbers, renderTextTemplate(textTemplate.value, textVars(null)))
+})
+
+async function onGroupText(): Promise<void> {
+  try {
+    await markTexted(groupTextable.value.map(i => i.id))
+  } catch (error) {
+    toast.add({ title: 'Could not mark them as texted', description: error instanceof Error ? error.message : undefined, color: 'error' })
   }
 }
 
@@ -168,9 +240,9 @@ async function onSaveOptions(): Promise<void> {
   savingOptions.value = true
   try {
     await saveInviteOptions(options.value)
-    toast.add({ title: 'E-vite design saved', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: 'E-vite settings saved', icon: 'i-lucide-check', color: 'success' })
   } catch {
-    toast.add({ title: 'Could not save the design', color: 'error' })
+    toast.add({ title: 'Could not save the settings', color: 'error' })
   } finally {
     savingOptions.value = false
   }
@@ -214,9 +286,9 @@ async function onDeleteSelected(): Promise<void> {
 // Emails already on the list — the picker hides these from its matches.
 const listedEmails = computed(() => invites.value.map(i => i.email))
 
-async function onAdd(email: string, name?: string): Promise<void> {
+async function onAdd(email: string, name?: string, phone?: string): Promise<void> {
   try {
-    await addInvite(email, name)
+    await addInvite(email, name, phone)
   } catch {
     toast.add({ title: 'Could not add them', color: 'error' })
   }
@@ -269,7 +341,9 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
   if (invite.rsvp === 'going') return { label: invite.plus_ones > 0 ? `Going +${invite.plus_ones}` : 'Going', color: 'success' }
   if (invite.rsvp === 'maybe') return { label: 'Maybe', color: 'warning' }
   if (invite.rsvp === 'no') return { label: 'Can\'t make it', color: 'neutral' }
-  // Nudged but still no reply — so admins can see who's been reminded (and not double-send).
+  // Nudged but still no reply — so admins can see who's been pinged (and not double-send).
+  // A personal text is the most recent, most deliberate nudge, so it wins over an email reminder.
+  if (invite.texted_at) return { label: 'Texted', color: 'info' }
   if (invite.reminded_at) return { label: 'Reminded', color: 'info' }
   if (invite.clicked_at) return { label: 'Clicked', color: 'info' }
   if (invite.opened_at) return { label: 'Opened', color: 'info' }
@@ -424,6 +498,56 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
       </template>
     </UCollapsible>
 
+    <!-- Texting: the host's own phone does the sending -->
+    <UCollapsible v-if="event" :unmount-on-hide="false" class="rounded-lg ring ring-default">
+      <UButton
+        label="Text people from your phone"
+        icon="i-lucide-message-circle"
+        color="neutral"
+        variant="ghost"
+        trailing-icon="i-lucide-chevron-down"
+        block
+        class="justify-between"
+      />
+      <template #content>
+        <div class="space-y-4 p-4 border-t border-default">
+          <p class="text-sm text-muted">
+            Each button opens your Messages app with the number and message filled in, so the text comes from you.
+            Nothing is sent until you tap send there. Text one person from their row, or everyone who hasn't replied at once.
+          </p>
+
+          <UFormField label="Message template" hint="{name}, {event}, {date} and {link} fill in per person">
+            <UTextarea
+              v-model="options.textMessage"
+              :rows="3"
+              :placeholder="DEFAULT_TEXT_TEMPLATE"
+              aria-label="Text message template"
+              class="w-full"
+            />
+          </UFormField>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <UButton label="Save template" icon="i-lucide-save" size="sm" color="neutral" variant="outline" :loading="savingOptions" @click="onSaveOptions" />
+            <UButton
+              :label="groupTextable.length ? `Group text ${groupTextable.length} who ${groupTextable.length === 1 ? 'hasn\'t' : 'haven\'t'} replied` : 'No one to group text'"
+              icon="i-lucide-messages-square"
+              size="sm"
+              :to="groupTextHref"
+              external
+              :disabled="!groupTextHref"
+              @click="onGroupText"
+            />
+            <span v-if="groupMissingNumbers" class="text-xs text-muted">
+              {{ groupMissingNumbers }} without a reply {{ groupMissingNumbers === 1 ? 'has' : 'have' }} no number yet — add one from their row.
+            </span>
+          </div>
+          <p v-if="groupTextable.length" class="text-xs text-muted">
+            A group text is one conversation everyone in it can see, so it uses a general link instead of personal RSVP links.
+          </p>
+        </div>
+      </template>
+    </UCollapsible>
+
     <!-- Add (live directory search or a new email) + actions -->
     <GuestPicker :exclude="listedEmails" @add="onAdd" />
     <div class="flex flex-wrap items-center gap-2">
@@ -507,6 +631,15 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
           @click="openRsvpFor(invite)"
         />
         <UButton
+          icon="i-lucide-message-circle"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          :aria-label="`Text ${invite.display_name || invite.email}`"
+          class="shrink-0"
+          @click="openTextFor(invite)"
+        />
+        <UButton
           icon="i-lucide-link"
           color="neutral"
           variant="ghost"
@@ -537,6 +670,14 @@ function statusBadge(invite: EventInvite): { label: string, color: 'success' | '
       :notifying="notifying"
       @set="onSetRsvp"
       @notify="onNotifyRsvp"
+    />
+
+    <GuestTextModal
+      v-model:open="textOpen"
+      :invite="textFor"
+      :default-message="textMessageFor"
+      @save-phone="onSavePhone"
+      @text="onText"
     />
   </div>
 </template>
