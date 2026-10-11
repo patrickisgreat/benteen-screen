@@ -15,6 +15,9 @@ export interface InviteOptions {
   message: string
   showPoster: boolean
   showDetails: boolean
+  /** Template for texts the host sends from their own phone (see shared/utils/sms).
+   *  Empty = use DEFAULT_TEXT_TEMPLATE. */
+  textMessage: string
 }
 
 export const DEFAULT_INVITE_OPTIONS: InviteOptions = {
@@ -22,5 +25,6 @@ export const DEFAULT_INVITE_OPTIONS: InviteOptions = {
   accent: 'green',
   message: '',
   showPoster: true,
-  showDetails: true
+  showDetails: true,
+  textMessage: ''
 }
