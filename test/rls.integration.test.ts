@@ -307,6 +307,45 @@ describe.skipIf(!ready)('invite-only RLS boundary', () => {
     await admin!.from('invites').delete().eq('email', emailT)
   })
 
+  it('contacts (phone numbers) are admin-only, remembered from guest lists, and admins can rename members', async () => {
+    const adminClient = await signInAs(adminEmail)
+    const guestEmail = `rls_contact_${stamp}@example.com`
+
+    // Typing a number on a guest list files it on the person's contact record.
+    const { data: guest } = await admin!
+      .from('event_invites').insert({ event_id: eventId, email: guestEmail, phone: '+15550001111' }).select('id').single()
+    const remembered = await admin!.from('contacts').select('phone').eq('email', guestEmail).single()
+    expect(remembered.data?.phone, 'a guest-list number becomes the person\'s number').toBe('+15550001111')
+    await admin!.from('event_invites').update({ phone: '+15550002222' }).eq('id', guest!.id)
+    const updated = await admin!.from('contacts').select('phone').eq('email', guestEmail).single()
+    expect(updated.data?.phone, 'a changed guest-list number follows').toBe('+15550002222')
+
+    // A member can neither read nor write anyone's number.
+    const memberRead = await memberClient.from('contacts').select('*').eq('email', guestEmail)
+    expect(memberRead.data ?? [], 'a member must not see phone numbers').toHaveLength(0)
+    const memberWrite = await memberClient.from('contacts').upsert({ email: guestEmail, phone: '+15550009999' })
+    expect(memberWrite.error, 'a member must not write phone numbers').toBeTruthy()
+
+    // An admin can, under their own session; a malformed number is rejected by the CHECK.
+    const adminWrite = await adminClient.from('contacts').upsert({ email: guestEmail, phone: '+15550003333' }, { onConflict: 'email' })
+    expect(adminWrite.error, 'an admin can set a number').toBeNull()
+    const badNumber = await adminClient.from('contacts').upsert({ email: guestEmail, phone: '555-1234' }, { onConflict: 'email' })
+    expect(badNumber.error, 'a non-E.164 number is rejected').toBeTruthy()
+
+    // Renaming: admins only, and only display_name changes.
+    const memberRename = await memberClient.rpc('admin_set_display_name', { target_id: adminUserId, value: 'Hacked' })
+    expect(memberRename.error, 'a member must not rename others').toBeTruthy()
+    const adminRename = await adminClient.rpc('admin_set_display_name', { target_id: memberId, value: '  Renamed Member  ' })
+    expect(adminRename.error, 'an admin can rename a member').toBeNull()
+    const renamed = await admin!.from('profiles').select('display_name, is_admin, blocked').eq('id', memberId).single()
+    expect(renamed.data, 'only the name changed').toEqual({ display_name: 'Renamed Member', is_admin: false, blocked: false })
+    const blank = await adminClient.rpc('admin_set_display_name', { target_id: memberId, value: '   ' })
+    expect(blank.error, 'a blank name is rejected').toBeTruthy()
+
+    await admin!.from('event_invites').delete().eq('id', guest!.id)
+    await admin!.from('contacts').delete().eq('email', guestEmail)
+  })
+
   it('the total invite cap blocks an over-limit member invite but exempts admin/seed', async () => {
     const { count } = await admin!.from('invites').select('*', { count: 'exact', head: true })
     // Set the cap to the current size so the next member-issued invite is over-limit.
