@@ -44,12 +44,12 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     }
   })
 
-  async function addInvite(email: string, displayName?: string): Promise<void> {
+  async function addInvite(email: string, displayName?: string, phone?: string): Promise<void> {
     const id = toValue(eventId)
     if (!id) return
     const { error } = await supabase
       .from('event_invites')
-      .insert({ event_id: id, email, display_name: displayName ?? null })
+      .insert({ event_id: id, email, display_name: displayName ?? null, phone: phone ?? null })
     // 23505 = already on this event's list — harmless.
     if (error && error.code !== '23505') throw error
     await refresh()
@@ -69,17 +69,19 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     await refresh()
   }
 
+  /** What "pull from last event" copies per person: who they are, plus the mobile
+   *  number typed for them last time, so it's entered once, not once per event. */
+  interface SeedCandidate { email: string, display_name: string | null, phone: string | null }
+
   /** Overlay the best-known display name (a signed-in person's profile name) onto
    *  seed candidates, falling back to whatever name the source row carried. Keeps
    *  "pull from last event" from importing bare emails when we actually know names. */
-  async function withProfileNames(
-    candidates: Array<{ email: string, display_name: string | null }>
-  ): Promise<Array<{ email: string, display_name: string | null }>> {
+  async function withProfileNames(candidates: SeedCandidate[]): Promise<SeedCandidate[]> {
     const emails = candidates.map(c => c.email).filter(Boolean)
     if (!emails.length) return candidates
     const { data: profiles } = await supabase.from('profiles').select('email, display_name').in('email', emails)
     const nameByEmail = new Map((profiles ?? []).filter(p => p.email).map(p => [p.email, p.display_name]))
-    return candidates.map(c => ({ email: c.email, display_name: nameByEmail.get(c.email) ?? c.display_name }))
+    return candidates.map(c => ({ ...c, display_name: nameByEmail.get(c.email) ?? c.display_name }))
   }
 
   /** Build this event's guest list from the most recent OTHER event that has one
@@ -90,7 +92,7 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     const id = toValue(eventId)
     if (!id) return 0
 
-    let candidates: Array<{ email: string, display_name: string | null }> = []
+    let candidates: SeedCandidate[] = []
     const { data: others } = await supabase
       .from('events')
       .select('id')
@@ -100,25 +102,25 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     if (otherIds.length) {
       const { data: pool } = await supabase
         .from('event_invites')
-        .select('event_id, email, display_name')
+        .select('event_id, email, display_name, phone')
         .in('event_id', otherIds)
       // otherIds is newest-first; take the first event that actually has invites.
       const sourceId = otherIds.find(eid => (pool ?? []).some(p => p.event_id === eid))
       if (sourceId) {
         candidates = (pool ?? [])
           .filter(p => p.event_id === sourceId)
-          .map(p => ({ email: p.email, display_name: p.display_name }))
+          .map(p => ({ email: p.email, display_name: p.display_name, phone: p.phone ?? null }))
       }
     }
     // Fallback: no prior event guest list → pull the whole allowlist roster.
     if (!candidates.length) {
       const { data: roster } = await supabase.from('invites').select('email, display_name')
-      candidates = (roster ?? []).map(r => ({ email: r.email, display_name: r.display_name }))
+      candidates = (roster ?? []).map(r => ({ email: r.email, display_name: r.display_name, phone: null }))
     }
 
     const existing = new Set(invites.value.map(i => i.email))
     const named = await withProfileNames(candidates.filter(c => !existing.has(c.email)))
-    const toAdd = named.map(c => ({ event_id: id, email: c.email, display_name: c.display_name }))
+    const toAdd = named.map(c => ({ event_id: id, email: c.email, display_name: c.display_name, phone: c.phone }))
     if (!toAdd.length) return 0
     const { error } = await supabase.from('event_invites').insert(toAdd)
     if (error) throw error
@@ -175,6 +177,26 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     return { sent: result.sent, failed: result.failed, error: result.error }
   }
 
+  /** Save (or clear, with null) a guest's mobile number. Callers normalize first
+   *  (`normalizePhone`); the DB check rejects anything that isn't E.164. */
+  async function setPhone(inviteId: string, phone: string | null): Promise<void> {
+    const { error } = await supabase.from('event_invites').update({ phone }).eq('id', inviteId)
+    if (error) throw error
+    await refresh()
+  }
+
+  /** Stamp that the host just opened a text to these guests, so the list shows
+   *  "Texted" and nobody gets nudged twice. No-op for an empty list. */
+  async function markTexted(inviteIds: readonly string[]): Promise<void> {
+    if (!inviteIds.length) return
+    const { error } = await supabase
+      .from('event_invites')
+      .update({ texted_at: new Date().toISOString() })
+      .in('id', [...inviteIds])
+    if (error) throw error
+    await refresh()
+  }
+
   // Live updates as RSVPs / opens land (event_invites is in the realtime publication).
   let channel: ReturnType<typeof supabase.channel> | null = null
   watch(() => toValue(eventId), (id) => {
@@ -196,5 +218,5 @@ export function useEventInvites(eventId: MaybeRefOrGetter<string | null>) {
     if (channel) supabase.removeChannel(channel)
   })
 
-  return { invites, pending, stats, refresh, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders, setRsvp, notifyRsvp }
+  return { invites, pending, stats, refresh, addInvite, removeInvite, removeInvites, seedFromLastEvent, sendInvites, remindNonResponders, setRsvp, notifyRsvp, setPhone, markTexted }
 }

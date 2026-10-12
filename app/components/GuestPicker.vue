@@ -4,10 +4,11 @@ import type { GuestCandidate } from '#shared/utils/guestDirectory'
 
 // The "add a guest" field for an event's list: one input that live-searches the
 // club directory (members, roster, past guests) by name or email, with a manual
-// email + optional name fallback for someone brand new. Either path emits `add`;
-// the parent owns the insert.
+// email + optional name + optional mobile fallback for someone brand new. Either
+// path emits `add` (a directory pick carries the number we already know); the
+// parent owns the insert.
 const props = withDefaults(defineProps<{ exclude?: readonly string[] }>(), { exclude: () => [] })
-const emit = defineEmits<{ add: [email: string, name?: string] }>()
+const emit = defineEmits<{ add: [email: string, name?: string, phone?: string] }>()
 
 const toast = useToast()
 const { candidates, pending, error } = useGuestDirectory()
@@ -15,16 +16,23 @@ const emailSchema = z.string().email()
 
 const query = ref('')
 const newName = ref('')
+const newPhone = ref('')
+const phoneInvalid = computed(() => Boolean(newPhone.value.trim()) && normalizePhone(newPhone.value) === null)
 
 const matches = computed(() => searchGuestCandidates(candidates.value, query.value, props.exclude))
 const queryIsEmail = computed(() => emailSchema.safeParse(query.value.trim()).success)
 // A typed email that's already in the directory — adding them should keep their name.
 const exactMatch = computed(() => matches.value.find(c => c.email === query.value.trim().toLowerCase()) ?? null)
 
-function pick(candidate: GuestCandidate): void {
-  emit('add', candidate.email, candidate.display_name ?? undefined)
+function reset(): void {
   query.value = ''
   newName.value = ''
+  newPhone.value = ''
+}
+
+function pick(candidate: GuestCandidate): void {
+  emit('add', candidate.email, candidate.display_name ?? undefined, candidate.phone ?? undefined)
+  reset()
 }
 
 function addTyped(): void {
@@ -33,9 +41,12 @@ function addTyped(): void {
     toast.add({ title: 'Pick a match or enter a valid email', color: 'warning' })
     return
   }
-  emit('add', email, newName.value.trim() || undefined)
-  query.value = ''
-  newName.value = ''
+  if (phoneInvalid.value) {
+    toast.add({ title: 'That doesn\'t look like a mobile number', description: 'Use 10 digits for US, or +country code.', color: 'warning' })
+    return
+  }
+  emit('add', email, newName.value.trim() || undefined, normalizePhone(newPhone.value) ?? undefined)
+  reset()
 }
 
 // Enter picks the directory entry when the text is exactly their email or the
@@ -63,6 +74,9 @@ function onEnter(): void {
       </UFormField>
       <UFormField label="Name" hint="optional" class="min-w-32">
         <UInput v-model="newName" placeholder="Jordan" class="w-full" @keydown.enter.prevent="addTyped" />
+      </UFormField>
+      <UFormField label="Mobile" hint="optional" :error="phoneInvalid ? 'Not a valid number' : undefined" class="min-w-36">
+        <UInput v-model="newPhone" type="tel" placeholder="(555) 123-4567" aria-label="Mobile number" class="w-full" @keydown.enter.prevent="addTyped" />
       </UFormField>
       <UButton label="Add" icon="i-lucide-plus" :disabled="!queryIsEmail" @click="addTyped" />
     </div>

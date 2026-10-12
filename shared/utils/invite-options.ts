@@ -18,6 +18,7 @@ export function normalizeInviteOptions(raw: unknown): InviteOptions {
     accent,
     message: typeof o.message === 'string' ? o.message : '',
     showPoster: typeof o.showPoster === 'boolean' ? o.showPoster : DEFAULT_INVITE_OPTIONS.showPoster,
-    showDetails: typeof o.showDetails === 'boolean' ? o.showDetails : DEFAULT_INVITE_OPTIONS.showDetails
+    showDetails: typeof o.showDetails === 'boolean' ? o.showDetails : DEFAULT_INVITE_OPTIONS.showDetails,
+    textMessage: typeof o.textMessage === 'string' ? o.textMessage : ''
   }
 }

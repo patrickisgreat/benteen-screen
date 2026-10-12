@@ -9,8 +9,8 @@ interface SendResult { sent: number, failed: number, error: string | null }
 interface Toast { title?: string, description?: string, color?: string }
 
 const invites = ref([
-  { id: 'a', event_id: 'e', email: 'pat@x.com', display_name: 'Pat', token: '1', rsvp: 'going', rsvp_at: null, plus_ones: 0, invited_by: null, resend_id: null, sent_at: 't', delivered_at: null, opened_at: null, clicked_at: null, bounced_at: null, created_at: '' },
-  { id: 'b', event_id: 'e', email: 'sam@x.com', display_name: 'Sam', token: '2', rsvp: null, rsvp_at: null, plus_ones: 0, invited_by: null, resend_id: null, sent_at: null, delivered_at: null, opened_at: null, clicked_at: null, bounced_at: null, created_at: '' }
+  { id: 'a', event_id: 'e', email: 'pat@x.com', display_name: 'Pat', token: '1', rsvp: 'going', rsvp_at: null, plus_ones: 0, invited_by: null, resend_id: null, sent_at: 't', delivered_at: null, opened_at: null, clicked_at: null, bounced_at: null, reminded_at: null, phone: '+15551230001', texted_at: null, created_at: '' },
+  { id: 'b', event_id: 'e', email: 'sam@x.com', display_name: 'Sam', token: '2', rsvp: null, rsvp_at: null, plus_ones: 0, invited_by: null, resend_id: null, sent_at: null, delivered_at: null, opened_at: null, clicked_at: null, bounced_at: null, reminded_at: null, phone: null, texted_at: null, created_at: '' }
 ])
 const sendFn = vi.fn<() => Promise<SendResult>>(async () => ({ sent: 0, failed: 0, error: null }))
 const remindFn = vi.fn<() => Promise<SendResult>>(async () => ({ sent: 0, failed: 0, error: null }))
@@ -20,6 +20,8 @@ const addFn = vi.fn(async (_email: string, _name?: string) => {})
 const saveOptionsFn = vi.fn(async () => {})
 const setRsvpFn = vi.fn(async (_inviteId: string, _status: string | null, _plusOnes: number) => {})
 const notifyRsvpFn = vi.fn<(inviteId: string) => Promise<SendResult>>(async () => ({ sent: 1, failed: 0, error: null }))
+const setPhoneFn = vi.fn(async (_inviteId: string, _phone: string | null) => {})
+const markTextedFn = vi.fn(async (_inviteIds: readonly string[]) => {})
 const toasts: Toast[] = []
 
 const eventObj = {
@@ -48,11 +50,13 @@ mockNuxtImport('useEventInvites', () => () => ({
   sendInvites: sendFn,
   remindNonResponders: remindFn,
   setRsvp: setRsvpFn,
-  notifyRsvp: notifyRsvpFn
+  notifyRsvp: notifyRsvpFn,
+  setPhone: setPhoneFn,
+  markTexted: markTextedFn
 }))
 mockNuxtImport('useToast', () => () => ({ add: (t: Toast) => toasts.push(t) }))
 mockNuxtImport('useGuestDirectory', () => () => ({
-  candidates: ref([{ email: 'zed@x.com', display_name: 'Zed', source: 'past-guest' }]),
+  candidates: ref([{ email: 'zed@x.com', display_name: 'Zed', phone: '+15551230009', source: 'past-guest' }]),
   pending: ref(false),
   error: ref(null)
 }))
@@ -83,6 +87,8 @@ beforeEach(() => {
   setRsvpFn.mockReset()
   notifyRsvpFn.mockReset()
   notifyRsvpFn.mockResolvedValue({ sent: 1, failed: 0, error: null })
+  setPhoneFn.mockReset()
+  markTextedFn.mockReset()
   sendFn.mockReset()
   sendFn.mockResolvedValue({ sent: 0, failed: 0, error: null })
   remindFn.mockReset()
@@ -123,7 +129,7 @@ describe('EventInviteManager', () => {
     await w.get('[aria-label="Search people or enter an email"]').setValue('zed')
     await w.get('[aria-label="Add Zed"]').trigger('click')
     await flushPromises()
-    expect(addFn).toHaveBeenCalledWith('zed@x.com', 'Zed')
+    expect(addFn).toHaveBeenCalledWith('zed@x.com', 'Zed', '+15551230009')
   })
 
   it('does not auto-pull from the last event on load, even when the list is empty', async () => {
@@ -286,6 +292,101 @@ describe('EventInviteManager', () => {
     await flushPromises()
     expect(notifyRsvpFn).toHaveBeenCalledWith('a')
     expect(toasts.at(-1)).toMatchObject({ title: 'Confirmation emailed to Pat', color: 'success' })
+  })
+
+  // --- Texting from the host's phone ---------------------------------------
+  function bodyLink(text: string): HTMLAnchorElement | undefined {
+    return [...document.querySelectorAll('a')].find(a => a.textContent?.includes(text))
+  }
+  async function withInvites<T>(list: typeof invites.value, run: () => Promise<T>): Promise<T> {
+    const prev = invites.value
+    invites.value = list
+    try {
+      return await run()
+    } finally {
+      invites.value = prev
+    }
+  }
+
+  it('shows Texted for a guest who was texted but has not replied', async () => {
+    await withInvites([{ ...invites.value[1]!, texted_at: '2026-10-10T18:00:00Z', reminded_at: '2026-10-09T18:00:00Z' }], async () => {
+      const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e' } })
+      expect(w.text()).toContain('Texted')
+      expect(w.text()).not.toContain('Reminded')
+    })
+  })
+
+  it('opens the text modal from a guest row with their personal RSVP link filled in, and stamps them texted', async () => {
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e', event: eventObj } })
+    await w.get('[aria-label="Text Pat"]').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('Text Pat')
+    const message = document.querySelector<HTMLTextAreaElement>('[aria-label="Text message"]')!.value
+    expect(message).toContain('Hey Pat!')
+    expect(message).toContain('The Goonies')
+    expect(message).toContain('/rsvp?token=1')
+    const open = bodyLink('Open in Messages')!
+    expect(open.getAttribute('href')).toMatch(/^sms:\+15551230001\?&body=/)
+    open.click()
+    await flushPromises()
+    expect(setPhoneFn).not.toHaveBeenCalled() // number unchanged
+    expect(markTextedFn).toHaveBeenCalledWith(['a'])
+  })
+
+  it('saves a number entered in the text modal', async () => {
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e', event: eventObj } })
+    await w.get('[aria-label="Text Sam"]').trigger('click')
+    await flushPromises()
+    const input = document.querySelector<HTMLInputElement>('[aria-label="Mobile number"]')!
+    input.value = '555 123 4567'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await flushPromises()
+    bodyButton('Save')!.click()
+    await flushPromises()
+    expect(setPhoneFn).toHaveBeenCalledWith('b', '+15551234567')
+    expect(toasts.at(-1)).toMatchObject({ title: 'Number saved', color: 'success' })
+  })
+
+  it('group-texts everyone without a reply who has a number, with a general link, and stamps them', async () => {
+    const [pat, sam] = invites.value
+    await withInvites([
+      pat!, // going — not nudged
+      { ...sam!, phone: '+15551230002' },
+      { ...sam!, id: 'c', email: 'cy@x.com', display_name: 'Cy', phone: '+15551230003' },
+      { ...sam!, id: 'd', email: 'dee@x.com', display_name: 'Dee', phone: null }
+    ], async () => {
+      const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e', event: eventObj } })
+      await w.findAll('button').find(b => b.text().includes('Text people from your phone'))!.trigger('click')
+      await flushPromises()
+      const group = w.find('a[href^="sms:"]')
+      expect(group.exists()).toBe(true)
+      const href = group.attributes('href')!
+      expect(href.startsWith('sms:+15551230002,+15551230003?&body=')).toBe(true)
+      expect(decodeURIComponent(href)).toContain('Hey everyone!')
+      expect(decodeURIComponent(href)).not.toContain('/rsvp?token=')
+      expect(w.text()).toContain('Group text 2 who haven\'t replied')
+      expect(w.text()).toContain('1 without a reply has no number yet')
+      await group.trigger('click')
+      await flushPromises()
+      expect(markTextedFn).toHaveBeenCalledWith(['b', 'c'])
+    })
+  })
+
+  it('has no group text to offer when no non-responder has a number', async () => {
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e', event: eventObj } })
+    expect(w.find('a[href^="sms:"]').exists()).toBe(false)
+    expect(w.text()).toContain('No one to group text')
+  })
+
+  it('saves the text template with the e-vite settings', async () => {
+    saveOptionsFn.mockClear()
+    const w = await mountSuspended(EventInviteManager, { props: { eventId: 'e', event: eventObj } })
+    await w.findAll('button').find(b => b.text().includes('Text people from your phone'))!.trigger('click')
+    await flushPromises()
+    await w.get('[aria-label="Text message template"]').setValue('Yo {name}, {link}')
+    await w.findAll('button').find(b => b.text().includes('Save template'))!.trigger('click')
+    await flushPromises()
+    expect(saveOptionsFn).toHaveBeenCalledWith(expect.objectContaining({ textMessage: 'Yo {name}, {link}' }))
   })
 
   it('shows why a confirmation email failed instead of a fake success', async () => {

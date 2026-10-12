@@ -8,9 +8,9 @@ import type { GuestCandidate } from '../shared/utils/guestDirectory'
 interface Toast { title?: string, color?: string }
 const toasts: Toast[] = []
 const candidates = ref<GuestCandidate[]>([
-  { email: 'ada@x.com', display_name: 'Ada Lovelace', source: 'member' },
-  { email: 'bo@x.com', display_name: 'Bo', source: 'past-guest' },
-  { email: 'cy@x.com', display_name: null, source: 'roster' }
+  { email: 'ada@x.com', display_name: 'Ada Lovelace', phone: null, source: 'member' },
+  { email: 'bo@x.com', display_name: 'Bo', phone: '+15551230002', source: 'past-guest' },
+  { email: 'cy@x.com', display_name: null, phone: null, source: 'roster' }
 ])
 const directoryError = ref<string | null>(null)
 mockNuxtImport('useGuestDirectory', () => () => ({ candidates, pending: ref(false), error: directoryError }))
@@ -38,11 +38,11 @@ describe('GuestPicker', () => {
     expect(list.text()).not.toContain('Bo')
   })
 
-  it('emits add with the match\'s email and name when a match is picked', async () => {
+  it('emits add with the match\'s email, name, and known phone when a match is picked', async () => {
     const w = await mountSuspended(GuestPicker)
     await searchBox(w).setValue('bo')
     await w.get('[aria-label="Add Bo"]').trigger('click')
-    expect(w.emitted('add')?.[0]).toEqual(['bo@x.com', 'Bo'])
+    expect(w.emitted('add')?.[0]).toEqual(['bo@x.com', 'Bo', '+15551230002'])
     // The field resets for the next search.
     expect((searchBox(w).element as HTMLInputElement).value).toBe('')
   })
@@ -60,7 +60,26 @@ describe('GuestPicker', () => {
     await searchBox(w).setValue('New@Example.com')
     await w.get('input[placeholder="Jordan"]').setValue('Newbie')
     await w.findAll('button').find(b => b.text().trim() === 'Add')!.trigger('click')
-    expect(w.emitted('add')?.[0]).toEqual(['new@example.com', 'Newbie'])
+    expect(w.emitted('add')?.[0]).toEqual(['new@example.com', 'Newbie', undefined])
+  })
+
+  it('adds a brand-new person with a normalized mobile number', async () => {
+    const w = await mountSuspended(GuestPicker)
+    await searchBox(w).setValue('new@example.com')
+    await w.get('[aria-label="Mobile number"]').setValue('(555) 123-4567')
+    await w.findAll('button').find(b => b.text().trim() === 'Add')!.trigger('click')
+    expect(w.emitted('add')?.[0]).toEqual(['new@example.com', undefined, '+15551234567'])
+    expect((w.get('[aria-label="Mobile number"]').element as HTMLInputElement).value).toBe('')
+  })
+
+  it('refuses to add when the typed mobile number is not dialable', async () => {
+    const w = await mountSuspended(GuestPicker)
+    await searchBox(w).setValue('new@example.com')
+    await w.get('[aria-label="Mobile number"]').setValue('555-12')
+    await w.findAll('button').find(b => b.text().trim() === 'Add')!.trigger('click')
+    expect(w.emitted('add')).toBeUndefined()
+    expect(toasts.at(-1)?.title).toContain('mobile number')
+    expect(w.text()).toContain('Not a valid number')
   })
 
   it('warns instead of adding when the text is neither a match nor an email', async () => {
@@ -76,7 +95,7 @@ describe('GuestPicker', () => {
     const w = await mountSuspended(GuestPicker)
     await searchBox(w).setValue('ADA@x.com')
     await searchBox(w).trigger('keydown', { key: 'Enter' })
-    expect(w.emitted('add')?.[0]).toEqual(['ada@x.com', 'Ada Lovelace'])
+    expect(w.emitted('add')?.[0]).toEqual(['ada@x.com', 'Ada Lovelace', undefined])
   })
 
   it('tells the admin a valid unknown email can be added', async () => {
@@ -96,6 +115,6 @@ describe('GuestPicker', () => {
     const w = await mountSuspended(GuestPicker)
     await searchBox(w).setValue('cy')
     await searchBox(w).trigger('keydown', { key: 'Enter' })
-    expect(w.emitted('add')?.[0]).toEqual(['cy@x.com', undefined])
+    expect(w.emitted('add')?.[0]).toEqual(['cy@x.com', undefined, undefined])
   })
 })

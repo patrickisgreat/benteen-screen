@@ -11,9 +11,10 @@ const roster = [
   { email: 'cy@x.com', display_name: 'Cy' }
 ]
 const pastGuests = [
-  { email: 'ada@x.com', display_name: 'Ada Lovelace' },
-  { email: 'dee@x.com', display_name: '  ' },
-  { email: 'dee@x.com', display_name: 'Dee' }
+  { email: 'ada@x.com', display_name: 'Ada Lovelace', phone: '+15551230001' },
+  { email: 'dee@x.com', display_name: '  ', phone: null },
+  { email: 'dee@x.com', display_name: 'Dee', phone: '+15551230002' },
+  { email: 'dee@x.com', display_name: 'Dee', phone: '+15559999999' }
 ]
 
 describe('mergeGuestCandidates', () => {
@@ -28,6 +29,13 @@ describe('mergeGuestCandidates', () => {
     const merged = mergeGuestCandidates(members, roster, pastGuests)
     expect(merged.find(c => c.email === 'bo@x.com')).toMatchObject({ source: 'member', display_name: 'Bo' })
     expect(merged.find(c => c.email === 'dee@x.com')).toMatchObject({ source: 'past-guest', display_name: 'Dee' })
+  })
+
+  it('carries a phone from a past guest list onto the person, first known number wins', () => {
+    const merged = mergeGuestCandidates(members, roster, pastGuests)
+    expect(merged.find(c => c.email === 'ada@x.com')?.phone).toBe('+15551230001')
+    expect(merged.find(c => c.email === 'dee@x.com')?.phone).toBe('+15551230002')
+    expect(merged.find(c => c.email === 'bo@x.com')?.phone).toBeNull()
   })
 
   it('drops rows without an email and sorts by name', () => {

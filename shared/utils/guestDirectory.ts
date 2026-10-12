@@ -9,13 +9,17 @@ export type GuestSource = (typeof GUEST_SOURCES)[number]
 export interface GuestCandidate {
   email: string
   display_name: string | null
+  /** Mobile number (E.164) if any source knows it — only past guest lists do. */
+  phone: string | null
   source: GuestSource
 }
 
-/** A row from any of the three source tables — just an email + optional name. */
+/** A row from any of the three source tables — an email, optional name, and
+ *  (for past guest lists) an optional phone. */
 export interface GuestRow {
   email: string | null
   display_name: string | null
+  phone?: string | null
 }
 
 export const GUEST_SOURCE_LABELS: Record<GuestSource, string> = {
@@ -25,8 +29,9 @@ export const GUEST_SOURCE_LABELS: Record<GuestSource, string> = {
 }
 
 /** Dedupe by (lowercased) email. A member beats a roster entry beats a past guest
- *  for the `source` tag, and the first non-empty display name wins so a bare
- *  email from an old guest list still shows the name their profile carries. */
+ *  for the `source` tag, and the first non-empty display name / phone wins so a
+ *  bare email from an old guest list still shows the name their profile carries,
+ *  and a number typed for one event follows the person to the next. */
 export function mergeGuestCandidates(
   members: readonly GuestRow[],
   roster: readonly GuestRow[],
@@ -38,11 +43,13 @@ export function mergeGuestCandidates(
       const email = row.email?.trim().toLowerCase()
       if (!email) continue
       const name = row.display_name?.trim() || null
+      const phone = row.phone?.trim() || null
       const existing = byEmail.get(email)
       if (existing) {
         if (!existing.display_name && name) existing.display_name = name
+        if (!existing.phone && phone) existing.phone = phone
       } else {
-        byEmail.set(email, { email, display_name: name, source })
+        byEmail.set(email, { email, display_name: name, phone, source })
       }
     }
   }

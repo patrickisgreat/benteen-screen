@@ -27,7 +27,7 @@ export function useGuestDirectory(): UseGuestDirectory {
     const [members, roster, pastGuests] = await Promise.all([
       supabase.from('profiles').select('email, display_name'),
       supabase.from('invites').select('email, display_name'),
-      supabase.from('event_invites').select('email, display_name')
+      supabase.from('event_invites').select('email, display_name, phone')
     ])
     // Surface a failed source instead of quietly searching a partial directory.
     error.value = (members.error ?? roster.error ?? pastGuests.error)?.message ?? null

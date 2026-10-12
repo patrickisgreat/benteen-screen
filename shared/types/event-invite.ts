@@ -20,6 +20,10 @@ export interface EventInvite {
   clicked_at: string | null
   bounced_at: string | null
   reminded_at: string | null
+  /** Mobile number in E.164 (`+15551234567`), for texting from the host's phone. */
+  phone: string | null
+  /** When the host last opened a text to them (see GuestTextModal); null = never. */
+  texted_at: string | null
   created_at: string
 }
 
