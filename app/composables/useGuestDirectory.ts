@@ -11,7 +11,8 @@ interface UseGuestDirectory {
 
 /**
  * Admin-only directory of everyone who could be added to a guest list: members,
- * the club roster, and past events' guests, merged + deduped by email. Loaded
+ * the club roster, and past events' guests, merged + deduped by email, with each
+ * person's number from their contact record. Loaded
  * once on mount (the club is small; someone who joins mid-session shows up on the
  * next page load) and searched client-side via `searchGuestCandidates`. Reads run
  * under RLS — every table here has an admin read policy.
@@ -24,14 +25,16 @@ export function useGuestDirectory(): UseGuestDirectory {
 
   async function load(): Promise<void> {
     pending.value = true
-    const [members, roster, pastGuests] = await Promise.all([
+    const [members, roster, pastGuests, contacts] = await Promise.all([
       supabase.from('profiles').select('email, display_name'),
       supabase.from('invites').select('email, display_name'),
-      supabase.from('event_invites').select('email, display_name, phone')
+      supabase.from('event_invites').select('email, display_name, phone'),
+      supabase.from('contacts').select('email, phone')
     ])
     // Surface a failed source instead of quietly searching a partial directory.
-    error.value = (members.error ?? roster.error ?? pastGuests.error)?.message ?? null
-    candidates.value = mergeGuestCandidates(members.data ?? [], roster.data ?? [], pastGuests.data ?? [])
+    error.value = (members.error ?? roster.error ?? pastGuests.error ?? contacts.error)?.message ?? null
+    const contactRows = (contacts.data ?? []).map(c => ({ email: c.email, display_name: null, phone: c.phone }))
+    candidates.value = mergeGuestCandidates(members.data ?? [], roster.data ?? [], pastGuests.data ?? [], contactRows)
     pending.value = false
   }
 

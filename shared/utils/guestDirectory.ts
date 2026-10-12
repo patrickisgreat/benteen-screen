@@ -1,6 +1,7 @@
 /** Everyone an admin could add to an event's guest list, gathered from the three
  *  places people live: signed-in members (`profiles`), the club allowlist
- *  (`invites`), and past events' guest lists (`event_invites`). Pure helpers so
+ *  (`invites`), and past events' guest lists (`event_invites`) — plus the
+ *  admin-only `contacts` table for the person-level phone number. Pure helpers so
  *  the merge + search rules are unit-testable without Supabase. */
 
 export const GUEST_SOURCES = ['member', 'roster', 'past-guest'] as const
@@ -9,7 +10,8 @@ export type GuestSource = (typeof GUEST_SOURCES)[number]
 export interface GuestCandidate {
   email: string
   display_name: string | null
-  /** Mobile number (E.164) if any source knows it — only past guest lists do. */
+  /** Mobile number (E.164) if any source knows it: the person's contact record
+   *  first, else whatever a past guest list carried. */
   phone: string | null
   source: GuestSource
 }
@@ -31,11 +33,14 @@ export const GUEST_SOURCE_LABELS: Record<GuestSource, string> = {
 /** Dedupe by (lowercased) email. A member beats a roster entry beats a past guest
  *  for the `source` tag, and the first non-empty display name / phone wins so a
  *  bare email from an old guest list still shows the name their profile carries,
- *  and a number typed for one event follows the person to the next. */
+ *  and a number typed for one event follows the person to the next. The person's
+ *  contact record (admin-edited) is authoritative for the number and overrides a
+ *  stale guest-list copy. */
 export function mergeGuestCandidates(
   members: readonly GuestRow[],
   roster: readonly GuestRow[],
-  pastGuests: readonly GuestRow[]
+  pastGuests: readonly GuestRow[],
+  contacts: readonly GuestRow[] = []
 ): GuestCandidate[] {
   const byEmail = new Map<string, GuestCandidate>()
   const absorb = (rows: readonly GuestRow[], source: GuestSource): void => {
@@ -56,6 +61,14 @@ export function mergeGuestCandidates(
   absorb(members, 'member')
   absorb(roster, 'roster')
   absorb(pastGuests, 'past-guest')
+  for (const contact of contacts) {
+    const email = contact.email?.trim().toLowerCase()
+    const phone = contact.phone?.trim() || null
+    if (!email || !phone) continue
+    const existing = byEmail.get(email)
+    if (existing) existing.phone = phone
+    else byEmail.set(email, { email, display_name: contact.display_name?.trim() || null, phone, source: 'past-guest' })
+  }
   return [...byEmail.values()].sort((a, b) => (a.display_name ?? a.email).localeCompare(b.display_name ?? b.email))
 }
 
