@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.28.0...v1.29.0) (2026-10-12)
+
+
+### Features
+
+* text guests from the host's own phone, one at a time or everyone who hasn't replied ([#218](https://github.com/patrickisgreat/benteen-screen/issues/218)) ([d83f237](https://github.com/patrickisgreat/benteen-screen/commit/d83f237f791c46db979078c0200acfeae42aaf9a))
+
 ## [1.28.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.27.0...v1.28.0) (2026-10-08)
 
 
