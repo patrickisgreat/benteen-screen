@@ -23,6 +23,12 @@ export interface Database {
         Update: { id?: boolean, max_invites?: number | null, max_suggestions?: number | null, max_votes?: number | null, reminder_days?: number[], updated_at?: string }
         Relationships: []
       }
+      contacts: {
+        Row: { email: string, phone: string | null, updated_at: string }
+        Insert: { email: string, phone?: string | null, updated_at?: string }
+        Update: { email?: string, phone?: string | null, updated_at?: string }
+        Relationships: []
+      }
       event_invites: {
         Row: { id: string, event_id: string, email: string, display_name: string | null, token: string, rsvp: string | null, rsvp_at: string | null, plus_ones: number, invited_by: string | null, resend_id: string | null, sent_at: string | null, delivered_at: string | null, opened_at: string | null, clicked_at: string | null, bounced_at: string | null, reminded_at: string | null, phone: string | null, texted_at: string | null, created_at: string }
         Insert: { id?: string, event_id: string, email: string, display_name?: string | null, token?: string, rsvp?: string | null, rsvp_at?: string | null, plus_ones?: number, invited_by?: string | null, resend_id?: string | null, sent_at?: string | null, delivered_at?: string | null, opened_at?: string | null, clicked_at?: string | null, bounced_at?: string | null, reminded_at?: string | null, phone?: string | null, texted_at?: string | null, created_at?: string }
@@ -106,6 +112,7 @@ export interface Database {
     Functions: {
       admin_set_admin: { Args: { target_id: string, value: boolean }, Returns: undefined }
       admin_set_blocked: { Args: { target_id: string, value: boolean }, Returns: undefined }
+      admin_set_display_name: { Args: { target_id: string, value: string }, Returns: undefined }
       claim_freed_votes: { Args: { p_event_id: string }, Returns: { suggestion_id: string, title: string | null }[] }
       cull_zero_votes: { Args: { p_event_id: string }, Returns: number }
       cull_to_top: { Args: { p_event_id: string, p_keep: number }, Returns: number }
