@@ -1,5 +1,6 @@
 import { DEFAULT_INVITE_OPTIONS, type InviteAccent, type InviteOptions, type InviteTheme } from '#shared/types/invite-options'
 import type { RsvpStatus } from '#shared/types/rsvp'
+import { EVENT_TIME_ZONE } from './event-day'
 
 /** Escape user-supplied text before it goes into email HTML (no injection). */
 export function escapeHtml(input: string): string {
@@ -58,11 +59,12 @@ export interface BuiltEmail {
   text: string
 }
 
-/** Human-readable date for email bodies (server-side; no app auto-imports here). */
+/** Human-readable date for email bodies, as the day it is in the event zone
+ *  (the server's own clock runs on UTC). */
 export function formatEmailDate(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+  return d.toLocaleDateString('en-US', { timeZone: EVENT_TIME_ZONE, weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 }
 
 /** Normalize, lowercase, and de-duplicate a recipient list. */
