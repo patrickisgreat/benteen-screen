@@ -72,19 +72,23 @@ describe('icsFilename', () => {
 })
 
 describe('applyTime', () => {
-  const base = new Date(2026, 6, 4, 0, 0, 0, 0)
+  // Midnight Eastern on July 4 (EDT, UTC-4).
+  const base = new Date('2026-07-04T04:00:00Z')
 
-  it('parses 12-hour times', () => {
-    expect(applyTime(base, '7:30 PM').getHours()).toBe(19)
-    expect(applyTime(base, '7:30 PM').getMinutes()).toBe(30)
-    expect(applyTime(base, '12:00 AM').getHours()).toBe(0)
-    expect(applyTime(base, '12 PM').getHours()).toBe(12)
+  it('parses 12-hour times as Eastern wall-clock times', () => {
+    expect(applyTime(base, '7:30 PM').toISOString()).toBe('2026-07-04T23:30:00.000Z')
+    expect(applyTime(base, '12:00 AM').toISOString()).toBe('2026-07-04T04:00:00.000Z')
+    expect(applyTime(base, '12 PM').toISOString()).toBe('2026-07-04T16:00:00.000Z')
   })
 
   it('parses 24-hour times', () => {
-    const d = applyTime(base, '19:45')
-    expect(d.getHours()).toBe(19)
-    expect(d.getMinutes()).toBe(45)
+    expect(applyTime(base, '19:45').toISOString()).toBe('2026-07-04T23:45:00.000Z')
+  })
+
+  it('keeps the event day for a viewer whose local day is still the one before', () => {
+    // Midnight Eastern is 9 pm Pacific the previous evening; the calendar entry
+    // must still land on July 4 at 8 pm Atlanta time.
+    expect(applyTime(base, '8:00 PM').toISOString()).toBe('2026-07-05T00:00:00.000Z')
   })
 
   it('returns the date unchanged for empty or unparseable input', () => {
@@ -96,6 +100,6 @@ describe('applyTime', () => {
 
   it('does not mutate the input date', () => {
     applyTime(base, '8:00 PM')
-    expect(base.getHours()).toBe(0)
+    expect(base.toISOString()).toBe('2026-07-04T04:00:00.000Z')
   })
 })

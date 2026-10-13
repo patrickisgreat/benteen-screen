@@ -1,3 +1,5 @@
+import { eventZoneTime, toEventDay } from './event-day'
+
 export interface CalendarEvent {
   title: string
   start: Date
@@ -26,8 +28,10 @@ function endOf(e: CalendarEvent): Date {
 }
 
 /**
- * Apply a freeform "7:30 PM" / "19:30" style time onto a date (local tz).
- * Returns a new Date; returns the date unchanged if the time can't be parsed.
+ * Apply a freeform "7:30 PM" / "19:30" style time onto a date, read as a
+ * wall-clock time in the event zone (the screening is in Atlanta whatever the
+ * viewer's phone says). Returns a new Date; returns the date unchanged if the
+ * time can't be parsed.
  */
 export function applyTime(date: Date, timeStr: string | null | undefined): Date {
   if (!timeStr) return date
@@ -39,9 +43,7 @@ export function applyTime(date: Date, timeStr: string | null | undefined): Date 
   if (ap === 'pm' && h < 12) h += 12
   if (ap === 'am' && h === 12) h = 0
   if (h > 23 || min > 59) return date
-  const d = new Date(date)
-  d.setHours(h, min, 0, 0)
-  return d
+  return eventZoneTime(toEventDay(date), h, min)
 }
 
 /** "Add to Google Calendar" URL. */
