@@ -84,7 +84,7 @@ function submit(): void {
     id: props.event?.id,
     title: title.value.trim(),
     description: description.value,
-    date: new Date(`${dateStr.value}T00:00:00`),
+    date: fromInputDate(dateStr.value),
     startTime: startTime.value.trim() || null,
     location: location.value.trim() || null,
     locationUrl: locationUrl.value.trim() || null,

@@ -5,6 +5,7 @@ import { flushPromises } from '@vue/test-utils'
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import RescheduleEventModal from '../app/components/RescheduleEventModal.vue'
 import type { RescheduleAudience, RescheduleRequest } from '../shared/utils/reschedule'
+import { eventZoneTime } from '../shared/utils/event-day'
 
 interface Toast { title?: string, description?: string, color?: string }
 interface Result { sent: number, failed: number, error: string | null }
@@ -18,8 +19,9 @@ mockNuxtImport('useAuth', () => () => ({ account: computed(() => ({ displayName:
 mockNuxtImport('useToast', () => () => ({ add: (t: Toast) => toasts.push(t) }))
 
 // A far-future event so the date input's "not before today" minimum never bites.
+// Stored the way the app stores it: midnight in the event zone, not the test runner's.
 const event = {
-  id: 'e1', title: 'Jaws on the Green', description: '', event_date: new Date('2999-10-17T00:00:00').toISOString(), start_time: '8pm',
+  id: 'e1', title: 'Jaws on the Green', description: '', event_date: eventZoneTime('2999-10-17').toISOString(), start_time: '8pm',
   location: null, location_url: null, poster_url: null, voting_locked_at: null, invite_options: null, poster_display: null,
   reminders_enabled: true, previous_event_date: null, previous_start_time: null, rescheduled_at: null, created_at: ''
 }
@@ -86,7 +88,7 @@ describe('RescheduleEventModal', () => {
     button('Move it and email 28')!.click()
     await flushPromises()
     expect(rescheduleFn).toHaveBeenCalledWith('e1', {
-      eventDate: new Date('2999-10-18T00:00:00').toISOString(),
+      eventDate: eventZoneTime('2999-10-18').toISOString(),
       startTime: '8pm',
       note: 'Rain on Friday.',
       notify: true
