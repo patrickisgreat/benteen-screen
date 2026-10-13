@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.30.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.29.0...v1.30.0) (2026-10-13)
+
+
+### Features
+
+* admins can edit a person's name and mobile number from People ([#220](https://github.com/patrickisgreat/benteen-screen/issues/220)) ([a5d1ecf](https://github.com/patrickisgreat/benteen-screen/commit/a5d1ecfb43edac1394ff7c9558302b0e9f4551b3))
+
+
+### Bug Fixes
+
+* show event dates as Atlanta calendar days for viewers in other time zones ([#221](https://github.com/patrickisgreat/benteen-screen/issues/221)) ([dccdd87](https://github.com/patrickisgreat/benteen-screen/commit/dccdd87a496e84c7c929bcafb45a886c1b3bf791))
+
 ## [1.29.0](https://github.com/patrickisgreat/benteen-screen/compare/v1.28.0...v1.29.0) (2026-10-12)
 
 
