@@ -48,7 +48,7 @@ async function loadAudience(eventId: string): Promise<void> {
 /** The move as the server will receive it; null until there is a real date. */
 const request = computed(() => {
   if (!dateStr.value) return null
-  const date = new Date(`${dateStr.value}T00:00:00`)
+  const date = fromInputDate(dateStr.value)
   if (Number.isNaN(date.getTime())) return null
   return {
     eventDate: date.toISOString(),

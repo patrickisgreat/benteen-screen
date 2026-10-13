@@ -269,8 +269,10 @@ describe('email utils', () => {
     expect(uniqueEmails([' A@x.com ', 'a@x.com', null, 'b@x.com', undefined, ''])).toEqual(['a@x.com', 'b@x.com'])
   })
 
-  it('formatEmailDate renders a readable date and tolerates junk', () => {
-    expect(formatEmailDate('2026-07-15T19:00:00Z')).toContain('2026')
+  it('formatEmailDate renders the event-zone day and tolerates junk', () => {
+    expect(formatEmailDate('2026-07-15T19:00:00Z')).toBe('Wednesday, July 15, 2026')
+    // Midnight Eastern on Halloween is still the 30th in Pacific (and the 31st in UTC either way).
+    expect(formatEmailDate('2026-10-31T04:00:00Z')).toBe('Saturday, October 31, 2026')
     expect(formatEmailDate('not-a-date')).toBe('')
   })
 
