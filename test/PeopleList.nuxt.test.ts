@@ -121,4 +121,23 @@ describe('PeopleList', () => {
     // Two other members get a toggle; Carol (self) does not → exactly two toggles.
     expect(labels.filter(l => l === 'Make admin' || l === 'Remove admin')).toHaveLength(2)
   })
+
+  const contacts = [{ email: 'alice@x.com', phone: '+15551234567', updated_at: '' }]
+
+  it('shows a person\'s number from their contact record', async () => {
+    const w = await mountSuspended(PeopleList, { props: { people, contacts } })
+    expect(w.text()).toContain('(555) 123-4567')
+  })
+
+  it('emits edit with a member\'s details, including their number', async () => {
+    const w = await mountSuspended(PeopleList, { props: { people, contacts } })
+    await w.get('[aria-label="Edit Alice"]').trigger('click')
+    expect(w.emitted('edit')?.[0]).toEqual([{ email: 'alice@x.com', profileId: 'u1', displayName: 'Alice', phone: '+15551234567' }])
+  })
+
+  it('emits edit for a pending roster entry with no profile', async () => {
+    const w = await mountSuspended(PeopleList, { props: { people, pending } })
+    await w.get('[aria-label="Edit Pat"]').trigger('click')
+    expect(w.emitted('edit')?.[0]).toEqual([{ email: 'pat@x.com', profileId: null, displayName: 'Pat', phone: null }])
+  })
 })

@@ -45,6 +45,28 @@ describe('mergeGuestCandidates', () => {
   })
 })
 
+describe('mergeGuestCandidates with contacts', () => {
+  it('the contact record\'s number overrides a stale guest-list number', () => {
+    const merged = mergeGuestCandidates(
+      [{ email: 'ada@x.com', display_name: 'Ada' }],
+      [],
+      [{ email: 'ada@x.com', display_name: null, phone: '+15550000001' }],
+      [{ email: 'ADA@x.com', display_name: null, phone: '+15550000002' }]
+    )
+    expect(merged).toEqual([{ email: 'ada@x.com', display_name: 'Ada', phone: '+15550000002', source: 'member' }])
+  })
+
+  it('gives a member their number even when no guest list ever had it', () => {
+    const merged = mergeGuestCandidates([{ email: 'bo@x.com', display_name: 'Bo' }], [], [], [{ email: 'bo@x.com', display_name: null, phone: '+15550000003' }])
+    expect(merged[0]?.phone).toBe('+15550000003')
+  })
+
+  it('ignores a contact without a number', () => {
+    const merged = mergeGuestCandidates([{ email: 'bo@x.com', display_name: 'Bo' }], [], [], [{ email: 'bo@x.com', display_name: null, phone: null }])
+    expect(merged[0]?.phone).toBeNull()
+  })
+})
+
 describe('searchGuestCandidates', () => {
   const candidates = mergeGuestCandidates(members, roster, pastGuests)
 

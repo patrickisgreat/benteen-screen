@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { Profile } from '#shared/types/user'
+import type { Contact, PersonDetails, Profile } from '#shared/types/user'
 import type { Invite } from '#shared/types/invite'
 import type { EventGuest } from '#shared/types/event-invite'
 
 const props = withDefaults(
-  defineProps<{ people: Profile[], pending?: Invite[] }>(),
-  { pending: () => [] }
+  defineProps<{ people: Profile[], pending?: Invite[], contacts?: Contact[] }>(),
+  { pending: () => [], contacts: () => [] }
 )
 const emit = defineEmits<{
   block: [person: Profile]
@@ -14,7 +14,14 @@ const emit = defineEmits<{
   select: [person: Profile]
   setAdmin: [person: Profile, value: boolean]
   invite: [guest: EventGuest]
+  edit: [person: PersonDetails]
 }>()
+
+// Admin-only numbers, by normalized email.
+const phoneByEmail = computed(() => new Map(props.contacts.filter(c => c.phone).map(c => [c.email.toLowerCase(), c.phone!])))
+function phoneOf(row: Row): string | null {
+  return phoneByEmail.value.get(row.email.toLowerCase()) ?? null
+}
 
 // To hide the admin toggle on your own row (you can't change your own admin).
 const { myId } = useAuth()
@@ -64,6 +71,14 @@ function invitable(row: Row): boolean {
 function guestOf(row: Row): EventGuest {
   return { email: row.email, display_name: row.kind === 'member' ? row.profile.display_name : row.invite.display_name }
 }
+function detailsOf(row: Row): PersonDetails {
+  return {
+    email: row.email,
+    profileId: row.kind === 'member' ? row.profile.id : null,
+    displayName: row.kind === 'member' ? row.profile.display_name : row.invite.display_name,
+    phone: phoneOf(row)
+  }
+}
 
 function initials(name: string, email: string): string {
   return (name || email || '?').slice(0, 2).toUpperCase()
@@ -110,9 +125,19 @@ function initials(name: string, email: string): string {
             <UBadge v-if="row.kind === 'pending'" label="Pending" color="warning" variant="subtle" size="xs" />
           </p>
           <p class="text-xs text-muted truncate">
-            {{ row.email || '—' }}
+            {{ row.email || '—' }}<span v-if="phoneOf(row)"> · {{ formatPhone(phoneOf(row)!) }}</span>
           </p>
         </component>
+
+        <UButton
+          icon="i-lucide-pencil"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          class="shrink-0"
+          :aria-label="`Edit ${row.name}`"
+          @click="emit('edit', detailsOf(row))"
+        />
 
         <UButton
           v-if="invitable(row)"

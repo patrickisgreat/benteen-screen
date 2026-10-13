@@ -4,10 +4,11 @@ import { flushPromises } from '@vue/test-utils'
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import { defineComponent, h } from 'vue'
 
-const tables: Record<string, Array<{ email: string | null, display_name: string | null }>> = {
+const tables: Record<string, Array<{ email: string | null, display_name?: string | null, phone?: string | null }>> = {
   profiles: [{ email: 'ada@x.com', display_name: 'Ada' }],
   invites: [{ email: 'bo@x.com', display_name: 'Bo' }, { email: 'ada@x.com', display_name: 'Ada Roster' }],
-  event_invites: [{ email: 'cy@x.com', display_name: null }]
+  event_invites: [{ email: 'cy@x.com', display_name: null }],
+  contacts: [{ email: 'ada@x.com', phone: '+15550000009' }]
 }
 
 let failing: string | null = null // a table whose query errors out
@@ -31,7 +32,21 @@ const Host = defineComponent({
   }
 })
 
+// A second host that prints numbers, for the contacts source.
+const PhoneHost = defineComponent({
+  setup() {
+    const dir = useGuestDirectory()
+    return () => h('ul', dir.candidates.value.map(c => h('li', `${c.email}|${c.phone ?? ''}`)))
+  }
+})
+
 describe('useGuestDirectory', () => {
+  it('reads each person\'s number from their admin-only contact record', async () => {
+    const w = await mountSuspended(PhoneHost)
+    await flushPromises()
+    expect(w.findAll('li').map(li => li.text())).toContain('ada@x.com|+15550000009')
+  })
+
   it('reports a failed source instead of silently searching a partial directory', async () => {
     failing = 'event_invites'
     try {

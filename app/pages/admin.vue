@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { MovieEvent } from '#shared/types/event'
 import type { BringItem } from '#shared/types/bring'
-import type { Profile } from '#shared/types/user'
+import type { PersonDetails, Profile } from '#shared/types/user'
 import type { Invite } from '#shared/types/invite'
 import type { EventGuest } from '#shared/types/event-invite'
 import type { PosterDisplay } from '#shared/utils/posterDisplay'
@@ -13,7 +13,7 @@ const toast = useToast()
 const { run } = useToastAction()
 const { events } = useEvents()
 const { createEvent, updateEvent, deleteEvent, setVotingLocked } = useEventAdmin()
-const { people, pendingInvites, loadError, setBlocked, setAdmin, revokeInvite } = useAdminPeople()
+const { people, pendingInvites, contacts, loadError, setBlocked, setAdmin, revokeInvite, updatePerson } = useAdminPeople()
 
 const modalOpen = ref(false)
 const inviteOpen = ref(false)
@@ -30,6 +30,11 @@ const eventPendingDelete = ref<MovieEvent | null>(null)
 // People → "invite to an event": the person being invited, and the upcoming nights to pick from.
 const inviteGuest = ref<EventGuest | null>(null)
 const inviteToEventOpen = ref(false)
+
+// People → edit name / number: the person being edited.
+const editPerson = ref<PersonDetails | null>(null)
+const editPersonOpen = ref(false)
+const savingPerson = ref(false)
 
 // People drill-down: the member whose activity stats are open.
 const statsPerson = ref<Profile | null>(null)
@@ -235,6 +240,21 @@ function onSelectPerson(person: Profile): void {
   statsPerson.value = person
   statsOpen.value = true
 }
+function onEditPerson(person: PersonDetails): void {
+  editPerson.value = person
+  editPersonOpen.value = true
+}
+async function onSavePerson(person: PersonDetails): Promise<void> {
+  savingPerson.value = true
+  try {
+    if (await run(() => updatePerson(person), 'Could not save their details')) {
+      toast.add({ title: `Saved ${person.displayName || person.email}`, icon: 'i-lucide-check', color: 'success' })
+      editPersonOpen.value = false
+    }
+  } finally {
+    savingPerson.value = false
+  }
+}
 async function onSetAdmin(person: Profile, value: boolean): Promise<void> {
   try {
     await setAdmin(person.id, value)
@@ -430,6 +450,8 @@ function onSelectEvent(event: MovieEvent): void {
           <PeopleList
             :people="people"
             :pending="pendingInvites"
+            :contacts="contacts"
+            @edit="onEditPerson"
             @block="onBlock"
             @unblock="onUnblock"
             @revoke="onRevoke"
@@ -573,6 +595,14 @@ function onSelectEvent(event: MovieEvent): void {
     <InviteToEventModal v-model:open="inviteToEventOpen" :guest="inviteGuest" :events="upcomingEvents" />
 
     <UserStatsModal v-model:open="statsOpen" :person="statsPerson" />
+
+    <!-- People → edit a person's name / number -->
+    <EditPersonModal
+      v-model:open="editPersonOpen"
+      :person="editPerson"
+      :saving="savingPerson"
+      @save="onSavePerson"
+    />
 
     <EventStatsModal v-model:open="eventStatsOpen" :event="statsEvent" />
 
