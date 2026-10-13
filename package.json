@@ -29,14 +29,14 @@
     "@tiptap/starter-kit": "^3.28.0",
     "@tiptap/vue-3": "^3.26.1",
     "dompurify": "^3.4.12",
-    "nuxt": "^4.5.1",
+    "nuxt": "^4.5.2",
     "resend": "^6.17.2",
     "tailwindcss": "^4.3.3",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.17.0",
-    "@nuxt/test-utils": "^4.1.0",
+    "@nuxt/test-utils": "^4.3.3",
     "@vue/test-utils": "^2.4.11",
     "eslint": "^10.8.1",
     "happy-dom": "^20.10.6",
