@@ -32,7 +32,7 @@
     "nuxt": "^4.5.1",
     "resend": "^6.17.2",
     "tailwindcss": "^4.3.3",
-    "zod": "^4.0.0"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.17.0",
