@@ -20,10 +20,12 @@ describe('buildAnnounceMails', () => {
     expect(mails[0]!.subject).toBe('Movie night')
   })
 
-  it('gives the unopened audience each guest\'s own one-click RSVP buttons', () => {
-    const [sam] = buildAnnounceMails({ ...base, scope: 'unopened' })
-    expect(sam!.html).toContain('https://x/rsvp?token=tok-sam&amp;status=going')
-    expect(sam!.text).toContain('https://x/rsvp?token=tok-sam&status=no')
+  it('gives the unreplied and unopened audiences each guest\'s own one-click RSVP buttons', () => {
+    for (const scope of ['unreplied', 'unopened'] as const) {
+      const [sam] = buildAnnounceMails({ ...base, scope })
+      expect(sam!.html).toContain('https://x/rsvp?token=tok-sam&amp;status=going')
+      expect(sam!.text).toContain('https://x/rsvp?token=tok-sam&status=no')
+    }
   })
 
   it('never puts RSVP buttons on an announcement to any other audience', () => {

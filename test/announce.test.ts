@@ -15,8 +15,13 @@ describe('announce scopes', () => {
     expect(parseAnnounceRequest({ eventId, scope: 'unopened', preview: true })).toMatchObject({ ok: true, value: { scope: 'unopened' } })
   })
 
-  it('gives RSVP buttons only to the audience that hasn\'t seen the e-vite', () => {
-    expect(ANNOUNCE_SCOPES.filter(announceIncludesRsvpButtons)).toEqual(['unopened'])
+  it('offers the guests who haven\'t replied as an audience', () => {
+    expect(ANNOUNCE_SCOPES).toContain('unreplied')
+    expect(parseAnnounceRequest({ eventId, scope: 'unreplied', preview: true })).toMatchObject({ ok: true, value: { scope: 'unreplied' } })
+  })
+
+  it('gives RSVP buttons only to the audiences still missing a reply', () => {
+    expect(ANNOUNCE_SCOPES.filter(announceIncludesRsvpButtons)).toEqual(['unreplied', 'unopened'])
   })
 
   it('defaults to this night\'s guest list, not the whole club', () => {

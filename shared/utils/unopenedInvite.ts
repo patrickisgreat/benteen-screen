@@ -20,3 +20,13 @@ export function isUnopenedInvite(invite: InviteTracking): boolean {
     && invite.clicked_at == null
     && invite.rsvp == null
 }
+
+/**
+ * Whether a guest on the e-vite list simply hasn't replied by any route, whether
+ * or not they opened the e-vite (or were ever sent it). Bounced addresses are
+ * left out — another copy would bounce too. The wider net: everyone an RSVP is
+ * still missing from.
+ */
+export function isUnrepliedInvite(invite: Pick<InviteTracking, 'bounced_at' | 'rsvp'>): boolean {
+  return invite.bounced_at == null && invite.rsvp == null
+}

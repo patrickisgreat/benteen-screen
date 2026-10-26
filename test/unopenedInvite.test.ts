@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isUnopenedInvite, type InviteTracking } from '../shared/utils/unopenedInvite'
+import { type InviteTracking, isUnopenedInvite, isUnrepliedInvite } from '../shared/utils/unopenedInvite'
 
 const invite = (over: Partial<InviteTracking> = {}): InviteTracking => ({
   sent_at: '2026-10-01T00:00:00Z', opened_at: null, clicked_at: null, bounced_at: null, rsvp: null, ...over
@@ -29,5 +29,24 @@ describe('isUnopenedInvite', () => {
 
   it('is false for a guest who was never sent the e-vite', () => {
     expect(isUnopenedInvite(invite({ sent_at: null }))).toBe(false)
+  })
+})
+
+describe('isUnrepliedInvite', () => {
+  it('is true for a guest with no RSVP, even one who opened or clicked the e-vite', () => {
+    expect(isUnrepliedInvite(invite())).toBe(true)
+    expect(isUnrepliedInvite(invite({ opened_at: 't', clicked_at: 't' }))).toBe(true)
+  })
+
+  it('is true for a guest who was never sent the e-vite — they still owe a reply', () => {
+    expect(isUnrepliedInvite(invite({ sent_at: null }))).toBe(true)
+  })
+
+  it('is false once they replied, by any route', () => {
+    expect(isUnrepliedInvite(invite({ rsvp: 'maybe' }))).toBe(false)
+  })
+
+  it('is false for a bounced address — another copy would bounce too', () => {
+    expect(isUnrepliedInvite(invite({ bounced_at: 't' }))).toBe(false)
   })
 })

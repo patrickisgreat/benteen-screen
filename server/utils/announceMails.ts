@@ -12,9 +12,9 @@ export interface AnnounceGuest {
 /**
  * Builds each recipient's own copy of an announcement: greeted by name and tied
  * to their guest-list row when they're on it (so opens count toward that guest).
- * For the `unopened` audience — people who haven't seen the e-vite, so haven't
- * replied either — each copy closes with that guest's one-click RSVP buttons, so
- * answering the note needs no sign-in.
+ * For the audiences still missing a reply (`unreplied`, and `unopened` — people
+ * who haven't even seen the e-vite) each copy closes with that guest's one-click
+ * RSVP buttons, so answering the note needs no sign-in.
  */
 export function buildAnnounceMails(opts: {
   readonly recipients: readonly AnnounceRecipient[]

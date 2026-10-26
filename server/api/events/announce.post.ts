@@ -11,8 +11,9 @@ import type { Database } from '~/types/database.types'
  * aren't leaked and each one's delivery/opens are tracked like an e-vite. Resend
  * key is server-only (Invariant 2).
  *
- * Audiences (see shared/utils/announce.ts): this night's guest list, those going,
- * hand-picked people, all members, or the whole club roster.
+ * Audiences (see shared/utils/announce.ts): this night's guest list, those who
+ * haven't replied or haven't opened the e-vite, those going, hand-picked people,
+ * all members, or the whole club roster.
  */
 export default defineEventHandler(async (event) => {
   const { user, userId } = await requireUser(event)
