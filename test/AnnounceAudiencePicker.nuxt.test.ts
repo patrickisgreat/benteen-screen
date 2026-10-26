@@ -51,8 +51,9 @@ describe('AnnounceAudiencePicker', () => {
     expect(w.text()).toContain('This night\'s guest list')
     expect(w.text()).toContain('Whole club roster')
     expect(w.text()).toContain('The biggest list')
+    expect(w.text()).toContain('Haven\'t replied')
     expect(w.text()).toContain('Haven\'t opened the e-vite')
-    expect(radios(w)).toHaveLength(6)
+    expect(radios(w)).toHaveLength(7)
   })
 
   it('previews the audience on mount and reports the count', async () => {
@@ -100,7 +101,7 @@ describe('AnnounceAudiencePicker', () => {
     }
     const w = await mount()
     await settle()
-    await radios(w)[4]!.trigger('click') // switch audiences while the first preview is still pending
+    await radios(w)[5]!.trigger('click') // switch audiences while the first preview is still pending
     await settle()
     expect(w.emitted('count')?.at(-1)).toEqual([50])
     releaseFirst!()
