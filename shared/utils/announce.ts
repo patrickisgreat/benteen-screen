@@ -3,7 +3,7 @@ import { htmlToText, uniqueEmails } from './email'
 
 /** Who an event announcement goes to. This night's audiences first, then out to
  *  the whole club. */
-export const ANNOUNCE_SCOPES = ['guests', 'unopened', 'going', 'custom', 'members', 'invited'] as const
+export const ANNOUNCE_SCOPES = ['guests', 'unreplied', 'unopened', 'going', 'custom', 'members', 'invited'] as const
 export type AnnounceScope = (typeof ANNOUNCE_SCOPES)[number]
 
 export interface AnnounceScopeOption {
@@ -16,6 +16,7 @@ export interface AnnounceScopeOption {
  *  description of exactly who is included, so "everyone" is never a surprise. */
 export const ANNOUNCE_SCOPE_OPTIONS: readonly AnnounceScopeOption[] = [
   { value: 'guests', label: 'This night\'s guest list', description: 'Everyone on the e-vite list for this event, whether or not they\'ve replied.' },
+  { value: 'unreplied', label: 'Haven\'t replied', description: 'Guests on the e-vite list with no RSVP yet, whether or not they\'ve opened it. Your message goes out with their own RSVP buttons.' },
   { value: 'unopened', label: 'Haven\'t opened the e-vite', description: 'Guests who were sent this night\'s e-vite and show no sign of seeing it: no open, no click, no reply. Your message goes out with their own RSVP buttons.' },
   { value: 'going', label: 'Going to this night', description: 'Only people who RSVP\'d going, in the app or by e-vite.' },
   { value: 'custom', label: 'Pick specific people', description: 'Search the directory and choose exactly who gets it.' },
@@ -25,12 +26,13 @@ export const ANNOUNCE_SCOPE_OPTIONS: readonly AnnounceScopeOption[] = [
 
 /**
  * Whether an audience's copies close with each guest's own one-click RSVP
- * buttons instead of the button into the app. Only people who haven't seen the
- * e-vite get them — they haven't replied either, so answering should take one
- * tap and no sign-in. One rule for the send and for the composer's preview.
+ * buttons instead of the button into the app. Only the audiences defined by a
+ * missing reply get them — people who haven't replied, or haven't even seen the
+ * e-vite — so answering should take one tap and no sign-in. One rule for the
+ * send and for the composer's preview.
  */
 export function announceIncludesRsvpButtons(scope: AnnounceScope): boolean {
-  return scope === 'unopened'
+  return scope === 'unreplied' || scope === 'unopened'
 }
 
 /** The sensible default: the people invited to this night, not the whole club. */
