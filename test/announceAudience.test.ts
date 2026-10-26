@@ -49,6 +49,21 @@ describe('resolveAnnounceAudience', () => {
     expect(out).toEqual([{ email: 'ada@x.com', name: 'Ada' }, { email: 'bo@x.com', name: null }])
   })
 
+  it('unreplied = guests with no RSVP yet, opened or not, minus bounced addresses', async () => {
+    const guest = (email: string, over: Row = {}): Row => ({ email, display_name: null, event_id: eventId, bounced_at: null, rsvp: null, ...over })
+    const db = makeFakeDb({ event_invites: [
+      guest('quiet@x.com', { display_name: 'Quinn' }),
+      guest('opened@x.com', { opened_at: 't', clicked_at: 't' }),
+      guest('unsent@x.com', { sent_at: null }),
+      guest('replied@x.com', { rsvp: 'maybe' }),
+      guest('bounced@x.com', { bounced_at: 't' }),
+      guest('other-night@x.com', { event_id: 'evt-2' })
+    ] })
+    const out = await resolveAnnounceAudience(db, eventId, 'unreplied', [])
+    expect(out.map(r => r.email)).toEqual(['quiet@x.com', 'opened@x.com', 'unsent@x.com'])
+    expect(out[0]).toEqual({ email: 'quiet@x.com', name: 'Quinn' })
+  })
+
   it('unopened = guests sent the e-vite with no open, click, reply or bounce', async () => {
     const guest = (email: string, over: Row = {}): Row => ({
       email, display_name: null, event_id: eventId, sent_at: 't', opened_at: null, clicked_at: null, bounced_at: null, rsvp: null, ...over

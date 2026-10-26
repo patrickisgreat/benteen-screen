@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AnnounceRecipient, AnnounceScope } from '#shared/utils/announce'
 import type { Database } from '~/types/database.types'
-import { isUnopenedInvite } from '../../shared/utils/unopenedInvite'
+import { isUnopenedInvite, isUnrepliedInvite } from '../../shared/utils/unopenedInvite'
 
 interface NamedEmailRow {
   email: string | null
@@ -38,6 +38,11 @@ export async function resolveAnnounceAudience(
       const { data, error } = await db.from('event_invites').select('email, display_name').eq('event_id', eventId)
       if (error) throw error
       return toRecipients(data ?? [])
+    }
+    case 'unreplied': {
+      const { data, error } = await db.from('event_invites').select('email, display_name, bounced_at, rsvp').eq('event_id', eventId)
+      if (error) throw error
+      return toRecipients((data ?? []).filter(isUnrepliedInvite))
     }
     case 'unopened': {
       const { data, error } = await db
